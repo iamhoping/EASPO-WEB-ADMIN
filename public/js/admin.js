@@ -56,6 +56,10 @@ import {
   submitAddGrade,
 } from './modules/grades.js'
 
+import {
+  initReportsSection,
+} from './modules/reports.js'
+
 import { renderPagination } from './ui/pagination.js';
 
 function renderStudents(page = 1) {
@@ -105,6 +109,7 @@ const SECTIONS = {
   parents    : { id: 'parentsSection',    title: 'Parents Management',    sub: 'Manage parent and guardian records' },
   attendance : { id: 'attendanceSection', title: 'Attendance Logs',       sub: 'Real-time tracking with manual override' },
   grades     : { id: 'gradesSection',     title: 'Grade Records',         sub: 'Manage student academic performance' },
+  reports    : { id: 'reportsSection',    title: 'Analytics & Reports',   sub: 'View comprehensive dashboards and analytics' },
 }
 
 let activeSection = 'overview'
@@ -430,6 +435,7 @@ async function boot() {
   initParentsSection()
   initAttendanceSection()
   initGradesSection()
+  initReportsSection()
   initSettingsTabs()
   initDropdownMenu()
   initSidebarSearch()

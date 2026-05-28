@@ -6,6 +6,12 @@
   <title>EASPO — Admin Dashboard</title>
   <link rel="stylesheet" href="css/style.css">
   <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+  <!-- jsPDF and dependencies -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <!-- SheetJS for Excel export -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 <div class="admin-layout">
@@ -41,7 +47,7 @@
           <button class="nav-dropdown-toggle" id="usersToggle">
             <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-users-icon lucide-users"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></svg></span> Users
             <span class="nav-dropdown-icon">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
             </span>
           </button>
           <div class="nav-submenu" id="usersSubmenu">
@@ -64,6 +70,9 @@
         </a>
         <a class="nav-link" data-section="grades" href="#">
           <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-notepad-text-icon lucide-notepad-text"><path d="M8 2v4"/><path d="M12 2v4"/><path d="M16 2v4"/><rect width="16" height="18" x="4" y="4" rx="2"/><path d="M8 10h6"/><path d="M8 14h8"/><path d="M8 18h5"/></svg></span> Grades
+        </a>
+        <a class="nav-link" data-section="reports" href="#">
+          <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bar-chart-3"><path d="M3 3v18a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2z"/><rect x="7" y="5" width="5" height="12"/><rect x="16" y="5" width="5" height="7"/></svg></span> Reports
         </a>
       </div>
 
@@ -558,6 +567,168 @@
         </div>
       </section>
 
+      <!-- ══ REPORTS SECTION ═══════════════════════════════ -->
+      <section id="reportsSection" class="hidden">
+        <div class="page-header">
+          <div>
+            <h2>Analytics & Reports</h2>
+            <p>View comprehensive dashboards and analytics</p>
+          </div>
+          <div class="page-header-actions">
+            <button class="btn btn-secondary" id="printReportBtn" onclick="printReport()">🖨 Print</button>
+            <button class="btn btn-secondary" id="exportPdfBtn" onclick="exportReportPdf()">📄 Export PDF</button>
+            <button class="btn btn-primary" id="exportCsvBtn" onclick="exportReportCsv()">📊 Export CSV</button>
+          </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="panel" style="margin-bottom: 24px;">
+          <h3 style="margin-bottom: 16px;">Filters</h3>
+          <div class="toolbar">
+            <div class="toolbar-left">
+              <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                <div style="flex: 1; min-width: 200px;">
+                  <label class="form-label" style="font-size: 12px; margin-bottom: 6px; display: block;">Grade Level</label>
+                  <select id="reportGradeFilter" class="filter-select" onchange="window.applyReportFilters()">
+                    <option value="">All Grades</option>
+                    <option value="Grade 7">Grade 7</option>
+                    <option value="Grade 8">Grade 8</option>
+                    <option value="Grade 9">Grade 9</option>
+                    <option value="Grade 10">Grade 10</option>
+                    <option value="Grade 11">Grade 11</option>
+                    <option value="Grade 12">Grade 12</option>
+                  </select>
+                </div>
+                <div style="flex: 1; min-width: 200px;">
+                  <label class="form-label" style="font-size: 12px; margin-bottom: 6px; display: block;">Date Range</label>
+                  <input id="reportDateRange" type="month" class="filter-select" onchange="window.applyReportFilters()" />
+                </div>
+              </div>
+            </div>
+            <div class="toolbar-right">
+              <button class="btn btn-secondary btn-sm" onclick="window.applyReportFilters()">🔄 Refresh</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="stats-grid" style="margin-bottom: 24px;">
+          <div class="stat-card c-blue">
+            <div class="stat-row">
+              <div class="stat-icon">🎒</div>
+              <span class="stat-change up" id="reportStudentChange">—</span>
+            </div>
+            <div class="stat-value" id="reportTotalStudents">—</div>
+            <div class="stat-label">Total Students</div>
+          </div>
+          <div class="stat-card c-green">
+            <div class="stat-row">
+              <div class="stat-icon">👨‍🏫</div>
+              <span class="stat-change up" id="reportTeacherChange">—</span>
+            </div>
+            <div class="stat-value" id="reportTotalTeachers">—</div>
+            <div class="stat-label">Total Teachers</div>
+          </div>
+          <div class="stat-card c-purple">
+            <div class="stat-row">
+              <div class="stat-icon">👥</div>
+              <span class="stat-change flat"></span>
+            </div>
+            <div class="stat-value" id="reportTotalParents">—</div>
+            <div class="stat-label">Registered Parents</div>
+          </div>
+          <div class="stat-card c-orange">
+            <div class="stat-row">
+              <div class="stat-icon">✅</div>
+              <span class="stat-change up"></span>
+            </div>
+            <div class="stat-value" id="reportAttendanceRate">—</div>
+            <div class="stat-label">Avg Attendance</div>
+          </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="charts-grid">
+          <!-- Student Population by Grade -->
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>Student Population by Grade</h3>
+              <div class="chart-loader hidden" id="chartLoader1">
+                <div class="spinner" style="width: 20px; height: 20px;"></div>
+              </div>
+            </div>
+            <div class="chart-body">
+              <canvas id="studentGradeChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Attendance Report -->
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>Attendance Status Distribution</h3>
+              <div class="chart-loader hidden" id="chartLoader2">
+                <div class="spinner" style="width: 20px; height: 20px;"></div>
+              </div>
+            </div>
+            <div class="chart-body">
+              <canvas id="attendanceChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Grade Performance -->
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>Grade Distribution</h3>
+              <div class="chart-loader hidden" id="chartLoader3">
+                <div class="spinner" style="width: 20px; height: 20px;"></div>
+              </div>
+            </div>
+            <div class="chart-body">
+              <canvas id="gradeDistributionChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Teacher Statistics -->
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>Teachers by Department</h3>
+              <div class="chart-loader hidden" id="chartLoader4">
+                <div class="spinner" style="width: 20px; height: 20px;"></div>
+              </div>
+            </div>
+            <div class="chart-body">
+              <canvas id="teacherDeptChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Enrollment Trend -->
+          <div class="chart-card" style="grid-column: 1 / -1;">
+            <div class="chart-header">
+              <h3>Enrollment Trend (Last 12 Months)</h3>
+              <div class="chart-loader hidden" id="chartLoader5">
+                <div class="spinner" style="width: 20px; height: 20px;"></div>
+              </div>
+            </div>
+            <div class="chart-body">
+              <canvas id="enrollmentTrendChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Attendance Trend -->
+          <div class="chart-card" style="grid-column: 1 / -1;">
+            <div class="chart-header">
+              <h3>Monthly Attendance Trend</h3>
+              <div class="chart-loader hidden" id="chartLoader6">
+                <div class="spinner" style="width: 20px; height: 20px;"></div>
+              </div>
+            </div>
+            <div class="chart-body">
+              <canvas id="attendanceTrendChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </section>
+
     </div><!-- /page-body -->
   </div><!-- /main-content -->
 </div><!-- /admin-layout -->
@@ -585,12 +756,12 @@
             <label class="form-label">Grade Level <span class="req">*</span></label>
             <select id="studentGrade" class="form-select" required>
               <option value="">Select grade...</option>
-              <option value="7">Grade 7</option>
-              <option value="8">Grade 8</option>
-              <option value="9">Grade 9</option>
-              <option value="10">Grade 10</option>
-              <option value="11">Grade 11</option>
-              <option value="12">Grade 12</option>
+              <option value="Grade 7">Grade 7</option>
+              <option value="Grade 8">Grade 8</option>
+              <option value="Grade 9">Grade 9</option>
+              <option value="Grade 10">Grade 10</option>
+              <option value="Grade 11">Grade 11</option>
+              <option value="Grade 12">Grade 12</option>
             </select>
           </div>
         </div>
@@ -618,8 +789,8 @@
             <input id="studentContact" class="form-input" type="tel" placeholder="09XX XXX XXXX" />
           </div>
           <div class="form-group">
-            <label class="form-label">Guardian Name</label>
-            <input id="guardianName" class="form-input" type="text" placeholder="Parent/Guardian full name" />
+            <label class="form-label">Guardian Email</label>
+            <input id="guardianEmail" class="form-input" type="email" placeholder="guardian@email.com" />
           </div>
         </div>
         <div class="form-group">
@@ -654,12 +825,12 @@
             <label class="form-label">Grade Level</label>
             <select id="editStudentGrade" class="form-select">
               <option value="">Select grade...</option>
-              <option value="7">Grade 7</option>
-              <option value="8">Grade 8</option>
-              <option value="9">Grade 9</option>
-              <option value="10">Grade 10</option>
-              <option value="11">Grade 11</option>
-              <option value="12">Grade 12</option>
+              <option value="Grade 7">Grade 7</option>
+              <option value="Grade 8">Grade 8</option>
+              <option value="Grade 9">Grade 9</option>
+              <option value="Grade 10">Grade 10</option>
+              <option value="Grade 11">Grade 11</option>
+              <option value="Grade 12">Grade 12</option>
             </select>
           </div>
         </div>
@@ -687,8 +858,8 @@
             <input id="editStudentContact" class="form-input" type="tel" />
           </div>
           <div class="form-group">
-            <label class="form-label">Guardian Name</label>
-            <input id="editGuardianName" class="form-input" type="text" />
+            <label class="form-label">Guardian Email</label>
+            <input id="editGuardianEmail" class="form-input" type="email" />
           </div>
         </div>
         <div class="form-group">
