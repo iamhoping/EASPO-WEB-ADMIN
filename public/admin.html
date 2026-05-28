@@ -1,0 +1,1218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EASPO — Admin Dashboard</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+<div class="admin-layout">
+
+  <!-- ═══ SIDEBAR ═══════════════════════════════════════════ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sb-brand">
+      <div class="sb-brand-icon">
+        <img src="logo.png" alt="Logo" class="sidebar-logo">
+      </div>
+      <div>
+        <div class="sb-brand-text">EASPO</div>
+        <div class="sb-brand-sub">Admin Portal</div>
+      </div>
+    </div>
+
+    <div class="sb-search">
+      <div class="sb-search-inner">
+        <span class="sb-search-icon"></span>
+        <input id="sidebarSearch" type="search" placeholder="Search..." autocomplete="off" />
+      </div>
+    </div>
+
+    <nav class="sb-nav">
+      <div class="nav-group">
+        <div class="nav-group-label">Main</div>
+        <a class="nav-link active" data-section="overview" href="#">
+          <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-layout-dashboard-icon lucide-layout-dashboard"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg></span> Dashboard
+        </a>
+        <a class="nav-link" data-section="students" href="#">
+          <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-graduation-cap-icon lucide-graduation-cap"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></svg></span> Students
+        </a>
+        <a class="nav-link" data-section="teachers" href="#">
+          <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-users-icon lucide-users"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></svg></span> Teachers
+        </a>
+        <a class="nav-link" data-section="parents" href="#">
+          <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-users-icon lucide-users"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></svg></span> Parents
+        </a>
+        <a class="nav-link" data-section="attendance" href="#">
+          <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chart-column-decreasing-icon lucide-chart-column-decreasing"><path d="M13 17V9"/><path d="M18 17v-3"/><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M8 17V5"/></svg></span> Attendance
+        </a>
+        <a class="nav-link" data-section="grades" href="#">
+          <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-notepad-text-icon lucide-notepad-text"><path d="M8 2v4"/><path d="M12 2v4"/><path d="M16 2v4"/><rect width="16" height="18" x="4" y="4" rx="2"/><path d="M8 10h6"/><path d="M8 14h8"/><path d="M8 18h5"/></svg></span> Grades
+        </a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-label">System</div>
+        <a class="nav-link" data-section="settings" href="#">
+          <span class="nav-icon">⚙️</span> Settings
+        </a>
+        <a class="nav-link" data-section="profile" href="#">
+          <span class="nav-icon">👤</span> My Profile
+        </a>
+      </div>
+    </nav>
+
+    <div class="sb-footer">
+      <div class="sb-user" onclick="window.openModal('profileModal')">
+        <div class="sb-avatar" id="sidebarInitials">WA</div>
+        <div>
+          <div class="sb-user-name" id="sidebarName">Web Admin</div>
+          <div class="sb-user-role">Administrator</div>
+        </div>
+      </div>
+      <button class="btn-logout" onclick="logout()">Sign out</button>
+    </div>
+  </aside>
+
+  <!-- ═══ MAIN CONTENT ══════════════════════════════════════ -->
+  <div class="main-content">
+
+    <!-- Topbar -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="topbar-title" id="topbarTitle">Admin Dashboard</div>
+        <div class="topbar-sub"  id="topbarSub">Overview of your school system</div>
+      </div>
+      <div class="topbar-right">
+        <button class="topbar-icon" id="themeToggle" title="Toggle Theme" style="margin-right: 8px;">
+          <span id="themeIcon">☀️</span>
+        </button>
+
+        <button class="topbar-icon" title="Logout" onclick="logout()">
+          <i data-lucide="log-out"></i> 🚪
+        </button>
+      </div>
+    </header>
+
+    <!-- ─── Page Body ─────────────────────────────────────── -->
+    <div class="page-body">
+
+      <!-- ══ OVERVIEW SECTION ══════════════════════════════ -->
+      <section id="overviewSection">
+        <div class="stats-grid">
+          <div class="stat-card c-green">
+            <div class="stat-row">
+              <div class="stat-icon"></div>
+              <span class="stat-change up" id="studentChange"></span>
+            </div>
+            <div class="stat-value" id="totalStudents">—</div>
+            <div class="stat-label">Total Students</div>
+          </div>
+          <div class="stat-card c-green">
+            <div class="stat-row">
+              <div class="stat-icon"></div>
+              <span class="stat-change up" id="teacherChange"></span>
+            </div>
+            <div class="stat-value" id="totalTeachers">—</div>
+            <div class="stat-label">Total Teachers</div>
+          </div>
+          <div class="stat-card c-green">
+            <div class="stat-row">
+              <div class="stat-icon"></div>
+              <span class="stat-change flat"></span>
+            </div>
+            <div class="stat-value" id="totalParents"></div>
+            <div class="stat-label">Registered Parents</div>
+          </div>
+          <div class="stat-card c-green">
+            <div class="stat-row">
+              <div class="stat-icon"></div>
+              <span class="stat-change up"></span>
+            </div>
+            <div class="stat-value" id="presentPercent"></div>
+            <div class="stat-label">Present Today</div>
+          </div>
+          <div class="stat-card c-green">
+            <div class="stat-row">
+              <div class="stat-icon"></div>
+              <span class="stat-change flat"></span>
+            </div>
+            <div class="stat-value" id="totalGrades"></div>
+            <div class="stat-label">Grade Records</div>
+          </div>
+        </div>
+
+        <div class="chart-row">
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">Attendance Trend</div>
+                <div class="panel-sub">Monthly attendance percentage by day</div>
+              </div>
+              <div class="panel-actions">
+                <input id="chartMonth" type="month" />
+                <button class="btn btn-sm btn-secondary" onclick="window.refreshChart?.()">Show</button>
+              </div>
+            </div>
+            <div class="chart-area">
+              <canvas id="attendanceChart"></canvas>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">Quick Stats</div>
+            </div>
+            <div class="qs-list">
+              <div class="qs-item">
+                <span class="qs-label">Absent Today</span>
+                <span class="qs-value text-red" id="absentToday">—</span>
+              </div>
+              <div class="qs-item">
+                <span class="qs-label">Late Today</span>
+                <span class="qs-value text-yellow" id="lateToday">—</span>
+              </div>
+              <div class="qs-item">
+                <span class="qs-label">Grade 7–9</span>
+                <span class="qs-value" id="juniorCount">—</span>
+              </div>
+              <div class="qs-item">
+                <span class="qs-label">Grade 10–12</span>
+                <span class="qs-value" id="seniorCount">—</span>
+              </div>
+              <div class="qs-item">
+                <span class="qs-label">Avg. GWA</span>
+                <span class="qs-value text-green" id="avgGwa">—</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ STUDENTS SECTION ══════════════════════════════ -->
+      <section id="studentsSection" class="hidden">
+        <div class="page-header">
+          <div>
+            <h2>Manage Students</h2>
+            <p>Create, edit and manage student records</p>
+          </div>
+          <div class="page-header-actions">
+            <button class="btn btn-secondary" id="exportStudentsBtn">⬇ Export</button>
+            <button class="btn btn-primary" id="addStudentBtn">+ Add Student</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="toolbar">
+            <div class="toolbar-left">
+              <div class="search-box">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                <input id="studentSearch" type="search" placeholder="Search by name or ID..." />
+              </div>
+            </div>
+            <div class="toolbar-right">
+              <select class="filter-select" id="gradeFilter">
+                <option value="">All Grades</option>
+                <option value="7">Grade 7</option>
+                <option value="8">Grade 8</option>
+                <option value="9">Grade 9</option>
+                <option value="10">Grade 10</option>
+                <option value="11">Grade 11</option>
+                <option value="12">Grade 12</option>
+              </select>
+              <select class="filter-select" id="statusFilter">
+                <option value="">All Statuses</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th class="cb-cell"><input type="checkbox" id="selectAllStudents" /></th>
+                  <th>Student</th>
+                  <th>Student ID</th>
+                  <th>Grade Level</th>
+                  <th>Contact</th>
+                  <th>Guardian</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="studentsTableBody">
+                <tr><td colspan="8"><div class="loader"><div class="spinner"></div></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="table-footer">
+            <span class="table-count" id="studentsCount">Loading...</span>
+            <div class="pagination" id="studentsPagination"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ TEACHERS SECTION ══════════════════════════════ -->
+      <section id="teachersSection" class="hidden">
+        <div class="page-header">
+          <div>
+            <h2>Manage Teachers</h2>
+            <p>Manage faculty records and assignments</p>
+          </div>
+          <div class="page-header-actions">
+            <button class="btn btn-secondary" id="exportTeachersBtn">⬇ Export</button>
+            <button class="btn btn-primary" id="addTeacherBtn">+ Add Teacher</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="toolbar">
+            <div class="toolbar-left">
+              <div class="search-box">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                <input id="teacherSearch" type="search" placeholder="Search teachers..." />
+              </div>
+            </div>
+            <div class="toolbar-right">
+              <select class="filter-select" id="deptFilter">
+                <option value="">All Departments</option>
+                <option value="Science">Science</option>
+                <option value="Mathematics">Mathematics</option>
+                <option value="Arts & Humanities">Arts & Humanities</option>
+                <option value="Physical Education">Physical Education</option>
+                <option value="Technology">Technology</option>
+              </select>
+              <select id="TeacherstatusFilter" class="filter-select">
+                  <option value="">All Status</option>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th class="cb-cell"><input type="checkbox" /></th>
+                  <th>Teacher</th>
+                  <th>Teacher ID</th>
+                  <th>Department</th>
+                  <th>Subjects</th>
+                  <th>Contact</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="teachersTableBody">
+                <tr><td colspan="8"><div class="loader"><div class="spinner"></div></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="table-footer">
+            <span class="table-count" id="teachersCount">Loading...</span>
+            <div class="pagination" id="teachersPagination"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ PARENTS SECTION ═══════════════════════════════ -->
+      <section id="parentsSection" class="hidden">
+        <div class="page-header">
+          <div>
+            <h2>Parents Management</h2>
+            <p>Manage parent and guardian records</p>
+          </div>
+          <div class="page-header-actions">
+            <button class="btn btn-secondary" id="exportParentsBtn">⬇ Export</button>
+            <button class="btn btn-primary" id="addParentBtn">+ Add Parent</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="toolbar">
+            <div class="toolbar-left">
+              <div class="search-box">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                <input id="parentSearch" type="search" placeholder="Search parents..." />
+              </div>
+            </div>
+            <div class="toolbar-right">
+              <select class="filter-select" id="relationFilter">
+                <option value="">All Relations</option>
+                <option value="Father">Father</option>
+                <option value="Mother">Mother</option>
+                <option value="Guardian">Guardian</option>
+                <option value="Grandparent">Grandparent</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th class="cb-cell"><input type="checkbox" /></th>
+                  <th>Parent / Guardian</th>
+                  <th>address</th>
+                  <th>Relation</th>
+                  <th>Contact</th>
+                  <th></th>
+                  <th>Email</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="parentsTableBody">
+                <tr><td colspan="8"><div class="loader"><div class="spinner"></div></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="table-footer">
+            <span class="table-count" id="parentsCount">Loading...</span>
+            <div class="pagination" id="parentsPagination"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ ATTENDANCE SECTION ════════════════════════════ -->
+      <section id="attendanceSection" class="hidden">
+        <div class="page-header">
+          <div>
+            <h2>Attendance Logs</h2>
+            <p>Real-time tracking with manual override</p>
+          </div>
+          <div class="page-header-actions">
+            <button class="btn btn-secondary" id="exportAttendanceBtn">⬇ Export</button>
+            <button class="btn btn-primary" id="manualEntryBtn">+ Manual Entry</button>
+          </div>
+        </div>
+
+        <div class="att-mini-grid">
+          <div class="att-mini">
+            <div class="att-mini-val text-blue"  id="attTotal">—</div>
+            <div class="att-mini-lbl">Total Students</div>
+          </div>
+          <div class="att-mini">
+            <div class="att-mini-val text-green" id="attPresent">—</div>
+            <div class="att-mini-lbl">Present Today</div>
+          </div>
+          <div class="att-mini">
+            <div class="att-mini-val text-red"   id="attAbsent">—</div>
+            <div class="att-mini-lbl">Absent Today</div>
+          </div>
+          <div class="att-mini">
+            <div class="att-mini-val text-yellow" id="attLate">—</div>
+            <div class="att-mini-lbl">Late Today</div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="toolbar">
+            <div class="toolbar-left">
+              <div class="search-box">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                <input id="attendanceSearch" type="search" placeholder="Search student..." />
+              </div>
+            </div>
+            <div class="toolbar-right">
+              <select class="filter-select" id="attGradeFilter">
+                <option value="">All Classes</option>
+                <option value="7">Grade 7</option>
+                <option value="8">Grade 8</option>
+                <option value="9">Grade 9</option>
+                <option value="10">Grade 10</option>
+                <option value="11">Grade 11</option>
+                <option value="12">Grade 12</option>
+              </select>
+              <select class="filter-select" id="attStatusFilter">
+                <option value="">All Statuses</option>
+                <option value="present">Present</option>
+                <option value="absent">Absent</option>
+                <option value="late">Late</option>
+                <option value="excused">Excused</option>
+              </select>
+              <input type="date" id="attendanceDatePicker" />
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date & Time</th>
+                  <th>Student</th>
+                  <th>Grade</th>
+                  <th>Marked By</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="attendanceTableBody">
+                <tr><td colspan="6"><div class="loader"><div class="spinner"></div></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="table-footer">
+            <span class="table-count" id="attendanceCount">Loading...</span>
+            <div class="pagination" id="attendancePagination"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ GRADES SECTION ════════════════════════════════ -->
+      <section id="gradesSection" class="hidden">
+        <div class="page-header">
+          <div>
+            <h2>Grade Records</h2>
+            <p>Manage and view student academic performance</p>
+          </div>
+          <div class="page-header-actions">
+            <button class="btn btn-secondary" id="exportGradesBtn">⬇ Export</button>
+            <button class="btn btn-primary" id="addGradeBtn">+ Add Grade</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="toolbar">
+            <div class="toolbar-left">
+              <div class="search-box">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                <input id="gradesSearch" type="search" placeholder="Search student..." />
+              </div>
+            </div>
+            <div class="toolbar-right">
+              <select class="filter-select" id="gradesGradeFilter">
+                <option value="">All Grades</option>
+                <option value="7">Grade 7</option>
+                <option value="8">Grade 8</option>
+                <option value="9">Grade 9</option>
+                <option value="10">Grade 10</option>
+                <option value="11">Grade 11</option>
+                <option value="12">Grade 12</option>
+              </select>
+              <select class="filter-select" id="subjectFilter">
+                <option value="">All Subjects</option>
+                <option value="Mathematics">Mathematics</option>
+                <option value="Science">Science</option>
+                <option value="English">English</option>
+                <option value="History">History</option>
+                <option value="Filipino">Filipino</option>
+                <option value="MAPEH">MAPEH</option>
+              </select>
+              <select class="filter-select" id="quarterFilter">
+                <option value="">All Quarters</option>
+                <option value="Q1">Q1</option>
+                <option value="Q2">Q2</option>
+                <option value="Q3">Q3</option>
+                <option value="Q4">Q4</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th class="cb-cell"><input type="checkbox" /></th>
+                  <th>Student</th>
+                  <th>Grade Level</th>
+                  <th>Subject</th>
+                  <th>Quarter</th>
+                  <th>Score</th>
+                  <th>Letter</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="gradesTableBody">
+                <tr><td colspan="8"><div class="loader"><div class="spinner"></div></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="table-footer">
+            <span class="table-count" id="gradesCount">Loading...</span>
+            <div class="pagination" id="gradesPagination"></div>
+          </div>
+        </div>
+      </section>
+
+    </div><!-- /page-body -->
+  </div><!-- /main-content -->
+</div><!-- /admin-layout -->
+
+<!-- ════════════════════════════════════════════════════════
+     MODALS
+     ════════════════════════════════════════════════════════ -->
+
+<!-- ── ADD STUDENT ──────────────────────────────────────── -->
+<div id="addStudentModal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2>Add New Student</h2>
+      <button class="modal-close" onclick="closeModal('addStudentModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form id="addStudentForm" class="form-grid">
+        <div class="form-divider">Account Credentials</div>
+        <div class="form-2col">
+          <div class="form-group">
+            <label class="form-label">Full Name <span class="req">*</span></label>
+            <input id="studentName" class="form-input" type="text" placeholder="Juan dela Cruz" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Grade Level <span class="req">*</span></label>
+            <select id="studentGrade" class="form-select" required>
+              <option value="">Select grade...</option>
+              <option value="7">Grade 7</option>
+              <option value="8">Grade 8</option>
+              <option value="9">Grade 9</option>
+              <option value="10">Grade 10</option>
+              <option value="11">Grade 11</option>
+              <option value="12">Grade 12</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email Address <span class="req">*</span></label>
+          <input id="studentEmail" class="form-input" type="email" placeholder="student@school.edu" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password <span class="req">*</span></label>
+          <input id="studentPassword" class="form-input" type="password" placeholder="Min. 6 characters" required />
+          <span class="form-hint">Student will use this to log in to the portal</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Student ID <span class="req">*</span></label>
+          <div class="input-row">
+            <input id="studentId" class="form-input" type="text" placeholder="Auto-generated" readonly />
+            <button type="button" class="btn btn-secondary btn-sm" onclick="generateStudentId()">Generate</button>
+          </div>
+        </div>
+
+        <div class="form-divider">Personal Information</div>
+        <div class="form-2col">
+          <div class="form-group">
+            <label class="form-label">Contact Number</label>
+            <input id="studentContact" class="form-input" type="tel" placeholder="09XX XXX XXXX" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Guardian Name</label>
+            <input id="guardianName" class="form-input" type="text" placeholder="Parent/Guardian full name" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Address</label>
+          <input id="studentAddress" class="form-input" type="text" placeholder="Street, City, Province" />
+        </div>
+      </form>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('addStudentModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitAddStudent()">Add Student</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── EDIT STUDENT ─────────────────────────────────────── -->
+<div id="editStudentModal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2>Edit Student</h2>
+      <button class="modal-close" onclick="closeModal('editStudentModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form id="editStudentForm" class="form-grid">
+        <input type="hidden" id="editStudentId" />
+        <div class="form-2col">
+          <div class="form-group">
+            <label class="form-label">Full Name <span class="req">*</span></label>
+            <input id="editStudentName" class="form-input" type="text" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Grade Level</label>
+            <select id="editStudentGrade" class="form-select">
+              <option value="">Select grade...</option>
+              <option value="7">Grade 7</option>
+              <option value="8">Grade 8</option>
+              <option value="9">Grade 9</option>
+              <option value="10">Grade 10</option>
+              <option value="11">Grade 11</option>
+              <option value="12">Grade 12</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-2col">
+           <div class="form-group">
+            <label class="form-label">Email <span class="req">*</span></label>
+            <input id="editStudentEmail" class="form-input" type="email" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Status <span class="req">*</span></label>
+            <select id="editStudentStatus" class="form-select">
+                <option value="">Select Status...</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Student ID</label>
+          <input id="editStudentIdField" class="form-input" type="text" readonly />
+        </div>
+        <div class="form-2col">
+          <div class="form-group">
+            <label class="form-label">Contact</label>
+            <input id="editStudentContact" class="form-input" type="tel" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Guardian Name</label>
+            <input id="editGuardianName" class="form-input" type="text" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Address</label>
+          <input id="editStudentAddress" class="form-input" type="text" />
+        </div>
+      </form>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('editStudentModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitEditStudent()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── ADD TEACHER ──────────────────────────────────────── -->
+<div id="addTeacherModal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2>Add New Teacher</h2>
+      <button class="modal-close" onclick="closeModal('addTeacherModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form id="addTeacherForm" class="form-grid">
+        <div class="form-2col">
+          <div class="form-group">
+            <label class="form-label">Full Name <span class="req">*</span></label>
+            <input id="teacherName" class="form-input" type="text" placeholder="Teacher's full name" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Department</label>
+            <select id="teacherDept" class="form-select">
+              <option value="">Select department...</option>
+              <option value="Science">Science</option>
+              <option value="Mathematics">Mathematics</option>
+              <option value="Arts & Humanities">Arts & Humanities</option>
+              <option value="Physical Education">Physical Education</option>
+              <option value="Technology">Technology</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email <span class="req">*</span></label>
+          <input id="teacherEmail" class="form-input" type="email" placeholder="teacher@school.edu" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password <span class="req">*</span></label>
+          <input id="teacherPassword" class="form-input" type="password" placeholder="Min. 6 characters" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Teacher ID <span class="req">*</span></label>
+          <div class="input-row">
+            <input id="teacherId" class="form-input" type="text" placeholder="Auto-generated" readonly />
+            <button type="button" class="btn btn-secondary btn-sm" onclick="generateTeacherId()">Generate</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Contact Number</label>
+          <input id="teacherContact" class="form-input" type="tel" placeholder="09XX XXX XXXX" />
+        </div>
+      </form>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('addTeacherModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitAddTeacher()">Add Teacher</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── EDIT TEACHER ─────────────────────────────────────── -->
+<div id="editTeacherModal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2>Edit Teacher</h2>
+      <button class="modal-close" onclick="closeModal('editTeacherModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form id="editTeacherForm" class="form-grid">
+        <input type="hidden" id="editTeacherId" />
+        <div class="form-2col">
+          <div class="form-group">
+            <label class="form-label">Full Name <span class="req">*</span></label>
+            <input id="editTeacherName" class="form-input" type="text" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Department</label>
+            <select id="editTeacherDept" class="form-select">
+              <option value="">Select...</option>
+              <option value="Science">Science</option>
+              <option value="Mathematics">Mathematics</option>
+              <option value="Arts & Humanities">Arts & Humanities</option>
+              <option value="Physical Education">Physical Education</option>
+              <option value="Technology">Technology</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-2col">
+            <div class="form-group">
+              <label class="form-label">Email <span class="req">*</span></label>
+              <input id="editTeacherEmail" class="form-input" type="email" required />
+            </div>
+            <div class="form-group">
+            <label class="form-label">Status <span class="req">*</span></label>
+            <select id="editTeacherStatus" class="filter-select">
+                      <option value="">Select Status...</option>
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+            </select>
+            </div>
+        </div>
+        <div class="form-2col">
+          <div class="form-group">
+            <label class="form-label">Contact</label>
+            <input id="editTeacherContact" class="form-input" type="tel" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Gender</label>
+            <select id="editTeacherGender" class="form-select">
+              <option value="">Prefer not to say</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+            </select>
+          </div>
+        </div>
+      </form>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('editTeacherModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitEditTeacher()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── ADD PARENT ───────────────────────────────────────── -->
+<div id="addParentModal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2>Add Parent / Guardian</h2>
+      <button class="modal-close" onclick="closeModal('addParentModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form id="addParentForm" class="form-grid">
+        <div class="form-2col">
+          <div class="form-group">
+            <label class="form-label">Full Name <span class="req">*</span></label>
+            <input id="parentName" class="form-input" type="text" placeholder="Parent's full name" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Relation <span class="req">*</span></label>
+            <select id="parentRelation" class="form-select" required>
+              <option value="">Select relation...</option>
+              <option value="Father">Father</option>
+              <option value="Mother">Mother</option>
+              <option value="Guardian">Guardian</option>
+              <option value="Grandparent">Grandparent</option>
+              <option value="Sibling">Sibling</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email Address <span class="req">*</span></label>
+          <input id="parentEmail" class="form-input" type="email" placeholder="parent@email.com" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password <span class="req">*</span></label>
+          <input id="parentPassword" class="form-input" type="password" placeholder="Min. 6 characters" required />
+        </div>
+        <!--
+        <div class="form-group">
+          <label class="form-label">Parent ID</label>
+          <div class="input-row">
+            <input id="parentId" class="form-input" type="text" placeholder="Auto-generated" readonly />
+            <button type="button" class="btn btn-secondary btn-sm" onclick="generateParentId()">Generate</button>
+          </div>
+        </div>
+        -->
+        <div class="form-group">
+            <label class="form-label">Contact Number</label>
+            <input id="parentContact" class="form-input" type="tel" placeholder="09XX XXX XXXX" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Address</label>
+          <input id="parentAddress" class="form-input" type="text" placeholder="Home address" />
+        </div>
+      </form>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('addParentModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitAddParent()">Add Parent</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── EDIT PARENT ──────────────────────────────────────── -->
+<div id="editParentModal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2>Edit Parent / Guardian</h2>
+      <button class="modal-close" onclick="closeModal('editParentModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form id="editParentForm" class="form-grid">
+        <input type="hidden" id="editParentId" />
+        <div class="form-2col">
+          <div class="form-group">
+            <label class="form-label">Full Name <span class="req">*</span></label>
+            <input id="editParentName" class="form-input" type="text" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Relation</label>
+            <select id="editParentRelation" class="form-select">
+              <option value="Father">Father</option>
+              <option value="Mother">Mother</option>
+              <option value="Guardian">Guardian</option>
+              <option value="Grandparent">Grandparent</option>
+              <option value="Sibling">Sibling</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email <span class="req">*</span></label>
+          <input id="editParentEmail" class="form-input" type="email" required />
+        </div>
+        <div class="form-group">
+            <label class="form-label">Contact</label>
+            <input id="editParentContact" class="form-input" type="tel" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Address</label>
+          <input id="editParentAddress" class="form-input" type="text" />
+        </div>
+      </form>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('editParentModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitEditParent()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── ADD GRADE ─────────────────────────────────────────── -->
+<div id="addGradeModal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2>Add Grade Record</h2>
+      <button class="modal-close" onclick="closeModal('addGradeModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form id="addGradeForm" class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Student <span class="req">*</span></label>
+          <select id="gradeStudent" class="form-select" required>
+            <option value="">Select student...</option>
+          </select>
+        </div>
+        <div class="form-2col">
+          <div class="form-group">
+            <label class="form-label">Subject <span class="req">*</span></label>
+            <select id="gradeSubject" class="form-select" required>
+              <option value="">Select subject...</option>
+              <option value="Mathematics">Mathematics</option>
+              <option value="Science">Science</option>
+              <option value="English">English</option>
+              <option value="Filipino">Filipino</option>
+              <option value="History">History</option>
+              <option value="MAPEH">MAPEH</option>
+              <option value="Values Education">Values Education</option>
+              <option value="Technology">Technology</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Quarter <span class="req">*</span></label>
+            <select id="gradeQuarter" class="form-select" required>
+              <option value="">Select quarter...</option>
+              <option value="Q1">Q1 — First Quarter</option>
+              <option value="Q2">Q2 — Second Quarter</option>
+              <option value="Q3">Q3 — Third Quarter</option>
+              <option value="Q4">Q4 — Fourth Quarter</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-2col">
+          <div class="form-group">
+            <label class="form-label">Score (0–100) <span class="req">*</span></label>
+            <input id="gradeScore" class="form-input" type="number" min="0" max="100" placeholder="e.g. 88" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Academic Year</label>
+            <input id="gradeYear" class="form-input" type="text" placeholder="e.g. 2024-2025" value="2024-2025" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Remarks</label>
+          <input id="gradeRemarks" class="form-input" type="text" placeholder="Optional notes..." />
+        </div>
+      </form>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('addGradeModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitAddGrade()">Save Grade</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── SETTINGS MODAL ───────────────────────────────────── -->
+<div id="settingsModal" class="modal-overlay hidden">
+  <div class="modal-box wide">
+    <div class="modal-head">
+      <h2>Settings</h2>
+      <button class="modal-close" onclick="closeModal('settingsModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="settings-layout">
+        <aside class="settings-tabs">
+          <button class="tab-btn active" data-tab="general">General</button>
+          <button class="tab-btn" data-tab="system">System</button>
+          <button class="tab-btn" data-tab="notifications">Notifications</button>
+          <button class="tab-btn" data-tab="security">Security</button>
+        </aside>
+        <div class="settings-content">
+          <!-- General -->
+          <div class="settings-panel active" data-panel="general">
+            <h3>General Information</h3>
+            <div class="setting-row">
+              <label>School Name</label>
+              <input type="text" value="EASPO Academy" />
+              <span class="setting-hint">Your institution's official name</span>
+            </div>
+            <div class="setting-row">
+              <label>Academic Year</label>
+              <input type="text" value="2024-2025" />
+            </div>
+            <div class="setting-row">
+              <label>Time Zone</label>
+              <select>
+                <option>UTC+8 (Philippine Time)</option>
+                <option>UTC-5 (Eastern Time)</option>
+                <option>UTC+0 (GMT)</option>
+              </select>
+            </div>
+            <div class="setting-row">
+              <label>School Logo</label>
+              <button class="btn btn-secondary btn-sm">Upload Logo</button>
+              <span class="setting-hint">Recommended: 512×512px PNG or SVG</span>
+            </div>
+          </div>
+
+          <!-- System -->
+          <div class="settings-panel" data-panel="system">
+            <h3>System Preferences</h3>
+            <div class="setting-row">
+              <label>Language</label>
+              <select><option>English</option><option>Filipino</option></select>
+            </div>
+            <div class="setting-row">
+              <label>Date Format</label>
+              <select>
+                <option>MM/DD/YYYY</option>
+                <option>DD/MM/YYYY</option>
+                <option>YYYY-MM-DD</option>
+              </select>
+            </div>
+            <div class="setting-row">
+              <label>School Start Time</label>
+              <input type="time" value="07:30" />
+            </div>
+            <div class="setting-row">
+              <label>School End Time</label>
+              <input type="time" value="16:00" />
+            </div>
+            <div class="setting-row">
+              <label>Late Threshold (minutes)</label>
+              <input type="number" value="15" min="1" max="60" />
+            </div>
+          </div>
+
+          <!-- Notifications -->
+          <div class="settings-panel" data-panel="notifications">
+            <h3>Notification Preferences</h3>
+            <div class="toggle-row">
+              <div class="toggle-label">
+                <span>Email Notifications</span>
+                <small>Receive alerts for attendance events</small>
+              </div>
+              <label class="toggle"><input type="checkbox" checked /><span class="toggle-knob"></span></label>
+            </div>
+            <div class="toggle-row">
+              <div class="toggle-label">
+                <span>SMS Alerts</span>
+                <small>Get SMS for critical events</small>
+              </div>
+              <label class="toggle"><input type="checkbox" /><span class="toggle-knob"></span></label>
+            </div>
+            <div class="toggle-row">
+              <div class="toggle-label">
+                <span>Notify on Absence</span>
+              </div>
+              <label class="toggle"><input type="checkbox" checked /><span class="toggle-knob"></span></label>
+            </div>
+            <div class="toggle-row">
+              <div class="toggle-label">
+                <span>Daily Summary Email</span>
+                <small>Sent at end of school day</small>
+              </div>
+              <label class="toggle"><input type="checkbox" /><span class="toggle-knob"></span></label>
+            </div>
+          </div>
+
+          <!-- Security -->
+          <div class="settings-panel" data-panel="security">
+            <h3>Security & Access</h3>
+            <div class="setting-row">
+              <label>Session Timeout</label>
+              <select>
+                <option>30 minutes</option>
+                <option>1 hour</option>
+                <option>2 hours</option>
+                <option>Never</option>
+              </select>
+            </div>
+            <div class="setting-row">
+              <label>Two-Factor Authentication</label>
+              <button class="btn btn-secondary btn-sm">Enable 2FA</button>
+            </div>
+            <div class="setting-row">
+              <label>Change Password</label>
+              <button class="btn btn-secondary btn-sm">Update Password</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('settingsModal')">Cancel</button>
+      <button class="btn btn-primary">Save Settings</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── PROFILE MODAL ─────────────────────────────────────── -->
+<div id="profileModal" class="modal-overlay hidden">
+  <div class="modal-box wide">
+    <div class="modal-head">
+      <h2>Admin Profile</h2>
+      <button class="modal-close" onclick="closeModal('profileModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="profile-modal-layout">
+        <div class="profile-left">
+          <div class="profile-av-lg" id="profileInitials">WA</div>
+          <div class="profile-badge">Super Admin</div>
+          <button class="btn btn-secondary btn-sm">📷 Change Photo</button>
+        </div>
+        <div class="profile-right">
+          <div class="profile-section">
+            <h4>Personal Information</h4>
+            <div class="setting-row">
+              <label>Full Name</label>
+              <div class="inline-edit">
+                <input class="form-input" id="profileName" type="text" value="Web Admin" />
+                <button class="edit-btn">✏️</button>
+              </div>
+            </div>
+            <div class="setting-row">
+              <label>Email</label>
+              <div class="inline-edit">
+                <input class="form-input" id="profileEmail" type="email" value="admin@school.edu" />
+                <button class="edit-btn">✏️</button>
+              </div>
+            </div>
+            <div class="setting-row">
+              <label>Phone</label>
+              <div class="inline-edit">
+                <input class="form-input" id="profilePhone" type="tel" value="+63 912 345 6789" />
+                <button class="edit-btn">✏️</button>
+              </div>
+            </div>
+          </div>
+          <div class="profile-section">
+            <h4>Account Details</h4>
+            <div class="setting-row">
+              <label>Admin ID</label>
+              <input class="form-input" type="text" value="ADM-0001" disabled />
+            </div>
+            <div class="setting-row">
+              <label>Role</label>
+              <input class="form-input" type="text" value="Web Administrator" disabled />
+            </div>
+          </div>
+          <div class="profile-section">
+            <h4>Security</h4>
+            <div class="setting-row">
+              <label>Two-Factor Auth</label>
+              <button class="btn btn-secondary btn-sm">Enable 2FA</button>
+            </div>
+            <div class="setting-row">
+              <label>Password</label>
+              <button class="btn btn-secondary btn-sm">Change Password</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('profileModal')">Cancel</button>
+      <button class="btn btn-primary">Update Profile</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div id="toastContainer"></div>
+<script>
+  const themeToggle = document.getElementById('themeToggle');
+  const themeIcon = document.getElementById('themeIcon');
+  const body = document.body;
+
+  // 1. Check if user previously chose light mode
+  if (localStorage.getItem('theme') === 'light') {
+    body.classList.add('light-mode');
+    themeIcon.textContent = '🌙'; // Show moon when in light mode
+  }
+
+  // 2. Toggle function
+  themeToggle.addEventListener('click', () => {
+    body.classList.toggle('light-mode');
+    
+    if (body.classList.contains('light-mode')) {
+      themeIcon.textContent = '🌙';
+      localStorage.setItem('theme', 'light');
+    } else {
+      themeIcon.textContent = '☀️';
+      localStorage.setItem('theme', 'dark');
+    }
+  });
+</script>
+
+<script type="module" src="js/admin.js"></script>
+</body>
+</html>

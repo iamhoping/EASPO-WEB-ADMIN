@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EASPO — Login</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="login-page">
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="login-brand">
+        <div class="login-brand-icon">
+          <img src="logo.png" alt="">
+        </div>
+        <div>
+          <div class="login-brand-name">EASPO</div>
+          <div class="login-brand-sub">Admin Portal</div>
+        </div>
+      </div>
+
+      <h2>Welcome back</h2>
+      <p class="sub">Sign in to your administrator account</p>
+
+      <form class="login-form" id="loginForm" onsubmit="handleLogin(event)">
+        <div class="login-field">
+          <label for="email">Email Address</label>
+          <input id="email" type="email" placeholder="admin@school.edu" required autocomplete="email" />
+        </div>
+        <div class="login-field">
+          <label for="password">Password</label>
+          <input id="password" type="password" placeholder="••••••••" required autocomplete="current-password" />
+        </div>
+        <button type="submit" class="login-btn" id="loginBtn">Sign In</button>
+      </form>
+
+      <div id="loginStatus"></div>
+    </div>
+  </div>
+
+  <script type="module" src="js/login.js"></script>
+</body>
+</html>
