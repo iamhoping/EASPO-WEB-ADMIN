@@ -109,6 +109,31 @@ const SECTIONS = {
 
 let activeSection = 'overview'
 
+// ── Dropdown Menu Management ───────────────────────────────────
+function initDropdownMenu() {
+  const toggle = document.getElementById('usersToggle')
+  const submenu = document.getElementById('usersSubmenu')
+  
+  if (!toggle || !submenu) return
+
+  toggle.addEventListener('click', (e) => {
+    e.preventDefault()
+    toggle.classList.toggle('active')
+    submenu.classList.toggle('open')
+  })
+
+  // Close dropdown when clicking a submenu item
+  document.querySelectorAll('.nav-submenu-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+      e.preventDefault()
+      const section = item.dataset.section
+      if (section === 'settings') { window.openModal('settingsModal'); return }
+      if (section === 'profile')  { window.openModal('profileModal');  return }
+      setActiveSection(section)
+    })
+  })
+}
+
 // ── Navigation ────────────────────────────────────────────────
 function setActiveSection(section) {
   if (section === activeSection) return
@@ -127,9 +152,34 @@ function setActiveSection(section) {
     setText('topbarSub',   cfg.sub)
   }
 
-  // Update nav links
+  // Update nav links (main links like Dashboard)
   document.querySelectorAll('.nav-link[data-section]').forEach(link => {
     link.classList.toggle('active', link.dataset.section === section)
+  })
+
+  // Update submenu items and dropdown state
+  const usersToggle = document.getElementById('usersToggle')
+  const usersSubmenu = document.getElementById('usersSubmenu')
+  const submenuItems = document.querySelectorAll('.nav-submenu-item')
+  
+  // Check if the active section is a Users submenu item
+  const isUsersSection = ['students', 'teachers', 'parents'].includes(section)
+  
+  if (usersToggle && usersSubmenu) {
+    // Expand dropdown if navigating to a Users section
+    if (isUsersSection) {
+      usersToggle.classList.add('active')
+      usersSubmenu.classList.add('open')
+    } else {
+      // Collapse dropdown when navigating away from Users sections
+      usersToggle.classList.remove('active')
+      usersSubmenu.classList.remove('open')
+    }
+  }
+
+  // Update submenu item active state
+  submenuItems.forEach(item => {
+    item.classList.toggle('active', item.dataset.section === section)
   })
 
   // Dispatch event for any listeners
@@ -202,10 +252,37 @@ function initSidebarSearch() {
   if (!input) return
   input.addEventListener('input', () => {
     const q = input.value.toLowerCase()
+    
+    // Filter main nav links
     document.querySelectorAll('.nav-link[data-section]').forEach(link => {
       const text = link.textContent.toLowerCase()
       link.style.display = !q || text.includes(q) ? '' : 'none'
     })
+
+    // Filter submenu items
+    const usersDropdown = document.querySelector('.nav-dropdown')
+    const submenuItems = document.querySelectorAll('.nav-submenu-item')
+    let anySubmenuVisible = false
+
+    submenuItems.forEach(item => {
+      const text = item.textContent.toLowerCase()
+      const isVisible = !q || text.includes(q)
+      item.style.display = isVisible ? '' : 'none'
+      if (isVisible) anySubmenuVisible = true
+    })
+
+    // Show/hide Users dropdown based on submenu visibility
+    if (usersDropdown) {
+      if (q && anySubmenuVisible) {
+        usersDropdown.style.display = ''
+        document.getElementById('usersToggle')?.classList.add('active')
+        document.getElementById('usersSubmenu')?.classList.add('open')
+      } else if (!q) {
+        usersDropdown.style.display = ''
+      } else {
+        usersDropdown.style.display = 'none'
+      }
+    }
   })
 }
 
@@ -354,6 +431,7 @@ async function boot() {
   initAttendanceSection()
   initGradesSection()
   initSettingsTabs()
+  initDropdownMenu()
   initSidebarSearch()
   initGlobalSearch()
 
