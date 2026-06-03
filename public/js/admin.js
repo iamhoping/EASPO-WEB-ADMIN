@@ -60,6 +60,11 @@ import {
   initReportsSection,
 } from './modules/reports.js'
 
+import {
+  initUserManagementSection,
+  loadUserManagement,
+} from './modules/user-management.js'
+
 import { renderPagination } from './ui/pagination.js';
 
 function renderStudents(page = 1) {
@@ -110,6 +115,7 @@ const SECTIONS = {
   attendance : { id: 'attendanceSection', title: 'Attendance Logs',       sub: 'Real-time tracking with manual override' },
   grades     : { id: 'gradesSection',     title: 'Grade Records',         sub: 'Manage student academic performance' },
   reports    : { id: 'reportsSection',    title: 'Analytics & Reports',   sub: 'View comprehensive dashboards and analytics' },
+  userManagement: { id: 'userManagementSection', title: 'User Management', sub: 'Manage user accounts and password resets' },
 }
 
 let activeSection = 'overview'
@@ -324,6 +330,7 @@ function initRealtime() {
       console.log('↻ profiles changed', payload.eventType)
       if (activeSection === 'students') loadStudents()
       if (activeSection === 'teachers') loadTeachers()
+      if (activeSection === 'userManagement') loadUserManagement()
       updateOverviewStats()
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'grades' }, () => {
@@ -436,6 +443,7 @@ async function boot() {
   initAttendanceSection()
   initGradesSection()
   initReportsSection()
+  initUserManagementSection()
   initSettingsTabs()
   initDropdownMenu()
   initSidebarSearch()

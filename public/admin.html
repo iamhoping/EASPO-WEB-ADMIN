@@ -74,6 +74,9 @@
         <a class="nav-link" data-section="reports" href="#">
           <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bar-chart-3"><path d="M3 3v18a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2z"/><rect x="7" y="5" width="5" height="12"/><rect x="16" y="5" width="5" height="7"/></svg></span> Reports
         </a>
+        <a class="nav-link" data-section="userManagement" href="#">
+          <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 21a8 8 0 0 0-16 0"/><circle cx="10" cy="8" r="5"/><path d="M22 20c0-3.37-2-6.5-5-7.87"/><path d="M17 3.13a5 5 0 0 1 0 9.74"/><path d="M19 8h3"/><path d="M20.5 6.5v3"/></svg></span> User Management
+        </a>
       </div>
 
       <div class="nav-group">
@@ -281,6 +284,70 @@
       </section>
 
       <!-- ══ TEACHERS SECTION ══════════════════════════════ -->
+      <section id="userManagementSection" class="hidden">
+        <div class="page-header">
+          <div>
+            <h2>User Management</h2>
+            <p>Manage registered accounts and administrator password resets</p>
+          </div>
+          <div class="page-header-actions">
+            <span class="user-management-count" id="userManagementTotal">Loading users...</span>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="toolbar user-management-toolbar">
+            <div class="toolbar-left">
+              <div class="search-box user-management-search">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                <input id="userManagementSearch" type="search" placeholder="Search name, email, username, role..." />
+              </div>
+            </div>
+            <div class="toolbar-right">
+              <select class="filter-select" id="userManagementRoleFilter">
+                <option value="">All Roles</option>
+                <option value="WEB_ADMIN">Administrator</option>
+                <option value="STUDENT">Student</option>
+                <option value="TEACHER">Teacher</option>
+                <option value="PARENT">Parent</option>
+              </select>
+              <select class="filter-select" id="userManagementStatusFilter">
+                <option value="">All Statuses</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+              <select class="filter-select" id="userManagementSort">
+                <option value="asc">Name A-Z</option>
+                <option value="desc">Name Z-A</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table class="user-management-table">
+              <thead>
+                <tr>
+                  <th>Full Name</th>
+                  <th>Username</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="userManagementTableBody">
+                <tr><td colspan="6"><div class="loader"><div class="spinner"></div></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="table-footer">
+            <span class="table-count" id="userManagementCount">Loading...</span>
+            <div class="pagination" id="userManagementPagination"></div>
+          </div>
+        </div>
+      </section>
+
       <section id="teachersSection" class="hidden">
         <div class="page-header">
           <div>
@@ -1167,6 +1234,45 @@
 </div>
 
 <!-- ── SETTINGS MODAL ───────────────────────────────────── -->
+<div id="changeUserPasswordModal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2>Change Password</h2>
+      <button class="modal-close" onclick="closeModal('changeUserPasswordModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form id="changeUserPasswordForm" class="form-grid">
+        <input type="hidden" id="changePasswordUserId" />
+        <div class="password-target">
+          <div class="av av-green" id="changePasswordInitials">U</div>
+          <div>
+            <div class="ent-name" id="changePasswordName">User</div>
+            <div class="ent-sub" id="changePasswordEmail">user@example.com</div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">New Password <span class="req">*</span></label>
+          <input id="changePasswordNew" class="form-input" type="password" autocomplete="new-password" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirm New Password <span class="req">*</span></label>
+          <input id="changePasswordConfirm" class="form-input" type="password" autocomplete="new-password" required />
+        </div>
+        <div class="password-rules" id="changePasswordRules">
+          <span data-rule="length">Minimum 8 characters</span>
+          <span data-rule="uppercase">At least one uppercase letter</span>
+          <span data-rule="number">At least one number</span>
+          <span data-rule="match">Passwords match</span>
+        </div>
+      </form>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('changeUserPasswordModal')">Cancel</button>
+      <button class="btn btn-primary" id="saveUserPasswordBtn" onclick="submitChangeUserPassword()">Save Password</button>
+    </div>
+  </div>
+</div>
+
 <div id="settingsModal" class="modal-overlay hidden">
   <div class="modal-box wide">
     <div class="modal-head">
