@@ -174,17 +174,16 @@
           <div class="panel">
             <div class="panel-header">
               <div>
-                <div class="panel-title">Attendance Trend</div>
-                <div class="panel-sub">Monthly attendance percentage by day</div>
+                <div class="panel-title">Attendance Calendar</div>
+                <div class="panel-sub">Real-time attendance tracker</div>
               </div>
               <div class="panel-actions">
-                <input id="chartMonth" type="month" />
-                <button class="btn btn-sm btn-secondary" onclick="window.refreshChart?.()">Show</button>
+                <button class="btn btn-sm btn-secondary" id="prevMonthBtn" onclick="window.prevMonth?.()">← Prev</button>
+                <span id="calendarMonthYear" style="font-weight: 600; min-width: 150px; text-align: center;"></span>
+                <button class="btn btn-sm btn-secondary" id="nextMonthBtn" onclick="window.nextMonth?.()">Next →</button>
               </div>
             </div>
-            <div class="chart-area">
-              <canvas id="attendanceChart"></canvas>
-            </div>
+            <div class="calendar-container" id="calendarContainer"></div>
           </div>
 
           <div class="panel">

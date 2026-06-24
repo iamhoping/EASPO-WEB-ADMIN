@@ -16,6 +16,8 @@ import {
   loadAdminProfile,
 } from './modules/dashboard.js'
 
+import { initCalendar } from './modules/calendar.js'
+
 import {
   initStudentsSection,
   loadStudents,
@@ -431,6 +433,9 @@ async function boot() {
 
   // Init overview section (chart month picker, refreshChart global)
   initOverviewSection()
+  
+  // Init calendar
+  initCalendar()
 
   // Load dashboard data
   const monthVal = document.getElementById('chartMonth')?.value
