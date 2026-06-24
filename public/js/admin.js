@@ -431,15 +431,14 @@ async function boot() {
   // Load admin profile into sidebar/header
   await loadAdminProfile(user.id)
 
-  // Init overview section (chart month picker, refreshChart global)
+  // Init overview section
   initOverviewSection()
   
-  // Init calendar
+  // Init calendar (handles attendance display)
   initCalendar()
 
   // Load dashboard data
-  const monthVal = document.getElementById('chartMonth')?.value
-  loadDashboard(monthVal)
+  loadDashboard()
 
   // Init all sections
   initStudentsSection()

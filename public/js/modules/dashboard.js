@@ -177,8 +177,7 @@ export async function loadDashboard(monthValue) {
   const avg    = scores.length ? (scores.reduce((a,b) => a+b, 0) / scores.length).toFixed(1) : '—'
   setText('avgGwa', avg)
 
-  // Attendance chart
-  await loadAttendanceChart(monthValue)
+  // Calendar is now handled by initCalendar() - no chart loading needed here
 }
 
 // ── Attendance chart ───────────────────────────────────────────
@@ -239,18 +238,8 @@ export async function loadAdminProfile(userId) {
 
 // ── Init overview section ──────────────────────────────────────
 export function initOverviewSection() {
-  const monthInput = document.getElementById('chartMonth')
-  if (monthInput) {
-    const now = new Date()
-    monthInput.value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`
-    monthInput.addEventListener('change', () => loadAttendanceChart(monthInput.value))
-  }
-
-  // Expose global refresh
-  window.refreshChart = () => {
-    const mv = document.getElementById('chartMonth')?.value
-    loadAttendanceChart(mv)
-  }
+  // Calendar is now initialized separately via initCalendar()
+  // No additional setup needed here
 }
 
 // ── Helper ─────────────────────────────────────────────────────

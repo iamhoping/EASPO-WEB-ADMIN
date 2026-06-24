@@ -21,13 +21,24 @@ const STATUS_PILL = {
 
 // ── Fetch students for dropdowns ──────────────────────────────
 async function fetchStudents() {
-  const { data } = await supabase
-    .from('profiles')
-    .select('id,name,student_id,grade_level')
-    .eq('role','STUDENT')
-    .order('name',{ascending:true})
-  allStudents = data || []
-  populateStudentDropdown()
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, name, student_id, grade_level')
+      .eq('role', 'STUDENT')
+      .order('name', { ascending: true })
+    
+    if (error) {
+      console.error('Error fetching students:', error)
+      allStudents = []
+    } else {
+      allStudents = data || []
+    }
+    populateStudentDropdown()
+  } catch (error) {
+    console.error('Exception in fetchStudents:', error)
+    allStudents = []
+  }
 }
 
 function populateStudentDropdown() {
@@ -35,7 +46,7 @@ function populateStudentDropdown() {
   if (!el) return
   el.innerHTML = `<option value="">Select student…</option>` +
     allStudents.map(s =>
-      `<option value="${s.id}">${s.name} — ${s.grade_level||'N/A'} (${s.student_id||'—'})</option>`
+      `<option value="${s.id}">${s.name} — ${s.grade_level || 'N/A'} (${s.student_id || '—'})</option>`
     ).join('')
 }
 
@@ -46,19 +57,38 @@ export async function loadAttendance() {
 
   await fetchStudents()
 
-  const dateVal = document.getElementById('attendanceDatePicker')?.value || new Date().toISOString().slice(0,10)
+  const dateVal = document.getElementById('attendanceDatePicker')?.value || ''
 
-  const { data, error } = await supabase
-    .from('attendance')
-    .select('*, profiles(name, student_id, grade_level)')
-    .eq('date', dateVal)
-    .order('created_at', { ascending: false })
+  try {
+    // Fetch attendance records. If a date is selected, filter by it;
+    // otherwise fetch all records ordered by date desc (default view).
+    let q = supabase
+      .from('attendance')
+      .select('student_id, date, status, subject')
+      .order('date', { ascending: false })
+    if (dateVal) q = q.eq('date', dateVal)
+    const { data: attData, error: attError } = await q
 
-  if (error) {
-    console.warn('attendance load:', error.message)
+    if (attError) {
+      console.error('Attendance load error:', attError.message)
+      allRecords = []
+    } else {
+      // Enrich attendance records with student information
+      allRecords = (attData || []).map(rec => {
+        const student = allStudents.find(s => s.id === rec.student_id)
+        return {
+          ...rec,
+          student_name: student?.name || 'Unknown',
+          student_id_code: student?.student_id || '—',
+          grade_level: student?.grade_level || '—',
+          subject: rec.subject || '—'
+        }
+      })
+    }
+    console.log(`Loaded ${allRecords.length} attendance records for ${dateVal}`)
+  } catch (error) {
+    console.error('Exception in loadAttendance:', error)
     allRecords = []
-  } else {
-    allRecords = data || []
   }
 
   updateAttendanceMiniStats()
@@ -84,16 +114,16 @@ function updateAttendanceMiniStats() {
   setText('lateToday',   late)
 }
 
-// ── Filter ────────────────────────────────────────────────────
+// ── Filter ────────────────────────────────────────────────
 export function applyFilters() {
   const q   = val('attendanceSearch').toLowerCase()
   const gr  = document.getElementById('attGradeFilter')?.value   || ''
   const st  = document.getElementById('attStatusFilter')?.value  || ''
 
   filtered = allRecords.filter(r => {
-    const name  = r.profiles?.name        || ''
-    const grade = r.profiles?.grade_level || ''
-    const sid   = r.profiles?.student_id  || ''
+    const name  = r.student_name || ''
+    const grade = r.grade_level || ''
+    const sid   = r.student_id_code || ''
     return (
       (!q  || name.toLowerCase().includes(q) || sid.toLowerCase().includes(q)) &&
       (!gr || grade === gr) &&
@@ -131,16 +161,17 @@ function render() {
   const pages = Math.ceil(total / PER_PAGE)
 
   tbody.innerHTML = slice.map(r => {
-    const name  = r.profiles?.name        || 'Unknown'
-    const grade = r.profiles?.grade_level || '—'
-    const sid   = r.profiles?.student_id  || '—'
+    const name  = r.student_name || 'Unknown'
+    const grade = r.grade_level || '—'
+    const sid   = r.student_id_code || '—'
+    const subject = r.subject || '—'
     const st    = r.status || 'present'
     const pillC = STATUS_PILL[st] || 'pill-grey'
     const pillL = st.charAt(0).toUpperCase() + st.slice(1)
 
-    const dt  = new Date(r.created_at || r.date)
-    const dateStr = dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})
-    const timeStr = r.created_at ? dt.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}) : '—'
+    const dt  = new Date(r.date)
+    const dateStr = dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    const timeStr = '—'
 
     return `
     <tr>
@@ -157,12 +188,12 @@ function render() {
         </div>
       </td>
       <td><span class="pill pill-blue">${grade}</span></td>
-      <td style="font-size:.82rem;color:var(--text3)">${r.marked_by || 'System'}</td>
+      <td style="font-size:.82rem;color:var(--text3)">${subject}</td>
       <td><span class="pill ${pillC}">${pillL}</span></td>
       <td>
         <div class="row-acts">
-          <button class="act-btn" title="Edit Status" onclick="openEditAttendanceModal('${r.id}','${st}','${name.replace(/'/g,"\\'")}')">✏️</button>
-          <button class="act-btn danger" title="Delete" onclick="confirmDeleteAttendance('${r.id}','${name.replace(/'/g,"\\'")}')">🗑</button>
+          <button class="act-btn" title="Edit Status" onclick="openEditAttendanceModal('${r.student_id}','${st}','${name.replace(/'/g, "\\'")}')">✏️</button>
+          <button class="act-btn danger" title="Delete" onclick="confirmDeleteAttendance('${r.student_id}','${r.date}','${name.replace(/'/g, "\\'")}')">🗑</button>
         </div>
       </td>
     </tr>`
@@ -185,7 +216,7 @@ export async function submitManualEntry() {
   // Check for duplicate
   const { data: existing } = await supabase
     .from('attendance')
-    .select('id')
+    .select('student_id, date')
     .eq('student_id', student_id)
     .eq('date', date)
     .maybeSingle()
@@ -194,15 +225,16 @@ export async function submitManualEntry() {
     // Update existing record
     const { error } = await supabase
       .from('attendance')
-      .update({ status, note: note||null, marked_by: 'Admin' })
-      .eq('id', existing.id)
+      .update({ status })
+      .eq('student_id', student_id)
+      .eq('date', date)
     if (error) return showToast('Error', error.message, 'error')
     showToast('Updated', 'Attendance record updated', 'success')
   } else {
     // Insert new record
     const { error } = await supabase
       .from('attendance')
-      .insert([{ student_id, status, date, note: note||null, marked_by: 'Admin' }])
+      .insert([{ student_id, status, date }])
     if (error) return showToast('Error', error.message, 'error')
     showToast('Recorded', 'Attendance entry saved', 'success')
   }
@@ -211,9 +243,8 @@ export async function submitManualEntry() {
   document.getElementById('manualEntryForm')?.reset()
   loadAttendance()
 }
-
 // ── Edit attendance status ────────────────────────────────────
-window.openEditAttendanceModal = function(id, currentStatus, name) {
+window.openEditAttendanceModal = function(studentId, currentStatus, name) {
   const newStatus = prompt(
     `Change attendance for "${name}":\nEnter: present, absent, late, or excused`,
     currentStatus
@@ -223,9 +254,11 @@ window.openEditAttendanceModal = function(id, currentStatus, name) {
   if (!valid.includes(newStatus.toLowerCase())) {
     showToast('Invalid','Enter: present, absent, late, or excused','warning'); return
   }
+  const dateVal = document.getElementById('attendanceDatePicker')?.value || new Date().toISOString().slice(0,10)
   supabase.from('attendance')
-    .update({ status: newStatus.toLowerCase(), marked_by: 'Admin' })
-    .eq('id', id)
+    .update({ status: newStatus.toLowerCase() })
+    .eq('student_id', studentId)
+    .eq('date', dateVal)
     .then(({ error }) => {
       if (error) return showToast('Error', error.message, 'error')
       showToast('Updated', `Status set to ${newStatus}`, 'success')
@@ -233,27 +266,30 @@ window.openEditAttendanceModal = function(id, currentStatus, name) {
     })
 }
 
-// ── Delete ────────────────────────────────────────────────────
-window.confirmDeleteAttendance = function(id, name) {
+// ── Delete attendance record ──────────────────────────────────
+window.confirmDeleteAttendance = function(studentId, date, name) {
   if (!confirm(`Delete attendance record for "${name}"?`)) return
-  supabase.from('attendance').delete().eq('id', id).then(({ error }) => {
-    if (error) return showToast('Error', error.message, 'error')
-    showToast('Deleted', 'Record removed', 'success')
-    loadAttendance()
-  })
+  supabase.from('attendance')
+    .delete()
+    .eq('student_id', studentId)
+    .eq('date', date)
+    .then(({ error }) => {
+      if (error) return showToast('Error', error.message, 'error')
+      showToast('Deleted', 'Record removed', 'success')
+      loadAttendance()
+    })
 }
 
 // ── Bulk mark all students ────────────────────────────────────
 export async function bulkMarkAttendance(status) {
   const date = document.getElementById('attendanceDatePicker')?.value || new Date().toISOString().slice(0,10)
-  if (!allStudents.length) return showToast('No students', 'No students to mark', 'warning')
+  if (!Array.isArray(allStudents) || !allStudents.length) return showToast('No students', 'No students to mark', 'warning')
   if (!confirm(`Mark ALL ${allStudents.length} students as "${status}" for ${date}?`)) return
 
   const rows = allStudents.map(s => ({
-    student_id : s.id,
-    status,
-    date,
-    marked_by  : 'Admin (Bulk)',
+    student_id: s.id,
+    status: status.toLowerCase(),
+    date
   }))
 
   const { error } = await supabase.from('attendance').upsert(rows, { onConflict: 'student_id,date' })
@@ -264,28 +300,29 @@ export async function bulkMarkAttendance(status) {
 
 // ── Export ────────────────────────────────────────────────────
 function exportCSV() {
-  if (!allRecords.length) return showToast('Empty', 'Nothing to export', 'warning')
-  const h = ['Date','Student Name','Student ID','Grade','Status','Marked By']
-  const r = allRecords.map(rec => [
-    rec.date,
-    rec.profiles?.name        || '',
-    rec.profiles?.student_id  || '',
-    rec.profiles?.grade_level || '',
-    rec.status,
-    rec.marked_by || 'System'
-  ].map(x => `"${x||''}"`).join(','))
-  const a = Object.assign(document.createElement('a'), {
-    href     : URL.createObjectURL(new Blob([[h, ...r].join('\n')], { type: 'text/csv' })),
-    download : `attendance-${new Date().toISOString().slice(0,10)}.csv`
-  }); a.click()
+  if (!Array.isArray(allRecords) || !allRecords.length) return showToast('Empty', 'Nothing to export', 'warning')
+  const headers = ['Date','Student Name','Student ID','Grade','Subject','Status']
+  const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`
+  const rows = allRecords.map(rec => [
+    esc(rec.date),
+    esc(rec.student_name),
+    esc(rec.student_id_code || rec.student_id),
+    esc(rec.grade_level),
+    esc(rec.subject),
+    esc(rec.status)
+  ].join(','))
+  const csv = [headers.join(','), ...rows].join('\n')
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
+  a.download = `attendance-${new Date().toISOString().slice(0,10)}.csv`
+  a.click()
 }
 
 // ── Init ──────────────────────────────────────────────────────
 export function initAttendanceSection() {
-  // Date picker default to today
+  // Date picker (optional) — leave empty to show all records by default
   const dp = document.getElementById('attendanceDatePicker')
   if (dp) {
-    dp.value = new Date().toISOString().slice(0,10)
     dp.addEventListener('change', loadAttendance)
   }
 

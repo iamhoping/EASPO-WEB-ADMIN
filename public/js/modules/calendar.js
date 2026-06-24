@@ -1,5 +1,6 @@
 // /js/modules/calendar.js
 import { supabase } from '../services/supabaseClient.js'
+import { showToast } from '../ui/toast.js'
 
 let currentDate = new Date()
 let attendanceData = {}
@@ -17,31 +18,48 @@ function getMonthBounds(date) {
 async function fetchAttendanceData(date) {
   const bounds = getMonthBounds(date)
   
-  const { data, error } = await supabase
-    .from('attendance')
-    .select('date, status')
-    .gte('date', bounds.start)
-    .lte('date', bounds.end)
-    .order('date', { ascending: true })
-  
-  if (error) {
-    console.warn('Error fetching attendance:', error.message)
+  try {
+    console.log(`Fetching attendance data from ${bounds.start} to ${bounds.end}`)
+    
+    const { data, error } = await supabase
+      .from('attendance')
+      .select('date, status')
+      .gte('date', bounds.start)
+      .lte('date', bounds.end)
+      .order('date', { ascending: true })
+    
+    if (error) {
+      console.error('Supabase query error:', error)
+      showToast(`Error fetching attendance: ${error.message}`, 'error')
+      return {}
+    }
+
+    if (!data) {
+      console.warn('No data returned from attendance table')
+      return {}
+    }
+
+    console.log(`Fetched ${data.length} attendance records`)
+
+    // Aggregate attendance by date
+    const summary = {}
+    data.forEach(item => {
+      if (!summary[item.date]) {
+        summary[item.date] = { total: 0, present: 0, absent: 0, late: 0 }
+      }
+      summary[item.date].total++
+      if (item.status === 'present') summary[item.date].present++
+      else if (item.status === 'absent') summary[item.date].absent++
+      else if (item.status === 'late') summary[item.date].late++
+    })
+
+    console.log('Attendance data aggregated:', summary)
+    return summary
+  } catch (error) {
+    console.error('Exception in fetchAttendanceData:', error)
+    showToast(`Calendar Error: ${error.message}`, 'error')
     return {}
   }
-
-  // Aggregate attendance by date
-  const summary = {}
-  ;(data || []).forEach(item => {
-    if (!summary[item.date]) {
-      summary[item.date] = { total: 0, present: 0, absent: 0, late: 0 }
-    }
-    summary[item.date].total++
-    if (item.status === 'present') summary[item.date].present++
-    else if (item.status === 'absent') summary[item.date].absent++
-    else if (item.status === 'late') summary[item.date].late++
-  })
-
-  return summary
 }
 
 // Render the calendar
