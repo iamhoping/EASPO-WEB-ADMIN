@@ -6,7 +6,7 @@
    
   
 
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap');
 
 /* ─── CSS Variables g ──────────────────────────────────────── */
 :root {
@@ -52,143 +52,160 @@
   --shadow-sm:    0 4px 20px rgba(0,0,0,0.5);
   --transition:   .2s cubic-bezier(.4, 0, .2, 1);
 
-  --font-head:    'Syne', sans-serif;
-  --font-body:    'DM Sans', sans-serif;
+  --font-head:    'Manrope', 'Segoe UI', Arial, sans-serif;
+  --font-body:    'Inter', 'Segoe UI', Arial, sans-serif;
 }
 
 /* ─── Light Mode Theme (Matching Reference) ──────────────── */
 /* ─── Light Mode Force Override ─────────────────────────── */
 body.light-mode {
   --bg: #F3F4F6 !important;
+  --bg2: #F8FAFC !important;
   --surface: #FFFFFF !important;
   --surface2: #F9FAFB !important;
-  --text: #111827 !important;  /* Dark Charcoal - Vital for visibility */
-  --text2: #4B5563 !important; /* Muted Slate */
-  --text3: #9CA3AF !important;
-  --border: rgba(0, 0, 0, 0.1) !important;
+  --surface3: #E5E7EB !important;
+  --text: #111827 !important;
+  --text2: #4B5563 !important;
+  --text3: #6B7280 !important;
+  --border: rgba(15, 23, 42, 0.10) !important;
+  --border2: rgba(16, 185, 129, 0.22) !important;
+  --shadow: 0 12px 35px rgba(15, 23, 42, 0.08) !important;
+  --shadow-sm: 0 6px 20px rgba(15, 23, 42, 0.06) !important;
 }
 
-/* Force specific elements that usually stay dark */
+body.light-mode,
+body.light-mode .main-content,
+body.light-mode .content-area,
 body.light-mode .sidebar,
 body.light-mode .topbar,
 body.light-mode .stat-card,
 body.light-mode .chart-card,
-body.light-mode .table-container {
+body.light-mode .table-container,
+body.light-mode .panel,
+body.light-mode .settings-panel,
+body.light-mode .modal-content,
+body.light-mode .profile-modal-layout,
+body.light-mode .calendar-container,
+body.light-mode .profile-card,
+body.light-mode .card,
+body.light-mode .section-card {
   background-color: var(--surface) !important;
   color: var(--text) !important;
   border-color: var(--border) !important;
 }
 
-/* Force all text inside the main area to be dark */
-body.light-mode .main-content *, 
-body.light-mode .sidebar * {
-  color: var(--text);
+body.light-mode .main-content *,
+body.light-mode .sidebar *,
+body.light-mode .topbar *,
+body.light-mode .panel *,
+body.light-mode .stat-card *,
+body.light-mode .chart-card *,
+body.light-mode .table-container *,
+body.light-mode .settings-panel *,
+body.light-mode .modal-content *,
+body.light-mode .profile-modal-layout *,
+body.light-mode .calendar-container * {
+  color: inherit;
 }
 
-/* Ensure active links still look good */
+body.light-mode .nav-link,
+body.light-mode .nav-link:hover,
+body.light-mode .nav-item {
+  color: var(--text2) !important;
+}
+
 body.light-mode .nav-link.active {
-  background: rgba(255, 255, 255, 0.1) !important;
+  background: rgba(16, 185, 129, 0.12) !important;
   color: var(--primary) !important;
 }
 
-/* Sidebar Search fix */
-body.light-mode .sb-search-inner {
-  background: var(--bg) !important;
-  border: 1px solid var(--border) !important;
-}
-body.light-mode #sidebarSearch {
-  color: var(--text) !important;
-}
-
-/* ─── Light Mode Fix for Toolbar Inputs & Selects ────────── */
+body.light-mode .sb-search-inner,
 body.light-mode .toolbar .search-box,
 body.light-mode .toolbar .filter-select,
 body.light-mode .toolbar input[type="search"],
-body.light-mode .toolbar input[type="date"] {
-  background-color: #FFFFFF !important; /* Force background to white */
-  color: #111827 !important;            /* Force text to dark charcoal */
-}
-
-/* Fix for the magnifying glass icon color in search boxes */
-body.light-mode .toolbar .search-box svg {
-  color: #4B5563 !important;
-}
-
-/* Ensure placeholder text is visible but muted */
-body.light-mode .toolbar input::placeholder {
-  color: #9CA3AF !important;
-}
-
-/* Specific fix for dropdown arrows in light mode */
-body.light-mode .filter-select {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%234B5563'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E") !important;
-  background-repeat: no-repeat !important;
-  background-position: right 0.7rem center !important;
-  background-size: 1em !important;
-  padding-right: 2.5rem !important;
-  appearance: none;
-}
-
-
-/* ─── Light Mode Fix for #chartMonth ─────────────────────── */
+body.light-mode .toolbar input[type="date"],
+body.light-mode .search-box,
+body.light-mode .form-input,
+body.light-mode .setting-row input,
+body.light-mode .setting-row select,
+body.light-mode .profile-section input:not([disabled]),
 body.light-mode #chartMonth {
-  background-color: #FFFFFF !important; /* Force background to white */
-  color: #111827 !important;            /* Force text to dark charcoal */
-  border: 1px solid rgba(0, 0, 0, 0.15) !important;
-  padding: 6px 10px !important;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-
-/* Ensure the calendar/picker icon inside the input is visible */
-body.light-mode #chartMonth::-webkit-calendar-picker-indicator {
-  filter: invert(0); /* Keeps it dark on a white background */
-  cursor: pointer;
-}
-
-/* Specific fix for the 'Show' button next to it */
-body.light-mode .panel-actions .btn-secondary {
-  background: #F3F4F6 !important;
-  color: #374151 !important;
-  border: 1px solid rgba(0, 0, 0, 0.1) !important;
-}
-
-body.light-mode .panel-actions .btn-secondary:hover {
-  background: #E5E7EB !important;
-}
-
-/* ─── Light Mode Fix for Modals & Profiles ──────────────── */
-body.light-mode .modal-content,
-body.light-mode .profile-modal-layout {
   background-color: #FFFFFF !important;
   color: #111827 !important;
+  border: 1px solid rgba(0, 0, 0, 0.15) !important;
+}
+
+body.light-mode .sb-search-inner {
+  background: var(--bg2) !important;
+}
+
+body.light-mode #sidebarSearch,
+body.light-mode .search-box input,
+body.light-mode .toolbar input::placeholder {
+  color: var(--text) !important;
+}
+
+body.light-mode .toolbar .search-box svg,
+body.light-mode .toolbar .search-box .icon,
+body.light-mode #chartMonth::-webkit-calendar-picker-indicator {
+  color: var(--text2) !important;
+  filter: invert(0) !important;
+}
+
+body.light-mode .filter-select,
+body.light-mode .setting-row select,
+body.light-mode #settingsTimezone,
+body.light-mode #settingsLanguage,
+body.light-mode #settingsDateFormat,
+body.light-mode #settingsTimeout {
+  background-color: #FFFFFF !important;
+  color: #111827 !important;
+  border: 1px solid rgba(0, 0, 0, 0.15) !important;
+  padding: 8px 12px !important;
+  border-radius: var(--radius-sm);
+  appearance: none !important;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%234B5563'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.8rem center !important;
+  background-size: 1rem !important;
+  padding-right: 2.5rem !important;
+}
+
+body.light-mode .panel-actions .btn-secondary,
+body.light-mode .btn-secondary {
+  background: #F3F4F6 !important;
+  color: #374151 !important;
+  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+}
+
+body.light-mode .panel-actions .btn-secondary:hover,
+body.light-mode .btn-secondary:hover {
+  background: #E5E7EB !important;
+  color: #111827 !important;
+}
+
+body.light-mode .btn-primary {
+  background: var(--primary) !important;
+  color: #FFFFFF !important;
 }
 
 body.light-mode .modal-head,
-body.light-mode .modal-foot {
+body.light-mode .modal-foot,
+body.light-mode .profile-left {
   background-color: #F9FAFB !important;
-  border-color: rgba(0, 0, 0, 0.1) !important;
+  border-color: rgba(0, 0, 0, 0.10) !important;
   color: #111827 !important;
 }
 
-/* Labels and Headings inside Modals */
 body.light-mode .modal-content h3,
 body.light-mode .modal-content h4,
 body.light-mode .profile-section h4,
-body.light-mode .setting-row label {
+body.light-mode .setting-row label,
+body.light-mode .setting-info h4 {
   color: #111827 !important;
 }
 
-/* Fix for Input Fields inside Modals/Settings */
-body.light-mode .form-input,
-body.light-mode .setting-row input,
-body.light-mode .profile-section input:not([disabled]) {
-  background-color: #FFFFFF !important;
-  color: #111827 !important;
-  border: 1px solid rgba(0, 0, 0, 0.15) !important;
-}
-
-/* Disabled inputs (like Admin ID) should look slightly different */
 body.light-mode .form-input:disabled,
 body.light-mode input:disabled {
   background-color: #F3F4F6 !important;
@@ -196,55 +213,19 @@ body.light-mode input:disabled {
   border-color: rgba(0, 0, 0, 0.05) !important;
 }
 
-/* Profile Left Section (usually has a different background) */
-body.light-mode .profile-left {
-  background-color: #F9FAFB !important;
-  border-right: 1px solid rgba(0, 0, 0, 0.1) !important;
+body.light-mode .setting-row,
+body.light-mode .settings-group,
+body.light-mode .table-row {
+  border-color: rgba(0, 0, 0, 0.08) !important;
 }
 
-/* Setting Rows and Dividers */
-body.light-mode .setting-row {
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05) !important;
-}
-
-/* ─── Light Mode Fix for Settings Fields ────────────────── */
-body.light-mode .setting-row select,
-body.light-mode #settingsTimezone,
-body.light-mode #settingsLanguage,
-body.light-mode #settingsDateFormat,
-body.light-mode #settingsTimeout {
-  background-color: #FFFFFF !important;
-  color: #111827 !important; /* High contrast text */
-  border: 1px solid rgba(0, 0, 0, 0.15) !important;
-  padding: 8px 12px !important;
-  border-radius: var(--radius-sm);
-  appearance: none !important;
-  cursor: pointer;
-  
-  /* Custom Dark Arrow for visibility */
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23111827'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E") !important;
-  background-repeat: no-repeat !important;
-  background-position: right 0.8rem center !important;
-  background-size: 1rem !important;
-  padding-right: 2.5rem !important;
-}
-
-/* Fix for descriptions under the settings titles */
 body.light-mode .setting-info p,
-body.light-mode .setting-row small {
-  color: #4B5563 !important; /* Muted Slate Grey */
-}
-
-/* Settings Group Dividers */
-body.light-mode .settings-group {
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
-  padding-bottom: 20px;
-  margin-bottom: 20px;
-}
-
-/* Ensure the labels are bold and dark */
-body.light-mode .setting-info h4 {
-  color: #111827 !important;
+body.light-mode .setting-row small,
+body.light-mode .stat-label,
+body.light-mode .qs-label,
+body.light-mode .empty-title,
+body.light-mode .toast-msg {
+  color: #4B5563 !important;
 }
 
 
@@ -315,34 +296,45 @@ input, select, textarea { font-family: var(--font-body); }
 
 .login-brand {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 32px;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 28px;
+  text-align: center;
 }
 .login-brand-icon {
-  width: 100px; height: 100px;
-  border-radius: 11px;
+  width: 86px;
+  height: 86px;
+  padding: 10px;
+  border-radius: 18px;
   display: grid;
   place-items: center;
-  font-size: 19px;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.18), rgba(52, 211, 153, 0.08));
+  border: 1px solid var(--border2);
+  box-shadow: 0 10px 28px rgba(16, 185, 129, 0.12);
 }
 
 .login-brand-icon img{
   width: 100%;
   height: 100%;
-  object-fit: contain;  
+  object-fit: contain;
 }
 .login-brand-name {
   font-family: var(--font-head);
-  font-size: 1rem;
+  font-size: 1.12rem;
   font-weight: 800;
-  letter-spacing: .07em;
+  letter-spacing: .16em;
+  text-transform: uppercase;
   color: var(--primary);
+  line-height: 1.1;
 }
 .login-brand-sub {
-  font-size: .68rem;
-  color: var(--text3);
-  letter-spacing: .04em;
+  font-size: .72rem;
+  color: var(--text2);
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  font-weight: 600;
 }
 
 .login-card h2 {
@@ -436,24 +428,46 @@ input, select, textarea { font-family: var(--font-body); }
 .sb-brand {
   display: flex;
   align-items: center;
-  gap: 11px;
-  padding: 22px 18px;
+  gap: 12px;
+  padding: 20px 18px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
 .sb-brand-icon {
-  width: 40px; height: 40px;
+  width: 58px;
+  height: 58px;
   display: grid;
-  place-items: 40px;
+  place-items: center;
   flex-shrink: 0;
+  border-radius: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
 }
 .sb-brand-icon img {
   width: 100%;
   height: 100%;
   object-fit: contain;
+  display: block;
 }
-.sb-brand-text { font-family: var(--font-head); font-size: .9rem; font-weight: 800; letter-spacing: .06em; color: var(--primary); }
-.sb-brand-sub  { font-size: .65rem; color: var(--text3); letter-spacing: .04em; }
+.sb-brand-text {
+  font-family: var(--font-head);
+  font-size: .95rem;
+  font-weight: 800;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--primary);
+  line-height: 1.1;
+}
+.sb-brand-sub {
+  font-size: .66rem;
+  color: var(--text2);
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  font-weight: 600;
+  margin-top: 2px;
+}
 
 .sb-search {
   padding: 14px 14px 12px;
@@ -1383,7 +1397,7 @@ tbody tr:last-child td { border-bottom: none; }
 
 .modal-overlay {
   position: fixed; inset: 0;
-  background: rgba(0,0,0,.7);
+  background: rgba(15, 23, 42, 0.55);
   backdrop-filter: blur(5px);
   display: grid; place-items: center;
   z-index: 1000;
@@ -1393,7 +1407,7 @@ tbody tr:last-child td { border-bottom: none; }
 
 .modal-box {
   background: var(--surface);
-  border: 1px solid var(--border2);
+  border: 1px solid var(--border);
   border-radius: 18px;
   width: 100%; max-width: 520px;
   box-shadow: var(--shadow);
@@ -1411,8 +1425,9 @@ tbody tr:last-child td { border-bottom: none; }
   display: flex; justify-content: space-between; align-items: center;
   padding: 20px 24px;
   border-bottom: 1px solid var(--border);
+  background: var(--surface2);
 }
-.modal-head h2 { font-family: var(--font-head); font-size: 1.05rem; font-weight: 700; }
+.modal-head h2 { font-family: var(--font-head); font-size: 1.05rem; font-weight: 700; color: var(--text); }
 .modal-close {
   width: 28px; height: 28px; border-radius: 7px;
   border: 1px solid var(--border); background: transparent;
@@ -1425,12 +1440,14 @@ tbody tr:last-child td { border-bottom: none; }
   padding: 22px 24px;
   max-height: 62vh;
   overflow-y: auto;
+  background: var(--surface);
 }
 
 .modal-foot {
   display: flex; justify-content: flex-end; gap: 9px;
   padding: 16px 24px;
   border-top: 1px solid var(--border);
+  background: var(--surface2);
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -1605,6 +1622,9 @@ tbody tr:last-child td { border-bottom: none; }
   display: flex; flex-direction: column; align-items: center; gap: 12px;
   border-right: 1px solid var(--border);
   padding-right: 24px;
+  background: var(--surface2);
+  border-radius: 12px;
+  padding: 16px;
 }
 .profile-av-lg {
   width: 90px; height: 90px;

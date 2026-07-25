@@ -5,12 +5,19 @@ import { showToast } from '../ui/toast.js'
 let currentDate = new Date()
 let attendanceData = {}
 
+function formatLocalDate(date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 // Helper function to get the start and end of a month
 function getMonthBounds(date) {
   const year = date.getFullYear()
   const month = date.getMonth()
-  const start = new Date(year, month, 1).toISOString().slice(0, 10)
-  const end = new Date(year, month + 1, 0).toISOString().slice(0, 10)
+  const start = formatLocalDate(new Date(year, month, 1))
+  const end = formatLocalDate(new Date(year, month + 1, 0))
   return { start, end, year, month }
 }
 
@@ -110,10 +117,10 @@ async function renderCalendar(date) {
   }
 
   // Days of month
-  const today = new Date().toISOString().slice(0, 10)
+  const today = formatLocalDate(new Date())
   for (let day = 1; day <= daysInMonth; day++) {
     const dayDate = new Date(bounds.year, bounds.month, day)
-    const dateStr = dayDate.toISOString().slice(0, 10)
+    const dateStr = formatLocalDate(dayDate)
     const dayEl = document.createElement('div')
     dayEl.className = 'calendar-day'
 
