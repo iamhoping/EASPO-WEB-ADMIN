@@ -27,13 +27,22 @@ async function fetchAttendanceData(date) {
   
   try {
     console.log(`Fetching attendance data from ${bounds.start} to ${bounds.end}`)
-    
+    // Get total registered students (for absent calculation)
+    const { count: totalStudents, error: studentsError } = await supabase
+      .from('profiles')
+      .select('id', { count: 'exact', head: true })
+      .eq('role', 'STUDENT')
+
+    if (studentsError) {
+      console.error('Error fetching students count:', studentsError)
+    }
+
     const { data, error } = await supabase
       .from('attendance')
-      .select('date, status')
-      .gte('date', bounds.start)
-      .lte('date', bounds.end)
-      .order('date', { ascending: true })
+      .select('student_id, attendance_date, status')
+      .gte('attendance_date', bounds.start)
+      .lte('attendance_date', bounds.end)
+      .order('attendance_date', { ascending: true })
     
     if (error) {
       console.error('Supabase query error:', error)
@@ -45,19 +54,27 @@ async function fetchAttendanceData(date) {
       console.warn('No data returned from attendance table')
       return {}
     }
+    // Normalize rows to include `date` (legacy UI expects `date`)
+    const rows = (data || []).map(d => ({ ...d, date: d.attendance_date || d.date }))
+    console.log(`Fetched ${rows.length} attendance records`)
 
-    console.log(`Fetched ${data.length} attendance records`)
-
-    // Aggregate attendance by date
+    // Aggregate attendance by date using unique student IDs for present count
     const summary = {}
-    data.forEach(item => {
+    for (const item of rows) {
       if (!summary[item.date]) {
-        summary[item.date] = { total: 0, present: 0, absent: 0, late: 0 }
+        summary[item.date] = { total: totalStudents || 0, present: 0, absent: 0, presentSet: new Set() }
       }
-      summary[item.date].total++
-      if (item.status === 'present') summary[item.date].present++
-      else if (item.status === 'absent') summary[item.date].absent++
-      else if (item.status === 'late') summary[item.date].late++
+      if (String(item.status || '').toLowerCase() === 'present') {
+        summary[item.date].presentSet.add(item.student_id)
+      }
+    }
+
+    // Finalize counts and remove helper sets
+    Object.keys(summary).forEach(d => {
+      const s = summary[d]
+      s.present = s.presentSet ? s.presentSet.size : 0
+      s.absent = Math.max(0, (s.total || 0) - s.present)
+      delete s.presentSet
     })
 
     console.log('Attendance data aggregated:', summary)
@@ -73,6 +90,9 @@ async function fetchAttendanceData(date) {
 async function renderCalendar(date) {
   const bounds = getMonthBounds(date)
   attendanceData = await fetchAttendanceData(date)
+  // expose for debugging in browser console
+  window.attendanceData = attendanceData
+  window.getAttendanceSummary = (d) => attendanceData[d] || null
 
   const container = document.getElementById('calendarContainer')
   if (!container) return
@@ -153,18 +173,6 @@ async function renderCalendar(date) {
     dayNumber.className = 'day-number'
     dayNumber.textContent = day
     dayEl.appendChild(dayNumber)
-
-    if (attendanceData[dateStr]) {
-      const att = attendanceData[dateStr]
-      const statsEl = document.createElement('div')
-      statsEl.className = 'day-stats'
-      statsEl.innerHTML = `
-        <span class="stat-badge present" title="Present">${att.present}</span>
-        <span class="stat-badge absent" title="Absent">${att.absent}</span>
-        <span class="stat-badge late" title="Late">${att.late}</span>
-      `
-      dayEl.appendChild(statsEl)
-    }
 
     daysContainer.appendChild(dayEl)
   }

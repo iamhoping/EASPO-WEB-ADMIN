@@ -26,6 +26,87 @@ window.handleLogin = async function (event) {
   await verifyAndRedirect(data.user.id)
 }
 
+window.showForgotPassword = function () {
+  document.getElementById('loginForm').classList.add('hidden')
+  document.getElementById('forgotPasswordBtn').classList.add('hidden')
+  document.getElementById('forgotPasswordForm').classList.remove('hidden')
+  setStatus('', '')
+  document.getElementById('resetEmail').value = document.getElementById('email').value.trim()
+  document.getElementById('resetEmail').focus()
+}
+
+window.showLoginForm = function () {
+  document.getElementById('forgotPasswordForm').classList.add('hidden')
+  document.getElementById('updatePasswordForm').classList.add('hidden')
+  document.getElementById('loginForm').classList.remove('hidden')
+  document.getElementById('forgotPasswordBtn').classList.remove('hidden')
+  setStatus('', '')
+}
+
+window.handleForgotPassword = async function (event) {
+  event.preventDefault()
+  const email = document.getElementById('resetEmail').value.trim()
+  const btn = document.getElementById('resetBtn')
+
+  setStatus('', '')
+  btn.disabled = true
+  btn.textContent = 'Sending…'
+
+  const redirectUrl = getWebResetRedirectUrl()
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: redirectUrl
+  })
+
+  if (error) {
+    setStatus(error.message, 'error')
+    btn.disabled = false
+    btn.textContent = 'Send Reset Link'
+    return
+  }
+
+  setStatus('Reset link sent. Check your email.', 'success')
+  btn.disabled = false
+  btn.textContent = 'Send Reset Link'
+}
+
+window.handleUpdatePassword = async function (event) {
+  event.preventDefault()
+  const password = document.getElementById('newPassword').value
+  const confirmation = document.getElementById('confirmPassword').value
+  const btn = document.getElementById('updatePasswordBtn')
+
+  if (password !== confirmation) {
+    setStatus('Passwords do not match.', 'error')
+    return
+  }
+
+  btn.disabled = true
+  btn.textContent = 'Updating…'
+  const { error } = await supabase.auth.updateUser({ password })
+
+  if (error) {
+    setStatus(error.message, 'error')
+    btn.disabled = false
+    btn.textContent = 'Update Password'
+    return
+  }
+
+  setStatus('Password updated. You can now sign in.', 'success')
+  document.getElementById('updatePasswordForm').classList.add('hidden')
+  document.getElementById('loginForm').classList.remove('hidden')
+  document.getElementById('forgotPasswordBtn').classList.remove('hidden')
+  btn.disabled = false
+  btn.textContent = 'Update Password'
+}
+
+function showRecoveryForm() {
+  document.getElementById('loginForm').classList.add('hidden')
+  document.getElementById('forgotPasswordBtn').classList.add('hidden')
+  document.getElementById('forgotPasswordForm').classList.add('hidden')
+  document.getElementById('updatePasswordForm').classList.remove('hidden')
+  setStatus('Choose a new password.', 'success')
+}
+
 async function verifyAndRedirect(userId) {
   const { data, error } = await supabase
     .from('profiles')
@@ -54,3 +135,28 @@ function setStatus(msg, type) {
   el.textContent = msg
   el.className = type
 }
+
+function getWebResetRedirectUrl() {
+  return new URL('index.html', window.location.href).href
+}
+
+supabase.auth.onAuthStateChange((event) => {
+  if (event === 'PASSWORD_RECOVERY') showRecoveryForm()
+})
+
+function initializeRecoveryState() {
+  const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+  const query = new URLSearchParams(window.location.search)
+  const recoveryError = hash.get('error_description') || query.get('error_description')
+
+  if (recoveryError) {
+    setStatus(decodeURIComponent(recoveryError.replace(/\+/g, ' ')), 'error')
+    return
+  }
+
+  if (hash.get('type') === 'recovery' || hash.has('access_token') || query.get('type') === 'recovery') {
+    showRecoveryForm()
+  }
+}
+
+initializeRecoveryState()

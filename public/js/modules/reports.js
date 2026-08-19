@@ -190,12 +190,14 @@ async function loadReportData() {
     safeSelect('sections', '*'),
     safeSelect('subjects', '*'),
     safeSelect('enrollments', '*'),
-    safeSelect('attendance', '*, profiles:student_id (name, student_id, grade_level)', query => query.order('date', { ascending: false })),
+    safeSelect('attendance', '*, profiles:student_id (name, student_id, grade_level)', query => query.order('attendance_date', { ascending: false })),
     safeSelect('grades', '*, profiles:student_id (name, student_id, grade_level)', query => query.order('created_at', { ascending: false })),
     safeSelect('schedules', '*')
   ])
 
-  return { students, teachers, parents, sections, subjects, enrollments, attendance, grades, schedules }
+  // Normalize attendance rows (map attendance_date -> date) for compatibility
+  const normalizedAttendance = (attendance || []).map(r => ({ ...r, date: r.attendance_date || r.date }))
+  return { students, teachers, parents, sections, subjects, enrollments, attendance: normalizedAttendance, grades, schedules }
 }
 
 async function safeSelect(table, columns = '*', applyQuery) {
@@ -289,7 +291,7 @@ function renderOverviewReport() {
 
 function renderAttendanceReport() {
   const attendance = filteredAttendance()
-  const late = attendance.filter(row => normalize(row.status) === 'late')
+  const absent = attendance.filter(row => normalize(row.status) !== 'present')
   const bySection = groupAttendanceBySection(attendance)
   const bySubject = countBy(attendance, row => row.subject || 'No subject')
   const byStudent = countBy(attendance, row => row.profiles?.name || row.student_id || 'Unknown')
@@ -299,7 +301,7 @@ function renderAttendanceReport() {
     ${summaryCards([
       ['Daily Attendance', countToday(attendance)],
       ['Monthly Attendance', countThisMonth(attendance, 'date')],
-      ['Late Students', late.length],
+      ['Absent Students', absent.length],
       ['Attendance by Section', Object.keys(bySection).length],
       ['Attendance by Subject', Object.keys(bySubject).length],
       ['Attendance by Student', Object.keys(byStudent).length],
@@ -310,7 +312,7 @@ function renderAttendanceReport() {
       ['Attendance Trend', 'attendanceTrendReportChart'],
       ['Attendance per Section', 'attendanceSectionChart']
     ])}
-    ${dataTable('Late Students', ['Date', 'Student', 'Grade', 'Subject'], late.slice(0, 10).map(row => [
+    ${dataTable('Absent Students', ['Date', 'Student', 'Grade', 'Subject'], absent.slice(0, 10).map(row => [
       formatDate(row.date),
       row.profiles?.name || row.student_id || 'Unknown',
       row.profiles?.grade_level || '-',
@@ -703,12 +705,10 @@ function countBy(rows, getKey) {
 }
 
 function countAttendanceStatuses(rows) {
-  const counts = { Present: 0, Absent: 0, Late: 0, Excused: 0 }
+  const counts = { Present: 0, Absent: 0 }
   rows.forEach(row => {
     const status = normalize(row.status)
     if (status === 'present') counts.Present++
-    else if (status === 'late') counts.Late++
-    else if (status === 'excused') counts.Excused++
     else counts.Absent++
   })
   return counts

@@ -155,14 +155,6 @@
           <div class="stat-card c-green">
             <div class="stat-row">
               <div class="stat-icon"></div>
-              <span class="stat-change up"></span>
-            </div>
-            <div class="stat-value" id="presentPercent"></div>
-            <div class="stat-label">Present Today</div>
-          </div>
-          <div class="stat-card c-green">
-            <div class="stat-row">
-              <div class="stat-icon"></div>
               <span class="stat-change flat"></span>
             </div>
             <div class="stat-value" id="totalGrades"></div>
@@ -174,8 +166,7 @@
           <div class="panel">
             <div class="panel-header">
               <div>
-                <div class="panel-title">Attendance Calendar</div>
-                <div class="panel-sub">Real-time attendance tracker</div>
+                <div class="panel-title">Calendar</div>
               </div>
               <div class="panel-actions">
                 <button class="btn btn-sm btn-secondary" id="prevMonthBtn" onclick="window.prevMonth?.()">← Prev</button>
@@ -186,43 +177,12 @@
             <div class="calendar-container" id="calendarContainer"></div>
           </div>
 
-          <div class="panel">
-            <div class="panel-header">
-              <div class="panel-title">Quick Stats</div>
-            </div>
-            <div class="qs-list">
-              <div class="qs-item">
-                <span class="qs-label">Absent Today</span>
-                <span class="qs-value text-red" id="absentToday">—</span>
-              </div>
-              <div class="qs-item">
-                <span class="qs-label">Late Today</span>
-                <span class="qs-value text-yellow" id="lateToday">—</span>
-              </div>
-              <div class="qs-item">
-                <span class="qs-label">Grade 7–9</span>
-                <span class="qs-value" id="juniorCount">—</span>
-              </div>
-              <div class="qs-item">
-                <span class="qs-label">Grade 10–12</span>
-                <span class="qs-value" id="seniorCount">—</span>
-              </div>
-              <div class="qs-item">
-                <span class="qs-label">Avg. GWA</span>
-                <span class="qs-value text-green" id="avgGwa">—</span>
-              </div>
-            </div>
-          </div>
         </div>
       </section>
 
       <!-- ══ STUDENTS SECTION ══════════════════════════════ -->
       <section id="studentsSection" class="hidden">
         <div class="page-header">
-          <div>
-            <h2>Manage Students</h2>
-            <p>Create, edit and manage student records</p>
-          </div>
           <div class="page-header-actions">
             <button class="btn btn-secondary" id="exportStudentsBtn">⬇ Export</button>
             <button class="btn btn-primary" id="addStudentBtn">+ Add Student</button>
@@ -252,6 +212,23 @@
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
               </select>
+            </div>
+          </div>
+
+          <div class="scanner-panel" id="scannerAttendancePanel">
+            <div class="scanner-panel-copy">
+              <div class="panel-title">USB QR Scanner Attendance</div>
+              <div class="panel-sub">Scan a student QR code to record attendance automatically.</div>
+              <div class="scanner-status" id="scannerStatus" role="status" aria-live="polite">Ready to scan</div>
+            </div>
+            <div class="scanner-indicator" id="scannerIndicator" aria-label="Scanner ready"></div>
+            <div class="scanner-result hidden" id="scannerResult" aria-live="polite">
+              <div class="scanner-result-title" id="scannerResultTitle">Attendance Recorded</div>
+              <div class="scanner-student-name" id="scannerStudentName"></div>
+              <div class="scanner-detail" id="scannerStudentId"></div>
+              <div class="scanner-detail" id="scannerStudentClass"></div>
+              <div class="scanner-result-status" id="scannerResultStatus"></div>
+              <div class="scanner-detail" id="scannerScannedAt"></div>
             </div>
           </div>
 
@@ -285,10 +262,6 @@
       <!-- ══ TEACHERS SECTION ══════════════════════════════ -->
       <section id="userManagementSection" class="hidden">
         <div class="page-header">
-          <div>
-            <h2>User Management</h2>
-            <p>Manage registered accounts and administrator password resets</p>
-          </div>
           <div class="page-header-actions">
             <span class="user-management-count" id="userManagementTotal">Loading users...</span>
           </div>
@@ -349,10 +322,6 @@
 
       <section id="teachersSection" class="hidden">
         <div class="page-header">
-          <div>
-            <h2>Manage Teachers</h2>
-            <p>Manage faculty records and assignments</p>
-          </div>
           <div class="page-header-actions">
             <button class="btn btn-secondary" id="exportTeachersBtn">⬇ Export</button>
             <button class="btn btn-primary" id="addTeacherBtn">+ Add Teacher</button>
@@ -414,10 +383,6 @@
       <!-- ══ PARENTS SECTION ═══════════════════════════════ -->
       <section id="parentsSection" class="hidden">
         <div class="page-header">
-          <div>
-            <h2>Parents Management</h2>
-            <p>Manage parent and guardian records</p>
-          </div>
           <div class="page-header-actions">
             <button class="btn btn-secondary" id="exportParentsBtn">⬇ Export</button>
             <button class="btn btn-primary" id="addParentBtn">+ Add Parent</button>
@@ -473,32 +438,9 @@
       <!-- ══ ATTENDANCE SECTION ════════════════════════════ -->
       <section id="attendanceSection" class="hidden">
         <div class="page-header">
-          <div>
-            <h2>Attendance Logs</h2>
-            <p>Real-time tracking with manual override</p>
-          </div>
           <div class="page-header-actions">
             <button class="btn btn-secondary" id="exportAttendanceBtn">⬇ Export</button>
             <button class="btn btn-primary" id="manualEntryBtn">+ Manual Entry</button>
-          </div>
-        </div>
-
-        <div class="att-mini-grid">
-          <div class="att-mini">
-            <div class="att-mini-val text-blue"  id="attTotal">—</div>
-            <div class="att-mini-lbl">Total Students</div>
-          </div>
-          <div class="att-mini">
-            <div class="att-mini-val text-green" id="attPresent">—</div>
-            <div class="att-mini-lbl">Present Today</div>
-          </div>
-          <div class="att-mini">
-            <div class="att-mini-val text-red"   id="attAbsent">—</div>
-            <div class="att-mini-lbl">Absent Today</div>
-          </div>
-          <div class="att-mini">
-            <div class="att-mini-val text-yellow" id="attLate">—</div>
-            <div class="att-mini-lbl">Late Today</div>
           </div>
         </div>
 
@@ -524,8 +466,6 @@
                 <option value="">All Statuses</option>
                 <option value="present">Present</option>
                 <option value="absent">Absent</option>
-                <option value="late">Late</option>
-                <option value="excused">Excused</option>
               </select>
               <input type="date" id="attendanceDatePicker" />
             </div>
@@ -538,7 +478,7 @@
                   <th>Date & Time</th>
                   <th>Student</th>
                   <th>Grade</th>
-                  <th>Marked By</th>
+                  <th>Section</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
@@ -559,10 +499,6 @@
       <!-- ══ GRADES SECTION ════════════════════════════════ -->
       <section id="gradesSection" class="hidden">
         <div class="page-header">
-          <div>
-            <h2>Grade Records</h2>
-            <p>Manage and view student academic performance</p>
-          </div>
           <div class="page-header-actions">
             <button class="btn btn-secondary" id="exportGradesBtn">⬇ Export</button>
             <button class="btn btn-primary" id="addGradeBtn">+ Add Grade</button>
@@ -636,10 +572,6 @@
       <!-- ══ REPORTS SECTION ═══════════════════════════════ -->
       <section id="reportsSection" class="hidden">
         <div class="page-header">
-          <div>
-            <h2>Analytics & Reports</h2>
-            <p>View comprehensive dashboards and analytics</p>
-          </div>
           <div class="page-header-actions">
             <button class="btn btn-secondary" id="printReportBtn" onclick="printReport()">🖨 Print</button>
             <button class="btn btn-secondary" id="exportPdfBtn" onclick="exportReportPdf()">📄 Export PDF</button>

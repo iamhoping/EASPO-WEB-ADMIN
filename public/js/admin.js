@@ -52,6 +52,8 @@ import {
   bulkMarkAttendance,
 } from './modules/attendance.js'
 
+import { initScannerAttendance } from './modules/scanner-attendance.js'
+
 import {
   initGradesSection,
   loadGrades,
@@ -383,8 +385,6 @@ function ensureManualEntryModal() {
                 <option value="">Select…</option>
                 <option value="present">Present</option>
                 <option value="absent">Absent</option>
-                <option value="late">Late</option>
-                <option value="excused">Excused</option>
               </select>
             </div>
             <div class="form-group">
@@ -445,6 +445,8 @@ async function boot() {
   initTeachersSection()
   initParentsSection()
   initAttendanceSection()
+  initScannerAttendance()
+  document.addEventListener('scanner-attendance-recorded', loadAttendance)
   initGradesSection()
   initReportsSection()
   initUserManagementSection()

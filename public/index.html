@@ -34,6 +34,31 @@
         <button type="submit" class="login-btn" id="loginBtn">Sign In</button>
       </form>
 
+      <button type="button" class="forgot-password-btn" id="forgotPasswordBtn" onclick="showForgotPassword()">
+        Forgot password?
+      </button>
+
+      <form class="login-form hidden" id="forgotPasswordForm" onsubmit="handleForgotPassword(event)">
+        <div class="login-field">
+          <label for="resetEmail">Email Address</label>
+          <input id="resetEmail" type="email" placeholder="admin@school.edu" required autocomplete="email" />
+        </div>
+        <button type="submit" class="login-btn" id="resetBtn">Send Reset Link</button>
+        <button type="button" class="login-back-btn" onclick="showLoginForm()">Back to Sign In</button>
+      </form>
+
+      <form class="login-form hidden" id="updatePasswordForm" onsubmit="handleUpdatePassword(event)">
+        <div class="login-field">
+          <label for="newPassword">New Password</label>
+          <input id="newPassword" type="password" minlength="6" required autocomplete="new-password" />
+        </div>
+        <div class="login-field">
+          <label for="confirmPassword">Confirm New Password</label>
+          <input id="confirmPassword" type="password" minlength="6" required autocomplete="new-password" />
+        </div>
+        <button type="submit" class="login-btn" id="updatePasswordBtn">Update Password</button>
+      </form>
+
       <div id="loginStatus"></div>
     </div>
   </div>

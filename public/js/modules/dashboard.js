@@ -129,27 +129,17 @@ function renderLineChart(canvasId, labels, values) {
 
 // ── Load dashboard data ────────────────────────────────────────
 export async function loadDashboard(monthValue) {
-  const today = new Date().toISOString().slice(0,10)
-
   // Parallel fetches
   const [
     { count: studentCount },
     { count: teacherCount },
     { count: parentCount  },
     { count: gradeCount   },
-    { data:  attToday     },
-    { data:  gradeData    },
-    { data:  juniorData   },
-    { data:  seniorData   },
   ] = await Promise.all([
     supabase.from('profiles').select('*',{count:'exact',head:true}).eq('role','STUDENT'),
     supabase.from('profiles').select('*',{count:'exact',head:true}).eq('role','TEACHER'),
     supabase.from('profiles').select('*',{count:'exact',head:true}).eq('role','PARENT'),
     supabase.from('grades').select('*',{count:'exact',head:true}),
-    supabase.from('attendance').select('status').eq('date', today),
-    supabase.from('grades').select('score'),
-    supabase.from('profiles').select('*',{count:'exact',head:true}).eq('role','STUDENT').in('grade_level',['Grade 7','Grade 8','Grade 9']),
-    supabase.from('profiles').select('*',{count:'exact',head:true}).eq('role','STUDENT').in('grade_level',['Grade 10','Grade 11','Grade 12']),
   ]);
 
   // Stat cards
@@ -157,25 +147,6 @@ export async function loadDashboard(monthValue) {
   setText('totalTeachers', teacherCount ?? '—')
   setText('totalParents',  parentCount  ?? '—')
   setText('totalGrades',   gradeCount   ?? '—')
-
-  // Today's attendance
-  const todayRecs  = attToday  || []
-  const present    = todayRecs.filter(r => r.status === 'present').length
-  const absent     = todayRecs.filter(r => r.status === 'absent').length
-  const late       = todayRecs.filter(r => r.status === 'late').length
-  const pct        = todayRecs.length > 0 ? Math.round((present / todayRecs.length) * 100) : 0
-  setText('presentPercent', pct + '%')
-  setText('absentToday',    absent)
-  setText('lateToday',      late)
-
-  // Class breakdown
-  setText('juniorCount', juniorData?.length ?? juniorData ?? '—')
-  setText('seniorCount', seniorData?.length ?? seniorData ?? '—')
-
-  // Avg GWA
-  const scores = (gradeData || []).map(g => Number(g.score)).filter(s => !isNaN(s))
-  const avg    = scores.length ? (scores.reduce((a,b) => a+b, 0) / scores.length).toFixed(1) : '—'
-  setText('avgGwa', avg)
 
   // Calendar is now handled by initCalendar() - no chart loading needed here
 }
@@ -186,10 +157,10 @@ async function loadAttendanceChart(monthValue) {
 
   const { data: histData, error } = await supabase
     .from('attendance')
-    .select('date, status')
-    .gte('date', range.start)
-    .lte('date', range.end)
-    .order('date', { ascending: true })
+    .select('attendance_date, status')
+    .gte('attendance_date', range.start)
+    .lte('attendance_date', range.end)
+    .order('attendance_date', { ascending: true })
 
   if (error) {
     console.warn('chart data error:', error.message)
@@ -200,9 +171,10 @@ async function loadAttendanceChart(monthValue) {
   // Aggregate by date
   const summary = {}
   ;(histData || []).forEach(item => {
-    if (!summary[item.date]) summary[item.date] = { total: 0, present: 0 }
-    summary[item.date].total++
-    if (item.status === 'present') summary[item.date].present++
+    const dt = item.attendance_date || item.date
+    if (!summary[dt]) summary[dt] = { total: 0, present: 0 }
+    summary[dt].total++
+    if (item.status === 'present') summary[dt].present++
   })
 
   const values = range.dateKeys.map(date => {

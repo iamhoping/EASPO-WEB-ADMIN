@@ -199,7 +199,7 @@ export async function loadDashboard(monthValue) {
   const { data: attendanceToday, error: attError } = await supabase
     .from('attendance')
     .select('status')
-    .eq('date', today)
+    .eq('attendance_date', today)
 
   if (attError) {
     console.error("Error fetching today's attendance:", attError.message)
@@ -219,10 +219,10 @@ export async function loadDashboard(monthValue) {
   const dateKeys = createDateKeys(range.start, range.end)
   const { data: attendanceHistory, error: histError } = await supabase
     .from('attendance')
-    .select('date, status')
-    .gte('date', range.start)
-    .lte('date', range.end)
-    .order('date', { ascending: true })
+    .select('attendance_date, status')
+    .gte('attendance_date', range.start)
+    .lte('attendance_date', range.end)
+    .order('attendance_date', { ascending: true })
 
   if (histError) {
     console.error("Error fetching attendance history:", histError.message)
@@ -233,9 +233,10 @@ export async function loadDashboard(monthValue) {
   // 🧮 Aggregate attendance data by date
   const summary = {}
   attendanceHistory.forEach(item => {
-    summary[item.date] = summary[item.date] || { total: 0, present: 0 }
-    summary[item.date].total += 1
-    if (item.status === 'present') summary[item.date].present += 1
+    const dt = item.attendance_date || item.date
+    summary[dt] = summary[dt] || { total: 0, present: 0 }
+    summary[dt].total += 1
+    if (item.status === 'present') summary[dt].present += 1
   })
 
   // 📈 Calculate percentages and render chart

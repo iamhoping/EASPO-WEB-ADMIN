@@ -222,7 +222,6 @@ body.light-mode .table-row {
 body.light-mode .setting-info p,
 body.light-mode .setting-row small,
 body.light-mode .stat-label,
-body.light-mode .qs-label,
 body.light-mode .empty-title,
 body.light-mode .toast-msg {
   color: #4B5563 !important;
@@ -387,6 +386,20 @@ input, select, textarea { font-family: var(--font-body); }
   transform: translateY(-1px);
   box-shadow: 0 4px 24px var(--primary-glow);
 }
+.forgot-password-btn,
+.login-back-btn {
+  display: block;
+  margin: 14px auto 0;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-size: .8rem;
+  cursor: pointer;
+}
+.forgot-password-btn:hover,
+.login-back-btn:hover { color: var(--primary-hover); text-decoration: underline; }
+.login-back-btn { margin-top: -4px; color: var(--text2); }
 
 #loginStatus {
   margin-top: 14px;
@@ -940,29 +953,16 @@ canvas { width: 100% !important; height: 200px; display: block; }
 
 .chart-row {
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: 1fr;
   gap: 14px;
   margin-bottom: 22px;
 }
-
-/* ─── Quick stats list ────────────────────────────────────── */
-.qs-list { padding: 6px 0; }
-.qs-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 22px;
-  border-bottom: 1px solid var(--border);
-}
-.qs-item:last-child { border-bottom: none; }
-.qs-label { font-size: .83rem; color: var(--text2); }
-.qs-value { font-family: var(--font-head); font-size: .95rem; font-weight: 700; }
 
 /* ═══════════════════════════════════════════════════════════
    CALENDAR
    ═══════════════════════════════════════════════════════════ */
 .calendar-container {
-  padding: 24px;
+  padding: 18px;
   background: var(--surface);
 }
 
@@ -970,6 +970,8 @@ canvas { width: 100% !important; height: 200px; display: block; }
   display: flex;
   flex-direction: column;
   gap: 0;
+  width: min(100%, 760px);
+  margin: 0 auto;
 }
 
 .calendar-weekdays {
@@ -1010,7 +1012,7 @@ canvas { width: 100% !important; height: 200px; display: block; }
   background: var(--surface2);
   cursor: pointer;
   transition: all var(--transition);
-  min-height: 80px;
+  min-height: 74px;
 }
 
 .calendar-day.empty {
@@ -1027,28 +1029,28 @@ canvas { width: 100% !important; height: 200px; display: block; }
 
 .calendar-day.today {
   border: 2px solid var(--primary);
-  background: var(--primary-dim);
+  background: var(--primary-dim) !important;
   font-weight: 700;
 }
 
-/* Status Colors */
+/* Status borders */
 .calendar-day.status-full {
-  background: linear-gradient(135deg, var(--green-dim) 0%, rgba(16, 185, 129, 0.08) 100%);
+  background: var(--surface2);
   border-color: var(--green);
 }
 
 .calendar-day.status-good {
-  background: linear-gradient(135deg, rgba(52, 211, 153, 0.15) 0%, rgba(52, 211, 153, 0.05) 100%);
+  background: var(--surface2);
   border-color: rgba(52, 211, 153, 0.6);
 }
 
 .calendar-day.status-medium {
-  background: linear-gradient(135deg, var(--yellow-dim) 0%, rgba(251, 191, 36, 0.08) 100%);
+  background: var(--surface2);
   border-color: rgba(251, 191, 36, 0.6);
 }
 
 .calendar-day.status-low {
-  background: linear-gradient(135deg, var(--red-dim) 0%, rgba(239, 68, 68, 0.08) 100%);
+  background: var(--surface2);
   border-color: rgba(239, 68, 68, 0.6);
 }
 
@@ -1108,27 +1110,26 @@ body.light-mode .calendar-day.empty {
 }
 
 body.light-mode .calendar-day.status-full {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.05) 100%);
+  background: #F9FAFB;
   border-color: var(--green);
 }
 
 body.light-mode .calendar-day.status-good {
-  background: linear-gradient(135deg, rgba(52, 211, 153, 0.1) 0%, rgba(52, 211, 153, 0.02) 100%);
+  background: #F9FAFB;
   border-color: rgba(52, 211, 153, 0.7);
 }
 
 body.light-mode .calendar-day.status-medium {
-  background: linear-gradient(135deg, rgba(251, 191, 36, 0.12) 0%, rgba(251, 191, 36, 0.03) 100%);
+  background: #F9FAFB;
   border-color: rgba(251, 191, 36, 0.7);
 }
 
 body.light-mode .calendar-day.status-low {
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(239, 68, 68, 0.03) 100%);
-  border-color: rgba(239, 68, 68, 0.7);
+  background: #F9FAFB;
 }
 
 body.light-mode .calendar-day.today {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.1) 100%);
+  background: rgba(16, 185, 129, 0.16) !important;
 }
 
 body.light-mode .day-number {
@@ -1699,6 +1700,49 @@ tbody tr:last-child td { border-bottom: none; }
 .att-mini-val { font-family: var(--font-head); font-size: 1.4rem; font-weight: 800; }
 .att-mini-lbl { font-size: .73rem; color: var(--text3); margin-top: 2px; }
 
+.scanner-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px 20px;
+  align-items: center;
+  margin: 18px 22px;
+  padding: 16px 18px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--primary);
+  border-radius: var(--radius-sm);
+}
+.scanner-panel-copy { min-width: 0; }
+.scanner-status {
+  margin-top: 8px;
+  color: var(--text3);
+  font-size: .76rem;
+}
+.scanner-indicator {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 0 4px var(--primary-dim);
+}
+.scanner-indicator.busy { background: var(--yellow); box-shadow: 0 0 0 4px var(--yellow-dim); }
+.scanner-indicator.success { background: var(--green); box-shadow: 0 0 0 4px var(--green-dim); }
+.scanner-indicator.error,
+.scanner-indicator.duplicate { background: var(--red); box-shadow: 0 0 0 4px var(--red-dim); }
+.scanner-indicator.idle { background: var(--text3); box-shadow: 0 0 0 4px var(--surface); }
+.scanner-result {
+  grid-column: 1 / -1;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.scanner-result-title { color: var(--green); font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.scanner-student-name { margin-top: 5px; color: var(--text); font-family: var(--font-head); font-size: 1.05rem; font-weight: 700; }
+.scanner-detail { margin-top: 3px; color: var(--text2); font-size: .78rem; }
+.scanner-result-status { margin-top: 8px; color: var(--green); font-family: var(--font-head); font-size: .95rem; font-weight: 800; }
+.scanner-result-error .scanner-result-title,
+.scanner-result-error .scanner-result-status { color: var(--red); }
+.scanner-result-duplicate .scanner-result-title { color: var(--yellow); }
+
 /* ═══════════════════════════════════════════════════════════
    EMPTY STATE / LOADER
    ═══════════════════════════════════════════════════════════ */
@@ -1735,6 +1779,9 @@ tbody tr:last-child td { border-bottom: none; }
 @media (max-width: 1100px) {
   .chart-row { grid-template-columns: 1fr; }
   .att-mini-grid { grid-template-columns: repeat(2,1fr); }
+}
+@media (max-width: 640px) {
+  .scanner-panel { margin: 14px; }
 }
 @media (max-width: 860px) {
   :root { --sidebar-w: 0px; }
