@@ -41,6 +41,7 @@ function roleLabel(role) {
     STUDENT: 'Student',
     TEACHER: 'Teacher',
     PARENT: 'Parent',
+    SCANNER: 'Scanner',
   })[role] || role || 'Unassigned'
 }
 
@@ -50,6 +51,7 @@ function rolePill(role) {
     STUDENT: 'pill-blue',
     TEACHER: 'pill-orange',
     PARENT: 'pill-green',
+    SCANNER: 'pill-yellow',
   })[role] || 'pill-grey'
 }
 
