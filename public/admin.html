@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>EASPO — Admin Dashboard</title>
+  <link rel="icon" type="image/png" href="logo.png">
   <link rel="stylesheet" href="css/style.css">
   <script src="https://unpkg.com/lucide@latest"></script>
   <!-- Chart.js -->
@@ -81,9 +82,6 @@
 
       <div class="nav-group">
         <div class="nav-group-label">System</div>
-        <a class="nav-link" data-section="settings" href="#">
-          <span class="nav-icon">⚙️</span> Settings
-        </a>
         <a class="nav-link" data-section="profile" href="#">
           <span class="nav-icon">👤</span> My Profile
         </a>
@@ -114,10 +112,6 @@
       <div class="topbar-right">
         <button class="topbar-icon" id="themeToggle" title="Toggle Theme" style="margin-right: 8px;">
           <span id="themeIcon">☀️</span>
-        </button>
-
-        <button class="topbar-icon" title="Logout" onclick="logout()">
-          <i data-lucide="log-out"></i> 🚪
         </button>
       </div>
     </header>
@@ -167,14 +161,27 @@
             <div class="panel-header">
               <div>
                 <div class="panel-title">Calendar</div>
+                <div class="panel-sub" id="calendarSubtitle">Attendance overview</div>
               </div>
               <div class="panel-actions">
-                <button class="btn btn-sm btn-secondary" id="prevMonthBtn" onclick="window.prevMonth?.()">← Prev</button>
-                <span id="calendarMonthYear" style="font-weight: 600; min-width: 150px; text-align: center;"></span>
-                <button class="btn btn-sm btn-secondary" id="nextMonthBtn" onclick="window.nextMonth?.()">Next →</button>
+                <button class="btn btn-sm btn-secondary" id="todayMonthBtn" type="button">Today</button>
+                <button class="icon-btn" id="refreshCalendarBtn" type="button" title="Refresh calendar" aria-label="Refresh calendar">↻</button>
+                <button class="icon-btn" id="prevMonthBtn" type="button" title="Previous month" aria-label="Previous month" onclick="window.prevMonth?.()">←</button>
+                <span id="calendarMonthYear" class="calendar-month-label"></span>
+                <button class="icon-btn" id="nextMonthBtn" type="button" title="Next month" aria-label="Next month" onclick="window.nextMonth?.()">→</button>
               </div>
             </div>
+            <div class="calendar-detail" id="calendarDetail" aria-live="polite">
+              <span class="calendar-detail-icon">i</span>
+              <div><strong>Select a day</strong><span>Choose a date to view its attendance summary.</span></div>
+            </div>
             <div class="calendar-container" id="calendarContainer"></div>
+            <div class="calendar-legend">
+              <span><i class="legend-dot legend-full"></i>Full</span>
+              <span><i class="legend-dot legend-good"></i>Good</span>
+              <span><i class="legend-dot legend-medium"></i>Needs attention</span>
+              <span><i class="legend-dot legend-low"></i>Low</span>
+            </div>
           </div>
 
         </div>
@@ -502,7 +509,6 @@
         <div class="page-header">
           <div class="page-header-actions">
             <button class="btn btn-secondary" id="exportGradesBtn">⬇ Export</button>
-            <button class="btn btn-primary" id="addGradeBtn">+ Add Grade</button>
           </div>
         </div>
 
@@ -1147,10 +1153,6 @@
             <label class="form-label">Score (0–100) <span class="req">*</span></label>
             <input id="gradeScore" class="form-input" type="number" min="0" max="100" placeholder="e.g. 88" required />
           </div>
-          <div class="form-group">
-            <label class="form-label">Academic Year</label>
-            <input id="gradeYear" class="form-input" type="text" placeholder="e.g. 2024-2025" value="2024-2025" />
-          </div>
         </div>
         <div class="form-group">
           <label class="form-label">Remarks</label>
@@ -1208,133 +1210,44 @@
 <div id="settingsModal" class="modal-overlay hidden">
   <div class="modal-box wide">
     <div class="modal-head">
-      <h2>Settings</h2>
+      <div>
+        <h2>Settings</h2>
+        <p class="settings-modal-subtitle">Manage your workspace preferences and account security</p>
+      </div>
       <button class="modal-close" onclick="closeModal('settingsModal')">&times;</button>
     </div>
     <div class="modal-body">
       <div class="settings-layout">
         <aside class="settings-tabs">
-          <button class="tab-btn active" data-tab="general">General</button>
-          <button class="tab-btn" data-tab="system">System</button>
-          <button class="tab-btn" data-tab="notifications">Notifications</button>
-          <button class="tab-btn" data-tab="security">Security</button>
+          <button class="tab-btn" data-tab="security"><span class="tab-icon">⌑</span>Security</button>
         </aside>
         <div class="settings-content">
-          <!-- General -->
-          <div class="settings-panel active" data-panel="general">
-            <h3>General Information</h3>
-            <div class="setting-row">
-              <label>School Name</label>
-              <input type="text" value="EASPO Academy" />
-              <span class="setting-hint">Your institution's official name</span>
-            </div>
-            <div class="setting-row">
-              <label>Academic Year</label>
-              <input type="text" value="2024-2025" />
-            </div>
-            <div class="setting-row">
-              <label>Time Zone</label>
-              <select>
-                <option>UTC+8 (Philippine Time)</option>
-                <option>UTC-5 (Eastern Time)</option>
-                <option>UTC+0 (GMT)</option>
-              </select>
-            </div>
-            <div class="setting-row">
-              <label>School Logo</label>
-              <button class="btn btn-secondary btn-sm">Upload Logo</button>
-              <span class="setting-hint">Recommended: 512×512px PNG or SVG</span>
-            </div>
-          </div>
-
-          <!-- System -->
-          <div class="settings-panel" data-panel="system">
-            <h3>System Preferences</h3>
-            <div class="setting-row">
-              <label>Language</label>
-              <select><option>English</option><option>Filipino</option></select>
-            </div>
-            <div class="setting-row">
-              <label>Date Format</label>
-              <select>
-                <option>MM/DD/YYYY</option>
-                <option>DD/MM/YYYY</option>
-                <option>YYYY-MM-DD</option>
-              </select>
-            </div>
-            <div class="setting-row">
-              <label>School Start Time</label>
-              <input type="time" value="07:30" />
-            </div>
-            <div class="setting-row">
-              <label>School End Time</label>
-              <input type="time" value="16:00" />
-            </div>
-            <div class="setting-row">
-              <label>Late Threshold (minutes)</label>
-              <input type="number" value="15" min="1" max="60" />
-            </div>
-          </div>
-
-          <!-- Notifications -->
-          <div class="settings-panel" data-panel="notifications">
-            <h3>Notification Preferences</h3>
-            <div class="toggle-row">
-              <div class="toggle-label">
-                <span>Email Notifications</span>
-                <small>Receive alerts for attendance events</small>
-              </div>
-              <label class="toggle"><input type="checkbox" checked /><span class="toggle-knob"></span></label>
-            </div>
-            <div class="toggle-row">
-              <div class="toggle-label">
-                <span>SMS Alerts</span>
-                <small>Get SMS for critical events</small>
-              </div>
-              <label class="toggle"><input type="checkbox" /><span class="toggle-knob"></span></label>
-            </div>
-            <div class="toggle-row">
-              <div class="toggle-label">
-                <span>Notify on Absence</span>
-              </div>
-              <label class="toggle"><input type="checkbox" checked /><span class="toggle-knob"></span></label>
-            </div>
-            <div class="toggle-row">
-              <div class="toggle-label">
-                <span>Daily Summary Email</span>
-                <small>Sent at end of school day</small>
-              </div>
-              <label class="toggle"><input type="checkbox" /><span class="toggle-knob"></span></label>
-            </div>
-          </div>
 
           <!-- Security -->
           <div class="settings-panel" data-panel="security">
             <h3>Security & Access</h3>
             <div class="setting-row">
-              <label>Session Timeout</label>
-              <select>
-                <option>30 minutes</option>
-                <option>1 hour</option>
-                <option>2 hours</option>
-                <option>Never</option>
-              </select>
+              <label for="settingsCurrentPassword">Current Password</label>
+              <input id="settingsCurrentPassword" type="password" autocomplete="current-password" />
             </div>
             <div class="setting-row">
-              <label>Two-Factor Authentication</label>
-              <button class="btn btn-secondary btn-sm">Enable 2FA</button>
+              <label for="settingsNewPassword">New Password</label>
+              <input id="settingsNewPassword" type="password" autocomplete="new-password" />
             </div>
             <div class="setting-row">
-              <label>Change Password</label>
-              <button class="btn btn-secondary btn-sm">Update Password</button>
+              <label for="settingsConfirmPassword">Confirm New Password</label>
+              <input id="settingsConfirmPassword" type="password" autocomplete="new-password" />
             </div>
           </div>
         </div>
       </div>
     </div>
     <div class="modal-foot">
-      <button class="btn btn-secondary" onclick="closeModal('settingsModal')">Cancel</button>
-      <button class="btn btn-primary">Save Settings</button>
+      <span class="settings-save-hint">Changes are applied when you save.</span>
+      <div class="settings-modal-actions">
+        <button class="btn btn-secondary" onclick="closeModal('settingsModal')">Cancel</button>
+        <button class="btn btn-primary" id="saveSettingsBtn">Save Settings</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1350,31 +1263,20 @@
       <div class="profile-modal-layout">
         <div class="profile-left">
           <div class="profile-av-lg" id="profileInitials">WA</div>
-          <div class="profile-badge">Super Admin</div>
-          <button class="btn btn-secondary btn-sm">📷 Change Photo</button>
         </div>
         <div class="profile-right">
           <div class="profile-section">
             <h4>Personal Information</h4>
             <div class="setting-row">
-              <label>Full Name</label>
+              <label>Name</label>
               <div class="inline-edit">
                 <input class="form-input" id="profileName" type="text" value="Web Admin" />
-                <button class="edit-btn">✏️</button>
               </div>
             </div>
             <div class="setting-row">
               <label>Email</label>
               <div class="inline-edit">
-                <input class="form-input" id="profileEmail" type="email" value="admin@school.edu" />
-                <button class="edit-btn">✏️</button>
-              </div>
-            </div>
-            <div class="setting-row">
-              <label>Phone</label>
-              <div class="inline-edit">
-                <input class="form-input" id="profilePhone" type="tel" value="+63 912 345 6789" />
-                <button class="edit-btn">✏️</button>
+                <input class="form-input" id="profileEmail" type="email"/>
               </div>
             </div>
           </div>
@@ -1389,23 +1291,12 @@
               <input class="form-input" type="text" value="Web Administrator" disabled />
             </div>
           </div>
-          <div class="profile-section">
-            <h4>Security</h4>
-            <div class="setting-row">
-              <label>Two-Factor Auth</label>
-              <button class="btn btn-secondary btn-sm">Enable 2FA</button>
-            </div>
-            <div class="setting-row">
-              <label>Password</label>
-              <button class="btn btn-secondary btn-sm">Change Password</button>
-            </div>
-          </div>
         </div>
       </div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-secondary" onclick="closeModal('profileModal')">Cancel</button>
-      <button class="btn btn-primary">Update Profile</button>
+      <button class="btn btn-primary" id="updateProfileBtn">Update Profile</button>
     </div>
   </div>
 </div>

@@ -14,6 +14,7 @@ import {
   initOverviewSection,
   loadDashboard,
   loadAdminProfile,
+  setProfileAvatar,
 } from './modules/dashboard.js'
 
 import { initCalendar } from './modules/calendar.js'
@@ -58,6 +59,7 @@ import {
   initGradesSection,
   loadGrades,
   submitAddGrade,
+  openEditGradeModal,
 } from './modules/grades.js'
 
 import {
@@ -123,6 +125,120 @@ const SECTIONS = {
 }
 
 let activeSection = 'overview'
+let settingsUser = null
+let pendingTwoFactor = null
+
+async function saveAdminProfile() {
+  const name = document.getElementById('profileName')?.value.trim() || ''
+  const email = document.getElementById('profileEmail')?.value.trim() || ''
+  const button = document.getElementById('updateProfileBtn')
+
+  if (!name || !email) return showToast('Profile not saved', 'Full name and email are required.', 'warning')
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return showToast('Profile not saved', 'Enter a valid email address.', 'warning')
+  if (!settingsUser?.id) return showToast('Profile not saved', 'Could not identify the current admin account.', 'error')
+
+  const originalText = button?.textContent || 'Update Profile'
+  if (button) {
+    button.disabled = true
+    button.textContent = 'Saving...'
+  }
+
+  try {
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .update({ name, email })
+      .eq('id', settingsUser.id)
+    if (profileError) throw profileError
+
+    if (email !== settingsUser.email) {
+      const { error: authError } = await supabase.auth.updateUser({ email })
+      if (authError) throw authError
+    }
+
+    settingsUser = { ...settingsUser, email, name }
+    await loadAdminProfile(settingsUser.id)
+    showToast('Profile updated', 'Your profile information was saved successfully.', 'success')
+  } catch (error) {
+    showToast('Profile not saved', error.message || 'Could not update your profile.', 'error')
+  } finally {
+    if (button) {
+      button.disabled = false
+      button.textContent = originalText
+    }
+  }
+}
+
+async function uploadProfilePhoto(file) {
+  if (!file || !settingsUser?.id) return
+  if (!file.type.startsWith('image/')) return showToast('Photo not uploaded', 'Choose a PNG, JPG, or WebP image.', 'warning')
+  if (file.size > 5 * 1024 * 1024) return showToast('Photo not uploaded', 'Choose an image smaller than 5 MB.', 'warning')
+
+  const button = document.getElementById('changeProfilePhotoBtn')
+  const originalText = button?.textContent || '📷 Change Photo'
+  if (button) {
+    button.disabled = true
+    button.textContent = 'Uploading...'
+  }
+
+  try {
+    const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+    const path = `${settingsUser.id}/${crypto.randomUUID()}.${extension}`
+    const { error: uploadError } = await supabase.storage.from('avatars').upload(path, file, {
+      cacheControl: '3600',
+      upsert: false,
+      contentType: file.type,
+    })
+    let avatarUrl
+    if (uploadError && /bucket not found|not found/i.test(uploadError.message || '')) {
+      avatarUrl = await compressProfilePhoto(file)
+    } else {
+      if (uploadError) throw uploadError
+      const { data: publicData } = supabase.storage.from('avatars').getPublicUrl(path)
+      avatarUrl = publicData?.publicUrl
+      if (!avatarUrl) throw new Error('Could not create a public photo URL.')
+    }
+
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .update({ avatar_url: avatarUrl })
+      .eq('id', settingsUser.id)
+    if (profileError) throw profileError
+
+    const name = document.getElementById('profileName')?.value || 'Admin'
+    const initials = name.split(' ').map(word => word[0] || '').join('').slice(0, 2).toUpperCase()
+    setProfileAvatar(avatarUrl, initials)
+    showToast('Photo updated', 'Your profile photo was saved successfully.', 'success')
+  } catch (error) {
+    showToast('Photo not uploaded', error.message || 'Could not save your profile photo.', 'error')
+  } finally {
+    if (button) {
+      button.disabled = false
+      button.textContent = originalText
+    }
+  }
+}
+
+function compressProfilePhoto(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error('Could not read the selected photo.'))
+    reader.onload = () => {
+      const image = new Image()
+      image.onerror = () => reject(new Error('Could not process the selected photo.'))
+      image.onload = () => {
+        const size = 512
+        const scale = Math.min(size / image.width, size / image.height, 1)
+        const canvas = document.createElement('canvas')
+        canvas.width = Math.max(1, Math.round(image.width * scale))
+        canvas.height = Math.max(1, Math.round(image.height * scale))
+        canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height)
+        resolve(canvas.toDataURL('image/jpeg', 0.78))
+      }
+      image.src = reader.result
+    }
+    reader.readAsDataURL(file)
+  })
+}
 
 // ── Dropdown Menu Management ───────────────────────────────────
 function initDropdownMenu() {
@@ -205,6 +321,7 @@ function setActiveSection(section) {
 window.openModal = function(id) {
   const el = document.getElementById(id)
   if (el) el.classList.remove('hidden')
+  if (id === 'settingsModal' && settingsUser) refreshSecuritySettings()
 }
 
 window.closeModal = function(id) {
@@ -246,6 +363,7 @@ window.bulkMarkAttendance   = bulkMarkAttendance
 
 // Grades
 window.submitAddGrade       = submitAddGrade
+window.openEditGradeModal   = openEditGradeModal
 
 // ── Settings tabs ─────────────────────────────────────────────
 function initSettingsTabs() {
@@ -259,6 +377,130 @@ function initSettingsTabs() {
       panels.forEach(p => p.classList.toggle('active', p.dataset.panel === name))
     })
   })
+}
+
+function passwordIsValid(password) {
+  return password.length >= 8 && /[A-Z]/.test(password) && /\d/.test(password)
+}
+
+function setTwoFactorSetup(message, qrCode = '') {
+  const setup = document.getElementById('settingsTwoFactorSetup')
+  const messageEl = document.getElementById('settingsTwoFactorSetupMessage')
+  const code = document.getElementById('settingsTwoFactorCode')
+  if (!setup) return
+  setup.classList.toggle('hidden', !message)
+  if (messageEl) messageEl.innerHTML = message ? `${message}${qrCode ? `<br><img src="${qrCode}" alt="Two-factor setup QR code" style="max-width:180px;margin-top:8px">` : ''}` : ''
+  if (code) code.hidden = !message
+}
+
+async function getTwoFactorFactors() {
+  const { data, error } = await supabase.auth.mfa.listFactors()
+  if (error) throw error
+  return data || { all: [], verified: [], unverified: [] }
+}
+
+async function refreshSecuritySettings() {
+  try {
+    const factors = await getTwoFactorFactors()
+    const enabled = (factors.verified || []).some(factor => factor.factor_type === 'totp')
+    const select = document.getElementById('settingsTwoFactor')
+    if (select) select.value = enabled ? 'enabled' : 'disabled'
+    pendingTwoFactor = (factors.unverified || []).find(factor => factor.factor_type === 'totp') || null
+    setTwoFactorSetup(pendingTwoFactor ? 'Enter the verification code from your authenticator app, then save again.' : '')
+  } catch (error) {
+    showToast('2FA unavailable', error.message || 'Could not load two-factor settings.', 'error')
+  }
+}
+
+async function saveTwoFactorSetting() {
+  const selected = document.getElementById('settingsTwoFactor')?.value
+  if (!['enabled', 'disabled'].includes(selected)) {
+    throw new Error('Select a valid two-factor authentication setting.')
+  }
+
+  const factors = await getTwoFactorFactors()
+  const totpFactors = (factors.all || []).filter(factor => factor.factor_type === 'totp')
+  if (selected === 'disabled') {
+    for (const factor of totpFactors) {
+      const { error } = await supabase.auth.mfa.unenroll({ factorId: factor.id })
+      if (error) throw error
+    }
+    pendingTwoFactor = null
+    setTwoFactorSetup('')
+    return
+  }
+
+  const verified = (factors.verified || []).find(factor => factor.factor_type === 'totp')
+  if (verified) return
+
+  const factor = pendingTwoFactor || (await supabase.auth.mfa.enroll({ factorType: 'totp', friendlyName: 'SchoolSys Admin' })).data
+  if (!factor?.id) throw new Error('Could not start two-factor setup.')
+  pendingTwoFactor = factor
+  const code = document.getElementById('settingsTwoFactorCode')?.value.trim()
+  if (!code) {
+    setTwoFactorSetup('Scan the QR code with an authenticator app, enter the code below, and click Save Settings again.', factor.totp?.qr_code)
+    throw new Error('Two-factor setup started. Enter the verification code and save again.')
+  }
+
+  const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({ factorId: factor.id })
+  if (challengeError) throw challengeError
+  const { error: verifyError } = await supabase.auth.mfa.verify({ factorId: factor.id, challengeId: challenge.id, code })
+  if (verifyError) throw verifyError
+  pendingTwoFactor = null
+  document.getElementById('settingsTwoFactorCode').value = ''
+  setTwoFactorSetup('')
+}
+
+async function savePasswordSetting() {
+  const current = document.getElementById('settingsCurrentPassword')?.value || ''
+  const next = document.getElementById('settingsNewPassword')?.value || ''
+  const confirmation = document.getElementById('settingsConfirmPassword')?.value || ''
+  const hasPasswordChange = current || next || confirmation
+  if (!hasPasswordChange) return
+  if (!current || !next || !confirmation) throw new Error('Fill in all password fields to change your password.')
+  if (!passwordIsValid(next)) throw new Error('New password must be at least 8 characters and include one uppercase letter and one number.')
+  if (next !== confirmation) throw new Error('New password and confirmation do not match.')
+  if (!settingsUser?.email) throw new Error('Could not identify the current admin account.')
+
+  const { error: authError } = await supabase.auth.signInWithPassword({ email: settingsUser.email, password: current })
+  if (authError) throw new Error('Current password is incorrect.')
+  const { error: updateError } = await supabase.auth.updateUser({ password: next })
+  if (updateError) throw updateError
+  document.getElementById('settingsCurrentPassword').value = ''
+  document.getElementById('settingsNewPassword').value = ''
+  document.getElementById('settingsConfirmPassword').value = ''
+}
+
+async function saveSecuritySettings() {
+  const button = document.getElementById('saveSettingsBtn')
+  if (button) {
+    button.disabled = true
+    button.textContent = 'Saving...'
+  }
+  try {
+    await saveTwoFactorSetting()
+    await savePasswordSetting()
+    await refreshSecuritySettings()
+    showToast('Settings saved', 'Security settings were updated successfully.', 'success')
+  } catch (error) {
+    showToast('Settings not saved', error.message || 'Could not update security settings.', 'error')
+    await refreshSecuritySettings()
+  } finally {
+    if (button) {
+      button.disabled = false
+      button.textContent = 'Save Settings'
+    }
+  }
+}
+
+function initSecuritySettings(user) {
+  settingsUser = user
+  const securityPanel = document.querySelector('[data-panel="security"]')
+  if (!securityPanel) return
+  if (document.getElementById('saveSettingsBtn')?.dataset.initialized) return
+  document.getElementById('saveSettingsBtn').dataset.initialized = 'true'
+  document.getElementById('saveSettingsBtn')?.addEventListener('click', saveSecuritySettings)
+  refreshSecuritySettings()
 }
 
 // ── Sidebar search filter ─────────────────────────────────────
@@ -392,14 +634,6 @@ function ensureManualEntryModal() {
               <input id="manualDate" class="form-input" type="date" required />
             </div>
           </div>
-          <div class="form-group">
-            <label class="form-label">Note (optional)</label>
-            <input id="manualNote" class="form-input" type="text" placeholder="e.g. Medical excuse, field trip…" />
-          </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
-            <button type="button" class="btn btn-secondary btn-sm" onclick="bulkMarkAttendance('present')">✅ Mark All Present</button>
-            <button type="button" class="btn btn-secondary btn-sm" onclick="bulkMarkAttendance('absent')">❌ Mark All Absent</button>
-          </div>
         </form>
       </div>
       <div class="modal-foot">
@@ -451,6 +685,14 @@ async function boot() {
   initReportsSection()
   initUserManagementSection()
   initSettingsTabs()
+  initSecuritySettings(user)
+  document.getElementById('updateProfileBtn')?.addEventListener('click', saveAdminProfile)
+  const photoInput = document.getElementById('profilePhotoInput')
+  document.getElementById('changeProfilePhotoBtn')?.addEventListener('click', () => photoInput?.click())
+  photoInput?.addEventListener('change', event => {
+    uploadProfilePhoto(event.target.files?.[0])
+    event.target.value = ''
+  })
   initDropdownMenu()
   initSidebarSearch()
   initGlobalSearch()

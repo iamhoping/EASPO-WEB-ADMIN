@@ -16,8 +16,12 @@ const closeM= id => document.getElementById(id)?.classList.add('hidden')
 
 const STATUS_PILL = {
 	present : 'pill-green',
-	absent  : 'pill-red'
+	absent  : 'pill-red',
+	late    : 'pill-yellow',
+	excused : 'pill-blue'
 }
+
+const BASE_STATUSES = ['present', 'late', 'absent']
 
 // ── Fetch students for dropdowns ──────────────────────────────
 async function fetchStudents() {
@@ -144,6 +148,7 @@ export async function loadAttendance() {
 				}
 			})
 		}
+		populateStatusFilter()
 		console.log(`Loaded ${allRecords.length} attendance records for ${dateVal}`)
 	} catch (error) {
 		console.error('Exception in loadAttendance:', error)
@@ -268,10 +273,18 @@ function render() {
 			</td>
 			<td><span class="pill pill-blue">${grade}</span></td>
 			<td><span class="pill pill-purple">${section}</span></td>
-			<td><span class="pill ${pillC}">${pillL}</span></td>
+			<td>
+				<span class="pill ${pillC} attendance-status-label">${pillL}</span>
+			</td>
 			<td>
 				<div class="row-acts">
-					<button class="act-btn" title="Edit Status" onclick="openEditAttendanceModal('${studentId}','${st}','${safeName}')">✏️</button>
+					<div class="attendance-status-edit">
+						<button class="act-btn attendance-edit-btn" type="button" title="Edit status" aria-label="Edit attendance status for ${safeName}" aria-expanded="false">✏️</button>
+						<div class="attendance-status-choices" aria-label="Choose attendance status for ${safeName}">
+							<button class="attendance-status-choice present-choice" type="button" data-status="present" data-student-id="${studentId}" data-date="${r.attendance_date || r.date || ''}" data-previous-status="${st}">Present</button>
+							<button class="attendance-status-choice absent-choice" type="button" data-status="absent" data-student-id="${studentId}" data-date="${r.attendance_date || r.date || ''}" data-previous-status="${st}">Absent</button>
+						</div>
+					</div>
 					<button class="act-btn danger" title="Delete" onclick="confirmDeleteAttendance('${studentId}','${r.date}','${safeName}')">🗑</button>
 				</div>
 			</td>
@@ -321,26 +334,38 @@ export async function submitManualEntry() {
 }
 
 // ── Edit attendance status ────────────────────────────────────
-window.openEditAttendanceModal = function(studentId, currentStatus, name) {
-	const newStatus = prompt(
-		`Change attendance for "${name}":\nEnter: present or absent`,
-		currentStatus
-	)
-	if (!newStatus) return
-	const valid = ['present','absent']
-	if (!valid.includes(newStatus.toLowerCase())) {
-		showToast('Invalid','Enter: present or absent','warning'); return
-	}
-	const dateVal = document.getElementById('attendanceDatePicker')?.value || new Date().toISOString().slice(0,10)
-	supabase.from('attendance')
-		.update({ status: newStatus.toLowerCase() })
+function closeAttendanceEditor(editor) {
+	if (!editor) return
+	editor.classList.remove('open')
+	editor.querySelector('.attendance-edit-btn')?.setAttribute('aria-expanded', 'false')
+}
+
+window.changeAttendanceStatus = async function(choice) {
+	const studentId = choice.dataset.studentId
+	const date = choice.dataset.date
+	const previousStatus = choice.dataset.previousStatus || 'absent'
+	const nextStatus = choice.dataset.status?.toLowerCase()
+	if (!studentId || !date || !['present', 'absent'].includes(nextStatus)) return
+
+	const editor = choice.closest('.attendance-status-edit')
+	editor?.querySelectorAll('.attendance-status-choice').forEach(button => { button.disabled = true })
+	const { error } = await supabase
+		.from('attendance')
+		.update({ status: nextStatus })
 		.eq('student_id', studentId)
-		.eq('attendance_date', dateVal)
-		.then(({ error }) => {
-			if (error) return showToast('Error', error.message, 'error')
-			showToast('Updated', `Status set to ${newStatus}`, 'success')
-			loadAttendance()
-		})
+		.eq('attendance_date', date)
+
+	if (error) {
+		editor?.querySelectorAll('.attendance-status-choice').forEach(button => { button.disabled = false })
+		closeAttendanceEditor(editor)
+		return showToast('Update failed', error.message, 'error')
+	}
+
+	const record = allRecords.find(item => String(item.student_id) === String(studentId) && String(item.attendance_date || item.date) === String(date))
+	if (record) record.status = nextStatus
+	closeAttendanceEditor(editor)
+	showToast('Attendance updated', `Status set to ${nextStatus.charAt(0).toUpperCase() + nextStatus.slice(1)}.`, 'success')
+	applyFilters()
 }
 
 // ── Delete attendance record ──────────────────────────────────
@@ -422,6 +447,29 @@ export function initAttendanceSection() {
 	document.getElementById('attSectionFilter')?.addEventListener('change', loadAttendance)
 	document.getElementById('attStatusFilter')?.addEventListener('change', applyFilters)
 	document.getElementById('exportAttendanceBtn')?.addEventListener('click', exportCSV)
+	document.getElementById('attendanceTableBody')?.addEventListener('click', event => {
+		const choice = event.target.closest('.attendance-status-choice')
+		if (choice) {
+			window.changeAttendanceStatus(choice)
+			return
+		}
+		const editButton = event.target.closest('.attendance-edit-btn')
+		if (!editButton) return
+		const editor = editButton.closest('.attendance-status-edit')
+		const isOpen = editor?.classList.toggle('open')
+		editButton.setAttribute('aria-expanded', String(Boolean(isOpen)))
+		if (isOpen) editor.querySelector('.attendance-status-choice')?.focus()
+	})
+	document.addEventListener('click', event => {
+		if (!event.target.closest('.attendance-status-edit')) {
+			document.querySelectorAll('.attendance-status-edit.open').forEach(closeAttendanceEditor)
+		}
+	})
+	document.addEventListener('keydown', event => {
+		if (event.key === 'Escape') {
+			document.querySelectorAll('.attendance-status-edit.open').forEach(closeAttendanceEditor)
+		}
+	})
 
 	loadAttendance()
 }
@@ -461,4 +509,17 @@ function renderPages(id, cur, total, onChange) {
 		const page = Number(btn.dataset.page)
 		if (!isNaN(page) && page !== cur) onChange(page)
 	}
+}
+
+function populateStatusFilter() {
+	const filter = document.getElementById('attStatusFilter')
+	if (!filter) return
+	const current = filter.value
+	const statuses = allRecords.some(record => String(record.status).toLowerCase() === 'excused')
+		? [...BASE_STATUSES, 'excused']
+		: BASE_STATUSES
+	filter.innerHTML = '<option value="">All Statuses</option>' + statuses
+		.map(status => `<option value="${status}">${status.charAt(0).toUpperCase() + status.slice(1)}</option>`)
+		.join('')
+	if (statuses.includes(current)) filter.value = current
 }

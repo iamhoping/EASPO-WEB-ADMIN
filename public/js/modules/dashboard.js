@@ -187,25 +187,42 @@ async function loadAttendanceChart(monthValue) {
 
 // ── Admin profile load ─────────────────────────────────────────
 export async function loadAdminProfile(userId) {
+  const { data: { user } = {} } = await supabase.auth.getUser()
   const { data, error } = await supabase
     .from('profiles')
-    .select('name, email, role')
+    .select('name, role')
     .eq('id', userId)
     .single()
 
-  if (error || !data) return
-
-  const name = data.name || 'Admin'
+  const name = data?.name || 'Admin'
   const ini  = name.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase()
 
   setText('sidebarName', name)
   setText('sidebarInitials', ini)
   setText('profileInitials', ini)
+  setProfileAvatar(null, ini)
 
   const profileName  = document.getElementById('profileName')
   const profileEmail = document.getElementById('profileEmail')
   if (profileName)  profileName.value  = name
-  if (profileEmail) profileEmail.value = data.email || ''
+  if (profileEmail) profileEmail.value = user?.email || ''
+}
+
+export function setProfileAvatar(url, initials = 'WA') {
+  const targets = [document.getElementById('profileInitials'), document.getElementById('sidebarInitials')]
+  targets.forEach(target => {
+    if (!target) return
+    target.textContent = ''
+    if (url) {
+      const image = document.createElement('img')
+      image.src = url
+      image.alt = 'Profile photo'
+      image.onerror = () => { target.textContent = initials }
+      target.appendChild(image)
+    } else {
+      target.textContent = initials
+    }
+  })
 }
 
 // ── Init overview section ──────────────────────────────────────

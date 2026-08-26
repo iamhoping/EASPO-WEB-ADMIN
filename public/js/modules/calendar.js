@@ -4,6 +4,7 @@ import { showToast } from '../ui/toast.js'
 
 let currentDate = new Date()
 let attendanceData = {}
+let selectedDate = formatLocalDate(currentDate)
 
 function formatLocalDate(date) {
   const year = date.getFullYear()
@@ -147,7 +148,7 @@ async function renderCalendar(date) {
     // Add status class based on attendance data
     if (attendanceData[dateStr]) {
       const att = attendanceData[dateStr]
-      const percentage = (att.present / att.total) * 100
+      const percentage = att.total ? (att.present / att.total) * 100 : 0
 
       if (percentage === 100) {
         dayEl.classList.add('status-full')
@@ -168,22 +169,65 @@ async function renderCalendar(date) {
     if (dateStr === today) {
       dayEl.classList.add('today')
     }
+    if (dateStr === selectedDate) dayEl.classList.add('selected')
+    dayEl.setAttribute('role', 'button')
+    dayEl.setAttribute('tabindex', '0')
+    dayEl.setAttribute('aria-label', `${dateStr}: ${attendanceData[dateStr] ? `${attendanceData[dateStr].present} of ${attendanceData[dateStr].total} present` : 'No attendance recorded'}`)
+    const selectDay = () => {
+      selectedDate = dateStr
+      updateCalendarDetail(dateStr)
+      daysContainer.querySelectorAll('.calendar-day.selected').forEach(day => day.classList.remove('selected'))
+      dayEl.classList.add('selected')
+    }
+    dayEl.addEventListener('click', selectDay)
+    dayEl.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectDay() }
+    })
 
     const dayNumber = document.createElement('div')
     dayNumber.className = 'day-number'
     dayNumber.textContent = day
     dayEl.appendChild(dayNumber)
 
+    const dayMeta = document.createElement('div')
+    dayMeta.className = 'day-meta'
+    const daySummary = attendanceData[dateStr]
+    dayMeta.textContent = daySummary
+      ? `${daySummary.present}/${daySummary.total} · ${daySummary.total ? Math.round((daySummary.present / daySummary.total) * 100) : 0}%`
+      : 'No data'
+    dayEl.appendChild(dayMeta)
+
     daysContainer.appendChild(dayEl)
   }
 
   calendarEl.appendChild(daysContainer)
   container.appendChild(calendarEl)
+  if (selectedDate && selectedDate.slice(0, 7) === `${bounds.year}-${String(bounds.month + 1).padStart(2, '0')}`) {
+    updateCalendarDetail(selectedDate)
+  }
+}
+
+function updateCalendarDetail(dateStr) {
+  const detail = document.getElementById('calendarDetail')
+  if (!detail) return
+  const date = new Date(`${dateStr}T00:00:00`)
+  const label = date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+  const summary = attendanceData[dateStr]
+  detail.innerHTML = summary
+    ? `<span class="calendar-detail-icon">✓</span><div><strong>${label}</strong><span>${summary.present} present · ${summary.absent} absent · ${summary.total} students tracked</span></div>`
+    : `<span class="calendar-detail-icon muted">i</span><div><strong>${label}</strong><span>No attendance records were recorded for this date.</span></div>`
 }
 
 // Navigation functions
 export function initCalendar() {
   renderCalendar(currentDate)
+
+  document.getElementById('todayMonthBtn')?.addEventListener('click', () => {
+    currentDate = new Date()
+    selectedDate = formatLocalDate(currentDate)
+    renderCalendar(new Date(currentDate))
+  })
+  document.getElementById('refreshCalendarBtn')?.addEventListener('click', () => renderCalendar(new Date(currentDate)))
 
   // Expose global functions for navigation
   window.prevMonth = () => {

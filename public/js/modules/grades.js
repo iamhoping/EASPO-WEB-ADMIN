@@ -193,6 +193,8 @@ function render() {
 
 // ── Add ───────────────────────────────────────────────────────
 export async function submitAddGrade() {
+  const form          = document.getElementById('addGradeForm')
+  const editingId     = form?.dataset.editId
   const student_id    = val('gradeStudent')
   const subject       = val('gradeSubject')
   const quarter       = val('gradeQuarter')
@@ -206,6 +208,23 @@ export async function submitAddGrade() {
   const numScore = Number(score)
   if (isNaN(numScore) || numScore < 0 || numScore > 100)
     return showToast('Invalid score', 'Score must be between 0 and 100', 'warning')
+
+  if (editingId) {
+    const updateData = { student_id, subject, quarter, score: numScore, remarks: remarks||null }
+    if (document.getElementById('gradeYear')) updateData.academic_year = academic_year
+    const { error } = await supabase
+      .from('grades')
+      .update(updateData)
+      .eq('id', editingId)
+    if (error) return showToast('Error', error.message, 'error')
+    showToast('Updated', 'Grade record updated', 'success')
+    closeM('addGradeModal')
+    form.reset()
+    delete form.dataset.editId
+    document.getElementById('addGradeModal').querySelector('.modal-head h2').textContent = 'Add Grade Record'
+    loadGrades()
+    return
+  }
 
   // Check for duplicate
   const { data: existing } = await supabase
@@ -248,17 +267,46 @@ export async function openEditGradeModal(id) {
   if (error) return showToast('Error', 'Could not load grade', 'error')
 
   // Reuse addGradeModal for editing — pre-populate
-  document.getElementById('addGradeModal').querySelector('.modal-head h2').textContent = 'Edit Grade Record'
-  document.getElementById('gradeStudent').value  = g.student_id  || ''
-  document.getElementById('gradeSubject').value  = g.subject     || ''
+  const modal = document.getElementById('addGradeModal')
+  const studentSelect = document.getElementById('gradeStudent')
+  const subjectSelect = document.getElementById('gradeSubject')
+  const yearInput = document.getElementById('gradeYear')
+  modal.querySelector('.modal-head h2').textContent = 'Edit Grade Record'
+  studentSelect.value = g.student_id || ''
+  subjectSelect.innerHTML = `<option value="${g.subject || ''}">${g.subject || 'No subject'}</option>`
+  subjectSelect.value = g.subject || ''
+  studentSelect.disabled = true
+  subjectSelect.disabled = true
   document.getElementById('gradeQuarter').value  = g.quarter     || ''
   document.getElementById('gradeScore').value    = g.score       ?? ''
-  document.getElementById('gradeYear').value     = g.academic_year || '2024-2025'
+  if (yearInput) yearInput.value = g.academic_year || '2024-2025'
   document.getElementById('gradeRemarks').value  = g.remarks     || ''
 
   // Store editing ID
   document.getElementById('addGradeForm').dataset.editId = id
   openM('addGradeModal')
+}
+
+function resetGradeModalForAdd() {
+  const modal = document.getElementById('addGradeModal')
+  const form = document.getElementById('addGradeForm')
+  const studentSelect = document.getElementById('gradeStudent')
+  const subjectSelect = document.getElementById('gradeSubject')
+  modal.querySelector('.modal-head h2').textContent = 'Add Grade Record'
+  form.reset()
+  delete form.dataset.editId
+  studentSelect.disabled = false
+  subjectSelect.disabled = false
+  subjectSelect.innerHTML = `
+    <option value="">Select subject...</option>
+    <option value="Mathematics">Mathematics</option>
+    <option value="Science">Science</option>
+    <option value="English">English</option>
+    <option value="Filipino">Filipino</option>
+    <option value="History">History</option>
+    <option value="MAPEH">MAPEH</option>
+    <option value="Values Education">Values Education</option>
+    <option value="Technology">Technology</option>`
 }
 
 // ── Delete ────────────────────────────────────────────────────
@@ -294,11 +342,7 @@ function exportCSV() {
 // ── Init ──────────────────────────────────────────────────────
 export function initGradesSection() {
   document.getElementById('addGradeBtn')?.addEventListener('click', () => {
-    // Reset modal title in case it was used for edit
-    const modal = document.getElementById('addGradeModal')
-    if (modal) modal.querySelector('.modal-head h2').textContent = 'Add Grade Record'
-    const form = document.getElementById('addGradeForm')
-    if (form) { form.reset(); delete form.dataset.editId }
+    resetGradeModalForAdd()
     openM('addGradeModal')
   })
 
