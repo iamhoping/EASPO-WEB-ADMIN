@@ -46,24 +46,29 @@ function escapeHtml(value: string) {
 
 async function sendGuardianEmail(student: Student, schedule: Schedule, attendanceDate: string): Promise<EmailResult> {
   const recipient = student.guardian_email?.trim() ?? ''
+  // This is intentionally profiles.guardian_email, never profiles.email.
+  console.log(`[AUTO-ABSENT][EMAIL] Student name=${student.name ?? 'unknown'}; uuid=${student.id}; profiles.guardian_email=${recipient || 'null/empty'}`)
   if (!recipient) {
-    console.warn(`[AUTO-ABSENT] Guardian email not found for student=${student.id}; email skipped`)
+    console.warn(`[AUTO-ABSENT][EMAIL] Validation=false; student=${student.id}; skipped because profiles.guardian_email is null, empty, or whitespace`)
     return { sent: false, reason: 'guardian email is empty' }
   }
   if (!isEmail(recipient)) {
-    console.warn(`[AUTO-ABSENT] Guardian email is invalid for student=${student.id}; email skipped`)
+    console.warn(`[AUTO-ABSENT][EMAIL] Validation=false; student=${student.id}; skipped because profiles.guardian_email is not a valid email address`)
     return { sent: false, reason: 'guardian email is invalid' }
   }
+  console.log(`[AUTO-ABSENT][EMAIL] Validation=true; student=${student.id}`)
   const apiKey = Deno.env.get('EMAIL_API_KEY')
   const from = Deno.env.get('EMAIL_FROM')
+  console.log(`[AUTO-ABSENT][EMAIL] EMAIL_API_KEY configured=${Boolean(apiKey)}; EMAIL_FROM=${from || 'not configured'}`)
   if (!apiKey || !from) {
-    console.error(`[AUTO-ABSENT] Brevo is not configured for student=${student.id}`)
+    console.error(`[AUTO-ABSENT][EMAIL] Brevo skipped; student=${student.id}; reason=${!apiKey && !from ? 'EMAIL_API_KEY and EMAIL_FROM are missing' : !apiKey ? 'EMAIL_API_KEY is missing' : 'EMAIL_FROM is missing'}`)
     return { sent: false, reason: 'Brevo credentials are not configured' }
   }
   const subject = String(value(schedule, ['subject_name', 'subject', 'subject_title', 'subject_code']) ?? 'Scheduled class')
   const section = String(value(schedule, ['section_name', 'section']) ?? '')
   const start = String(value(schedule, ['start_time', 'time_start', 'start']) ?? '')
   try {
+    console.log(`[AUTO-ABSENT][EMAIL] Attempting Brevo request; student=${student.id}; recipient=${recipient}; from=${from}`)
     const response = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST', headers: { 'api-key': apiKey, 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({
@@ -73,11 +78,12 @@ async function sendGuardianEmail(student: Student, schedule: Schedule, attendanc
       }),
     })
     const responseBody = await response.text()
+    console.log(`[AUTO-ABSENT][EMAIL] Brevo HTTP status=${response.status}; student=${student.id}; response=${responseBody.slice(0, 500) || '(empty)'}`)
     if (!response.ok) {
-      console.error(`[AUTO-ABSENT] Brevo failed for student=${student.id}; status=${response.status}; response=${responseBody.slice(0, 500)}`)
+      console.error(`[AUTO-ABSENT][EMAIL] Brevo rejected email; student=${student.id}`)
       return { sent: false, reason: `Brevo returned ${response.status}` }
     }
-    console.log(`[AUTO-ABSENT] Brevo accepted email for student=${student.id}; response=${responseBody.slice(0, 500)}`)
+    console.log(`[AUTO-ABSENT][EMAIL] Brevo accepted email; student=${student.id}`)
     return { sent: true }
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error)
