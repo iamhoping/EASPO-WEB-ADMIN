@@ -7,6 +7,10 @@
     {
       "source": "/scanner-attendance",
       "destination": "/scanner-attendance.html"
+    },
+    {
+      "source": "/login",
+      "destination": "/index.html"
     }
   ],
   "redirects": [
@@ -18,6 +22,11 @@
     {
       "source": "/scanner-attendance.html",
       "destination": "/scanner-attendance",
+      "permanent": true
+    },
+    {
+      "source": "/index.html",
+      "destination": "/login",
       "permanent": true
     }
   ]
