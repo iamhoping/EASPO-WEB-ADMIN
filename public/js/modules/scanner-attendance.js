@@ -57,17 +57,31 @@ function armScannerIdleTimer() {
 }
 
 function formatScanTime(date) {
-  return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' })
+  return date.toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour: 'numeric', minute: '2-digit', second: '2-digit' })
+}
+
+function schoolDateParts(date) {
+  return Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23', weekday: 'long'
+  }).formatToParts(date).filter(part => part.type !== 'literal').map(part => [part.type, part.value]))
 }
 
 function formatAttendanceTime(date) {
-  return [date.getHours(), date.getMinutes(), date.getSeconds()]
-    .map((part, index) => index === 0 ? String(part).padStart(2, '0') : String(part).padStart(2, '0'))
-    .join(':')
+  const parts = schoolDateParts(date)
+  return `${parts.hour}:${parts.minute}:${parts.second}`
 }
 
 function formatLocalDate(date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+  const parts = schoolDateParts(date)
+  return `${parts.year}-${parts.month}-${parts.day}`
+}
+
+function isLateForSchedule(schedule, scannedAt) {
+  const start = String(scheduleValue(schedule, ['start_time', 'time_start', 'start']) || '00:00')
+  const [hour = '0', minute = '0'] = start.split(':')
+  const parts = schoolDateParts(scannedAt)
+  return Number(parts.hour) * 60 + Number(parts.minute) > Number(hour) * 60 + Number(minute)
 }
 
 function getStudentIdCandidates(scannedValue) {
@@ -236,7 +250,7 @@ async function recordScan(rawValue) {
     const scannedAt = new Date()
     const attendanceDate = formatLocalDate(scannedAt)
     const timeIn = formatAttendanceTime(scannedAt)
-    const todaySchedule = await findTodaySchedule(student, attendanceDate, scannedAt.toLocaleDateString('en-US', { weekday: 'long' }))
+    const todaySchedule = await findTodaySchedule(student, attendanceDate, schoolDateParts(scannedAt).weekday)
     if (!todaySchedule) {
       showNoScheduleResult(student)
       finishResult('NO_SCHEDULE')
@@ -244,7 +258,7 @@ async function recordScan(rawValue) {
     }
     const scheduleId = scheduleValue(todaySchedule, ['id', 'schedule_id'])
     const subjectName = scheduleValue(todaySchedule, ['subject_name', 'subject', 'subject_title', 'subject_code']) || '—'
-    console.log('[ATTENDANCE] Duplicate check:', {
+    console.log('[ATTENDANCE] Checking for existing record:', {
       studentId: student.id,
       scheduleId,
       attendanceDate
@@ -256,40 +270,102 @@ async function recordScan(rawValue) {
       .eq('attendance_date', attendanceDate)
     const { data: attendanceRows, error: existingError } = await duplicateQuery
 
-    const existing = (attendanceRows || []).find(row => !scheduleId || !row.schedule_id || String(row.schedule_id) === String(scheduleId))
-    console.log('[ATTENDANCE] Duplicate check result:', existing || null)
+    const existing = (attendanceRows || []).find(row => String(row.schedule_id) === String(scheduleId))
+    console.log('[ATTENDANCE] Existing record check result:', existing || null)
     if (existingError) throw existingError
+
+    // Determine if this is a late scan (updating Absent to Present)
+    let isLate = isLateForSchedule(todaySchedule, scannedAt)
+    let attendance = null
+    let insertError = null
+
     if (existing) {
-      console.log('[ATTENDANCE] Already marked present', existing)
-      showErrorResult('Already Scanned', `${student.name} has already been marked present for this schedule. No duplicate was created.`, true)
-      setText('scannerScannedAt', `Time In: ${existing.time_in || 'Recorded'}`)
-      finishResult('DUPLICATE')
-      return
+      if (existing.status === 'present') {
+        // Already scanned as present
+        console.log('[ATTENDANCE] Already marked present', existing)
+        showErrorResult('Already Scanned', `${student.name} has already been marked present for this schedule. No duplicate was created.`, true)
+        setText('scannerScannedAt', `Time In: ${existing.time_in || 'Recorded'}`)
+        finishResult('DUPLICATE')
+        processing = false
+        armScannerIdleTimer()
+        return
+      } else if (existing.status === 'absent') {
+        // Late scan - update Absent to Present
+        console.log('[ATTENDANCE] Late scan detected - updating Absent to Present', existing)
+        isLate = true
+        const updateData = {
+          status: 'present',
+          time_in: timeIn,
+          is_late: true,
+          guardian_email_sent: existing.guardian_email_sent || false
+        }
+        const { data: updatedAttendance, error: updateError } = await supabase
+          .from('attendance')
+          .update(updateData)
+          .eq('id', existing.id)
+          .select()
+          .single()
+
+        attendance = updatedAttendance
+        insertError = updateError
+        console.log('[ATTENDANCE] Late scan update result:', attendance)
+      } else {
+        // Other status - still create new or handle as needed
+        console.log('[ATTENDANCE] Existing record with status:', existing.status)
+        showErrorResult('Conflicting Record', `A record with status "${existing.status}" exists for this student. Please contact an administrator.`)
+        finishResult('ERROR')
+        processing = false
+        armScannerIdleTimer()
+        return
+      }
+    } else {
+      // Create new Present record
+      const attendanceRecord = {
+        student_id: student.id,
+        section_id: student.section_id,
+        schedule_id: scheduleId,
+        subject: subjectName,
+        attendance_date: attendanceDate,
+        time_in: timeIn,
+        status: 'present',
+        is_late: isLate,
+        guardian_email_sent: false
+      }
+      console.log('[ATTENDANCE] Insert:', attendanceRecord)
+      const result = await supabase
+        .from('attendance')
+        .insert([attendanceRecord])
+        .select()
+        .single()
+
+      attendance = result.data
+      insertError = result.error
+      console.log('[ATTENDANCE] New record result:', attendance)
     }
 
-    const attendanceRecord = {
-      student_id: student.id,
-      section_id: student.section_id,
-      subject: subjectName,
-      attendance_date: attendanceDate,
-      time_in: timeIn,
-      status: 'present'
-    }
-    console.log('[ATTENDANCE] Insert:', attendanceRecord)
-    const { data: attendance, error: insertError } = await supabase
-      .from('attendance')
-      .insert([attendanceRecord])
-      .select()
-      .single()
-
-    console.log('Attendance result:', attendance)
-    console.error('Attendance insert error:', insertError)
+    console.error('[ATTENDANCE] Potential error:', insertError)
     if (insertError) throw insertError
 
     console.log('[ATTENDANCE] Success:', attendance)
-    showResult(student, sectionName, subjectName, scannedAt)
+    if (isLate) {
+      // Show late arrival message
+      const resultDiv = getElement('scannerResult')
+      if (resultDiv) {
+        resultDiv.classList.remove('hidden', 'scanner-result-error', 'scanner-result-duplicate', 'scanner-result-info')
+        setText('scannerResultTitle', 'Late Arrival Recorded')
+        setText('scannerStudentName', student.name)
+        setText('scannerStudentId', `Student ID: ${student.student_id}`)
+        setText('scannerStudentClass', `${student.grade_level || 'No grade'} - ${sectionName}`)
+        setText('scannerSubject', `Subject: ${subjectName || '—'}`)
+        setText('scannerResultStatus', 'Late')
+        setText('scannerScannedAt', formatScanTime(scannedAt))
+        setScannerState('Late Arrival', 'success')
+      }
+    } else {
+      showResult(student, sectionName, subjectName, scannedAt)
+      setScannerState('Ready to Scan', 'success')
+    }
     document.dispatchEvent(new CustomEvent('scanner-attendance-recorded'))
-    setScannerState('Ready to Scan', 'success')
   } catch (error) {
     console.error('[SCANNER] Flow failed:', error)
     showErrorResult('System Error', 'Unable to record attendance. Please try scanning again.')
