@@ -9,7 +9,8 @@ const corsHeaders = {
 }
 
 type Schedule = Record<string, unknown>
-type Student = { id: string; name: string | null; guardian_email: string | null }
+type Student = { id: string; name: string | null; guardian_email: string | null; section_id: string | null }
+type EmailResult = { sent: boolean; reason?: string }
 
 function json(status: number, body: Record<string, unknown>) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
@@ -30,120 +31,157 @@ function value(row: Schedule, names: string[]) {
 function normalizedDay(day: unknown) { return String(day ?? '').trim().toLowerCase().slice(0, 3) }
 function timeMinutes(time: unknown) {
   const [hour = '0', minute = '0'] = String(time ?? '00:00').split(':')
-  return Number(hour) * 60 + Number(minute)
+  const parsedHour = Number(hour)
+  const parsedMinute = Number(minute)
+  return Number.isInteger(parsedHour) && Number.isInteger(parsedMinute) && parsedHour >= 0 && parsedHour < 24 && parsedMinute >= 0 && parsedMinute < 60
+    ? parsedHour * 60 + parsedMinute
+    : null
 }
+function formatMinutes(minutes: number) { return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}` }
+function normalizedStatus(status: unknown) { return String(status ?? '').trim().toLowerCase() }
+function isEmail(value: string) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) }
 function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char] as string))
 }
 
-async function sendGuardianEmail(student: Student, schedule: Schedule, attendanceDate: string) {
+async function sendGuardianEmail(student: Student, schedule: Schedule, attendanceDate: string): Promise<EmailResult> {
+  const recipient = student.guardian_email?.trim() ?? ''
+  if (!recipient) {
+    console.warn(`[AUTO-ABSENT] Guardian email not found for student=${student.id}; email skipped`)
+    return { sent: false, reason: 'guardian email is empty' }
+  }
+  if (!isEmail(recipient)) {
+    console.warn(`[AUTO-ABSENT] Guardian email is invalid for student=${student.id}; email skipped`)
+    return { sent: false, reason: 'guardian email is invalid' }
+  }
   const apiKey = Deno.env.get('EMAIL_API_KEY')
   const from = Deno.env.get('EMAIL_FROM')
-  if (!student.guardian_email?.trim()) {
-    console.warn(`[AUTO-ABSENT] Guardian email unavailable for student ${student.id}`)
-    return false
-  }
   if (!apiKey || !from) {
-    console.error('[AUTO-ABSENT] Email is not configured (EMAIL_API_KEY and EMAIL_FROM are required)')
-    return false
+    console.error(`[AUTO-ABSENT] Brevo is not configured for student=${student.id}`)
+    return { sent: false, reason: 'Brevo credentials are not configured' }
   }
   const subject = String(value(schedule, ['subject_name', 'subject', 'subject_title', 'subject_code']) ?? 'Scheduled class')
   const section = String(value(schedule, ['section_name', 'section']) ?? '')
   const start = String(value(schedule, ['start_time', 'time_start', 'start']) ?? '')
-  const name = escapeHtml(student.name || 'your child')
-  const response = await fetch('https://api.brevo.com/v3/smtp/email', {
-    method: 'POST',
-    headers: { 'api-key': apiKey, 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({
-      sender: { email: from, name: 'EASPO Attendance System' },
-      to: [{ email: student.guardian_email.trim() }],
-      subject: 'Attendance Notification - Your Child Was Marked Absent',
-      htmlContent: `<p>Dear Parent/Guardian,</p><p>This is to inform you that <strong>${name}</strong> was marked absent for today's scheduled class.</p><p>Date: ${escapeHtml(attendanceDate)}<br>Schedule: ${escapeHtml(start)}<br>Subject: ${escapeHtml(subject)}${section ? `<br>Section: ${escapeHtml(section)}` : ''}</p><p>If your child arrived late or has a valid reason, please contact the school.</p><p>Thank you.<br>EASPO Attendance System</p>`,
-    }),
-  })
-  if (!response.ok) {
-    console.error(`[AUTO-ABSENT] Brevo email failed for student ${student.id}: ${response.status}`)
-    return false
+  try {
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST', headers: { 'api-key': apiKey, 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        sender: { email: from, name: 'EASPO Attendance System' }, to: [{ email: recipient }],
+        subject: 'Attendance Notification - Your Child Was Marked Absent',
+        htmlContent: `<p>Dear Parent/Guardian,</p><p>This is to inform you that <strong>${escapeHtml(student.name || 'your child')}</strong> was marked absent for today's scheduled class.</p><p>Date: ${escapeHtml(attendanceDate)}<br>Schedule: ${escapeHtml(start)}<br>Subject: ${escapeHtml(subject)}${section ? `<br>Section: ${escapeHtml(section)}` : ''}</p><p>If your child arrived late or has a valid reason, please contact the school.</p><p>Thank you.<br>EASPO Attendance System</p>`,
+      }),
+    })
+    const responseBody = await response.text()
+    if (!response.ok) {
+      console.error(`[AUTO-ABSENT] Brevo failed for student=${student.id}; status=${response.status}; response=${responseBody.slice(0, 500)}`)
+      return { sent: false, reason: `Brevo returned ${response.status}` }
+    }
+    console.log(`[AUTO-ABSENT] Brevo accepted email for student=${student.id}; response=${responseBody.slice(0, 500)}`)
+    return { sent: true }
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error)
+    console.error(`[AUTO-ABSENT] Brevo request failed for student=${student.id}; error=${reason}`)
+    return { sent: false, reason }
   }
-  return true
 }
 
 serve(async req => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders })
   if (req.method !== 'POST') return json(405, { error: 'Method not allowed' })
-
   const url = Deno.env.get('SUPABASE_URL')
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
   if (!url || !serviceKey) return json(500, { error: 'Supabase server credentials are not configured' })
+
   const supabase = createClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
   const parts = schoolParts()
   const today = `${parts.year}-${parts.month}-${parts.day}`
   const nowMinutes = Number(parts.hour) * 60 + Number(parts.minute)
   let markedAbsent = 0
   let emailsSent = 0
-  console.log(`[AUTO-ABSENT] Starting attendance check: ${today} ${parts.hour}:${parts.minute} ${SCHOOL_TIME_ZONE}`)
+  console.log(`[AUTO-ABSENT] Philippine now=${today} ${parts.hour}:${parts.minute}; day=${parts.weekday}; timezone=${SCHOOL_TIME_ZONE}`)
 
   try {
-    const { data: schedules, error: schedulesError } = await supabase.from('schedules').select('*')
+    const { data: allSchedules, error: schedulesError } = await supabase.from('schedules').select('*')
     if (schedulesError) throw schedulesError
-    for (const schedule of schedules || []) {
-      const status = String(schedule.status ?? '').toLowerCase()
-      const scheduleDate = value(schedule, ['schedule_date', 'date', 'scheduled_date'])
-      const scheduleDay = value(schedule, ['day_of_week', 'day', 'weekday'])
-      const activeToday = (schedule.active !== false) && !['inactive', 'cancelled', 'canceled'].includes(status)
-        && (scheduleDate || scheduleDay)
-        && (!scheduleDate || String(scheduleDate).slice(0, 10) === today)
-        && (!scheduleDay || normalizedDay(scheduleDay) === normalizedDay(parts.weekday))
-      if (!activeToday || nowMinutes < timeMinutes(value(schedule, ['start_time', 'time_start', 'start'])) + 60) continue
+    // EASPO is section-based: schedules.section_id = profiles.section_id. Do not query schedules.status.
+    const schedulesToday = (allSchedules || []).filter(schedule => normalizedDay(schedule.day) === normalizedDay(parts.weekday))
+    console.log(`[AUTO-ABSENT] Schedules total=${allSchedules?.length ?? 0}; schedules found today=${schedulesToday.length}`)
 
+    for (const schedule of schedulesToday) {
       const scheduleId = value(schedule, ['id', 'schedule_id'])
-      const assignedStudent = value(schedule, ['student_id', 'profile_id'])
-      const assignedSection = value(schedule, ['section_id', 'section'])
-      if (!scheduleId || (!assignedStudent && !assignedSection)) {
-        console.warn(`[AUTO-ABSENT] Skipping malformed schedule ${String(scheduleId ?? 'unknown')}`)
+      const sectionId = value(schedule, ['section_id'])
+      const startTime = value(schedule, ['start_time', 'time_start', 'start'])
+      const startMinutes = timeMinutes(startTime)
+      if (!scheduleId || !sectionId || startMinutes === null) {
+        console.warn(`[AUTO-ABSENT] Skipping malformed schedule; id=${String(scheduleId)}; sectionId=${String(sectionId)}; startTime=${String(startTime)}`)
         continue
       }
-      let query = supabase.from('profiles').select('id, name, guardian_email').eq('role', 'STUDENT').eq('status', 'active')
-      query = assignedStudent ? query.eq('id', assignedStudent) : query.eq('section_id', assignedSection)
-      const { data: students, error: studentsError } = await query
-      if (studentsError) { console.error(`[AUTO-ABSENT] Student lookup failed for ${scheduleId}: ${studentsError.message}`); continue }
+      const thresholdMinutes = startMinutes + 60
+      console.log(`[AUTO-ABSENT] Schedule id=${scheduleId}; sectionId=${sectionId}; start=${startTime}; oneHourThreshold=${today} ${formatMinutes(thresholdMinutes)}; now=${formatMinutes(nowMinutes)}`)
+      if (nowMinutes < thresholdMinutes) {
+        console.log(`[AUTO-ABSENT] Schedule id=${scheduleId} skipped: one-hour threshold has not been reached`)
+        continue
+      }
+
+      const { data: students, error: studentsError } = await supabase.from('profiles')
+        .select('id, name, guardian_email, section_id').eq('role', 'STUDENT').eq('section_id', sectionId)
+      if (studentsError) {
+        console.error(`[AUTO-ABSENT] Student lookup failed; schedule=${scheduleId}; section=${sectionId}; error=${studentsError.message}`)
+        continue
+      }
+      console.log(`[AUTO-ABSENT] Schedule id=${scheduleId}; students found in section=${students?.length ?? 0}; studentIds=${(students || []).map(student => student.id).join(',') || 'none'}`)
 
       for (const student of (students || []) as Student[]) {
         const { data: existing, error: attendanceError } = await supabase.from('attendance').select('*')
           .eq('student_id', student.id).eq('schedule_id', scheduleId).eq('attendance_date', today).maybeSingle()
-        if (attendanceError) { console.error(`[AUTO-ABSENT] Attendance lookup failed for ${student.id}: ${attendanceError.message}`); continue }
-        if (existing?.status === 'present') continue
+        if (attendanceError) {
+          console.error(`[AUTO-ABSENT] Attendance lookup failed; schedule=${scheduleId}; student=${student.id}; error=${attendanceError.message}`)
+          continue
+        }
+        console.log(`[AUTO-ABSENT] Attendance record; schedule=${scheduleId}; student=${student.id}; found=${Boolean(existing)}; status=${existing?.status ?? 'none'}`)
+        if (existing && normalizedStatus(existing.status) === 'present') continue
 
         let attendance = existing
         if (!attendance) {
           const { data, error } = await supabase.from('attendance').insert({
-            student_id: student.id, section_id: assignedSection, schedule_id: scheduleId, attendance_date: today,
-            status: 'absent', time_in: null, is_late: false, guardian_email_sent: false,
+            student_id: student.id, section_id: sectionId, schedule_id: scheduleId,
+            subject: value(schedule, ['subject_name', 'subject', 'subject_title', 'subject_code']),
+            attendance_date: today, status: 'absent', time_in: null, is_late: false, guardian_email_sent: false,
           }).select().single()
-          // The unique index makes a concurrent scanner/worker safe. Re-read on conflict.
           if (error?.code === '23505') {
-            const reread = await supabase.from('attendance').select('*').eq('student_id', student.id).eq('schedule_id', scheduleId).eq('attendance_date', today).maybeSingle()
-            attendance = reread.data
-          } else if (error) { console.error(`[AUTO-ABSENT] Could not mark ${student.id} absent: ${error.message}`); continue }
-          else { attendance = data; markedAbsent++; console.log(`[AUTO-ABSENT] Marked student absent: ${student.id}`) }
+            const { data: reread, error: rereadError } = await supabase.from('attendance').select('*')
+              .eq('student_id', student.id).eq('schedule_id', scheduleId).eq('attendance_date', today).maybeSingle()
+            if (rereadError) console.error(`[AUTO-ABSENT] Duplicate reread failed; schedule=${scheduleId}; student=${student.id}; error=${rereadError.message}`)
+            attendance = reread
+          } else if (error) {
+            console.error(`[AUTO-ABSENT] Could not mark absent; schedule=${scheduleId}; student=${student.id}; error=${error.message}`)
+            continue
+          } else {
+            attendance = data
+            markedAbsent++
+            console.log(`[AUTO-ABSENT] Marked absent; schedule=${scheduleId}; student=${student.id}`)
+          }
         }
-        if (attendance?.status !== 'absent' || attendance.guardian_email_sent) continue
-        // Atomically claim the boolean before talking to the provider.  A second
-        // worker sees zero returned rows and must not send a duplicate email.
-        const { data: claimed, error: claimError } = await supabase.from('attendance')
+
+        if (!attendance || normalizedStatus(attendance.status) !== 'absent' || attendance.guardian_email_sent) continue
+        const email = await sendGuardianEmail(student, schedule, today)
+        if (!email.sent) {
+          console.log(`[AUTO-ABSENT] Email not sent; schedule=${scheduleId}; student=${student.id}; reason=${email.reason}`)
+          continue
+        }
+        // Brevo has already accepted the message; only now persist the sent flag.
+        const { data: updated, error: updateError } = await supabase.from('attendance')
           .update({ guardian_email_sent: true }).eq('id', attendance.id).eq('guardian_email_sent', false).select('id')
-        if (claimError || !claimed?.length) continue
-        if (await sendGuardianEmail(student, schedule, today)) {
-          emailsSent++
-          console.log(`[AUTO-ABSENT] Guardian email sent for student ${student.id}`)
-        } else {
-          // Only a failed delivery becomes eligible for a later retry.
-          const { error } = await supabase.from('attendance').update({ guardian_email_sent: false }).eq('id', attendance.id).eq('guardian_email_sent', true)
-          if (error) console.error(`[AUTO-ABSENT] Email retry flag reset failed for ${student.id}: ${error.message}`)
+        if (updateError || !updated?.length) {
+          console.error(`[AUTO-ABSENT] Email was accepted but guardian_email_sent could not be saved; student=${student.id}; error=${updateError?.message ?? 'record was already updated'}`)
+          continue
         }
+        emailsSent++
+        console.log(`[AUTO-ABSENT] Guardian email marked sent; schedule=${scheduleId}; student=${student.id}`)
       }
     }
-    console.log('[AUTO-ABSENT] Completed')
+    console.log(`[AUTO-ABSENT] Completed; markedAbsent=${markedAbsent}; emailsSent=${emailsSent}`)
     return json(200, { ok: true, date: today, markedAbsent, emailsSent })
   } catch (error) {
     console.error('[AUTO-ABSENT] Failed:', error)

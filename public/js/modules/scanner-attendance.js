@@ -280,7 +280,7 @@ async function recordScan(rawValue) {
     let insertError = null
 
     if (existing) {
-      if (existing.status === 'present') {
+      if (String(existing.status || '').toLowerCase() === 'present') {
         // Already scanned as present
         console.log('[ATTENDANCE] Already marked present', existing)
         showErrorResult('Already Scanned', `${student.name} has already been marked present for this schedule. No duplicate was created.`, true)
@@ -289,7 +289,7 @@ async function recordScan(rawValue) {
         processing = false
         armScannerIdleTimer()
         return
-      } else if (existing.status === 'absent') {
+      } else if (String(existing.status || '').toLowerCase() === 'absent') {
         // Late scan - update Absent to Present
         console.log('[ATTENDANCE] Late scan detected - updating Absent to Present', existing)
         isLate = true
