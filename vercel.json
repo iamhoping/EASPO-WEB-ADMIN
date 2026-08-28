@@ -12,4 +12,18 @@
       "permanent": true
     }
   ]
+
+    "rewrites": [
+    {
+      "source": "/scanner-attendance",
+      "destination": "/scanner-attendance.html"
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/scanner-attendance.html",
+      "destination": "/scanner-attendance",
+      "permanent": true
+    }
+  ]
 }
