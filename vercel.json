@@ -3,6 +3,10 @@
     {
       "source": "/admin",
       "destination": "/admin.html"
+    },
+    {
+      "source": "/scanner-attendance",
+      "destination": "/scanner-attendance.html"
     }
   ],
   "redirects": [
@@ -10,16 +14,7 @@
       "source": "/admin.html",
       "destination": "/admin",
       "permanent": true
-    }
-  ]
-
-    "rewrites": [
-    {
-      "source": "/scanner-attendance",
-      "destination": "/scanner-attendance.html"
-    }
-  ],
-  "redirects": [
+    },
     {
       "source": "/scanner-attendance.html",
       "destination": "/scanner-attendance",
