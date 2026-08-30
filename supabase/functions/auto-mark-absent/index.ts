@@ -64,7 +64,6 @@ async function sendGuardianEmail(student: Student, schedule: Schedule, attendanc
     console.error(`[AUTO-ABSENT][EMAIL] Brevo skipped; student=${student.id}; reason=${!apiKey && !from ? 'EMAIL_API_KEY and EMAIL_FROM are missing' : !apiKey ? 'EMAIL_API_KEY is missing' : 'EMAIL_FROM is missing'}`)
     return { sent: false, reason: 'Brevo credentials are not configured' }
   }
-  const subject = String(value(schedule, ['subject_name', 'subject', 'subject_title', 'subject_code']) ?? 'Scheduled class')
   const section = String(value(schedule, ['section_name', 'section']) ?? '')
   const start = String(value(schedule, ['start_time', 'time_start', 'start']) ?? '')
   try {
@@ -74,7 +73,27 @@ async function sendGuardianEmail(student: Student, schedule: Schedule, attendanc
       body: JSON.stringify({
         sender: { email: from, name: 'EASPO Attendance System' }, to: [{ email: recipient }],
         subject: 'Attendance Notification - Your Child Was Marked Absent',
-        htmlContent: `<p>Dear Parent/Guardian,</p><p>This is to inform you that <strong>${escapeHtml(student.name || 'your child')}</strong> was marked absent for today's scheduled class.</p><p>Date: ${escapeHtml(attendanceDate)}<br>Schedule: ${escapeHtml(start)}<br>Subject: ${escapeHtml(subject)}${section ? `<br>Section: ${escapeHtml(section)}` : ''}</p><p>If your child arrived late or has a valid reason, please contact the school.</p><p>Thank you.<br>EASPO Attendance System</p>`,
+        htmlContent: `
+            <p>Dear Parent/Guardian,</p>
+            <p>
+              This is to inform you that 
+              <strong>${escapeHtml(student.name || 'your child')}</strong>
+              was marked <strong>ABSENT</strong> for today's scheduled class.
+            </p>
+            <p><strong>Attendance Details:</strong></p>
+            <p>
+              <strong>Date:</strong> ${escapeHtml(attendanceDate)}<br>
+              <strong>Schedule:</strong> ${escapeHtml(start)}<br>
+              ${section ? `<strong>Section:</strong> ${escapeHtml(section)}` : ''}
+            </p>
+            <p>
+              If your child arrived late or has a valid reason, please contact the school.
+            </p>
+            <p>
+              Thank you.<br>
+              <strong>EASPO Attendance System</strong>
+            </p>
+          `,
       }),
     })
     const responseBody = await response.text()
