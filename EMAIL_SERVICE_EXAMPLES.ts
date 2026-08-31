@@ -1,6 +1,9 @@
 // Email Service Integration Examples
 // These functions can be used to replace the placeholder sendGuardianEmail function
 
+const getEnv = (key: string) =>
+  (globalThis as typeof globalThis & { Deno?: { env: { get(name: string): string | undefined } } }).Deno?.env.get(key)
+
 // ================== SENDGRID INTEGRATION ==================
 async function sendGuardianEmailSendGrid(
   guardianEmail: string,
@@ -14,7 +17,7 @@ async function sendGuardianEmailSendGrid(
       return false
     }
 
-    const sendgridApiKey = Deno.env.get('SENDGRID_API_KEY')
+    const sendgridApiKey = getEnv('SENDGRID_API_KEY')
     if (!sendgridApiKey) {
       console.log('[EMAIL] SendGrid API key not configured')
       return false
@@ -56,7 +59,7 @@ async function sendGuardianEmailSendGrid(
           },
         ],
         from: {
-          email: Deno.env.get('EMAIL_FROM') || 'noreply@school.edu',
+          email: getEnv('EMAIL_FROM') || 'noreply@school.edu',
           name: 'School Attendance System',
         },
         content: [
@@ -95,7 +98,7 @@ async function sendGuardianEmailBrevo(
       return false
     }
 
-    const brevoApiKey = Deno.env.get('BREVO_API_KEY')
+    const brevoApiKey = getEnv('BREVO_API_KEY')
     if (!brevoApiKey) {
       console.log('[EMAIL] Brevo API key not configured')
       return false
@@ -132,7 +135,7 @@ async function sendGuardianEmailBrevo(
       body: JSON.stringify({
         to: [{ email: guardianEmail }],
         sender: {
-          email: Deno.env.get('EMAIL_FROM') || 'noreply@school.edu',
+          email: getEnv('EMAIL_FROM') || 'noreply@school.edu',
           name: 'School Attendance System',
         },
         subject: 'Student Attendance Notification',
@@ -167,8 +170,8 @@ async function sendGuardianEmailMailgun(
       return false
     }
 
-    const mailgunApiKey = Deno.env.get('MAILGUN_API_KEY')
-    const mailgunDomain = Deno.env.get('MAILGUN_DOMAIN')
+    const mailgunApiKey = getEnv('MAILGUN_API_KEY')
+    const mailgunDomain = getEnv('MAILGUN_DOMAIN')
 
     if (!mailgunApiKey || !mailgunDomain) {
       console.log('[EMAIL] Mailgun credentials not configured')

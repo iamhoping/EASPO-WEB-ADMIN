@@ -1,5 +1,5 @@
 -- Run after deploying the auto-mark-absent Edge Function and setting
--- AUTO_ABSENT_TRIGGER_SECRET. Replace only YOUR_PROJECT_REF before applying.
+-- AUTO_ABSENT_TRIGGER_SECRET before applying.
 -- This uses Supabase Cron + pg_net, so it runs independently of the web host.
 
 CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA extensions;
@@ -22,7 +22,7 @@ SELECT cron.schedule(
   '*/5 * * * *',
   $$
     SELECT net.http_post(
-      url := 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/auto-mark-absent',
+      url := 'https://sbizrtjugvtcajdkkiak.supabase.co/functions/v1/auto-mark-absent',
       headers := jsonb_build_object(
         'Content-Type', 'application/json',
         'x-auto-absent-secret', (
