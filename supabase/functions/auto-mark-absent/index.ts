@@ -9,7 +9,13 @@ const corsHeaders = {
 }
 
 type Schedule = Record<string, unknown>
-type Student = { id: string; name: string | null; guardian_email: string | null; section_id: string | null }
+type Student = {
+  id: string
+  name: string | null
+  guardian_email: string | null
+  section_id: string | null
+  grade_level: string | number | null
+}
 type EmailResult = { sent: boolean; reason?: string }
 
 function json(status: number, body: Record<string, unknown>) {
@@ -69,8 +75,11 @@ async function sendGuardianEmail(student: Student, schedule: Schedule, attendanc
     return { sent: false, reason: 'Brevo credentials are not configured' }
   }
   const section = String(value(schedule, ['section_name', 'section']) ?? '')
-  const subject = String(value(schedule, ['subject_name', 'subject', 'subject_title', 'subject_code']) ?? '')
   const start = String(value(schedule, ['start_time', 'time_start', 'start']) ?? '')
+  const gradeLevel =
+    student.grade_level !== null && student.grade_level !== undefined
+      ? String(student.grade_level)
+      : ''
   try {
     console.log(`[AUTO-ABSENT][EMAIL] Sending Brevo request; student=${student.id}; recipient=${maskEmail(recipient)}; schedule=${String(value(schedule, ['id', 'schedule_id']) ?? 'unknown')}`)
     const response = await fetch('https://api.brevo.com/v3/smtp/email', {
@@ -86,11 +95,12 @@ async function sendGuardianEmail(student: Student, schedule: Schedule, attendanc
               was marked <strong>ABSENT</strong> for today's scheduled class.
             </p>
             <p><strong>Attendance Details:</strong></p>
+
             <p>
               <strong>Date:</strong> ${escapeHtml(attendanceDate)}<br>
               <strong>Schedule:</strong> ${escapeHtml(start)}<br>
-              ${subject ? `<strong>Subject:</strong> ${escapeHtml(subject)}<br>` : ''}
-              ${section ? `<strong>Section:</strong> ${escapeHtml(section)}` : ''}
+              ${section ? `<strong>Section:</strong> ${escapeHtml(section)}<br>` : ''}
+              ${gradeLevel ? `<strong>Grade Level:</strong> ${escapeHtml(gradeLevel)}` : ''}
             </p>
             <p>
               If your child arrived late or has a valid reason, please contact the school.
@@ -167,8 +177,11 @@ serve(async req => {
         continue
       }
 
-      const { data: students, error: studentsError } = await supabase.from('profiles')
-        .select('id, name, guardian_email, section_id').eq('role', 'STUDENT').eq('section_id', sectionId)
+      const { data: students, error: studentsError } = await supabase
+        .from('profiles')
+        .select('id, name, guardian_email, section_id, grade_level')
+        .eq('role', 'STUDENT')
+        .eq('section_id', sectionId)
       if (studentsError) {
         console.error(`[AUTO-ABSENT] Student lookup failed; schedule=${scheduleId}; section=${sectionId}; error=${studentsError.message}`)
         continue
