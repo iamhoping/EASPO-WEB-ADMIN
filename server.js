@@ -15,13 +15,17 @@ app.get('/', (req, res) => {
 
 function invokeAutoAbsent() {
     return new Promise((resolve, reject) => {
-        const supabaseUrl = process.env.SUPABASE_URL || 'https://sbizrtjugvtcajdkkiak.supabase.co';
+        const supabaseUrl = process.env.SUPABASE_URL;
         const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-        if (!supabaseKey) return reject(new Error('Supabase service role key not configured'));
+        if (!supabaseUrl || !supabaseKey) return reject(new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be configured'));
         const url = new URL('/functions/v1/auto-mark-absent', supabaseUrl);
         const request = https.request(url, {
             method: 'POST',
-            headers: { Authorization: `Bearer ${supabaseKey}`, 'Content-Type': 'application/json' },
+            headers: {
+                Authorization: `Bearer ${supabaseKey}`,
+                'Content-Type': 'application/json',
+                ...(process.env.AUTO_ABSENT_TRIGGER_SECRET ? { 'x-auto-absent-secret': process.env.AUTO_ABSENT_TRIGGER_SECRET } : {}),
+            },
         }, response => {
             let data = '';
             response.on('data', (chunk) => { data += chunk; });
@@ -54,8 +58,13 @@ app.post('/api/trigger-auto-absent', async (req, res) => {
     }
 });
 
-// Periodic auto-absent check (every 5 minutes)
+// Useful only for an explicitly managed Node host. Production scheduling belongs
+// in Supabase Cron (see supabase/migrations/20240101000001_schedule_auto_mark_absent.sql).
 function startAutoAbsentScheduler() {
+    if (process.env.AUTO_ABSENT_LOCAL_SCHEDULER !== 'true') {
+        console.log('[SCHEDULER] Local scheduler disabled; use Supabase Cron in production');
+        return;
+    }
     const intervalMinutes = 5;
     const intervalMs = intervalMinutes * 60 * 1000;
 

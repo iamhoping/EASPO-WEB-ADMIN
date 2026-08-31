@@ -257,6 +257,7 @@ async function recordScan(rawValue) {
       return
     }
     const scheduleId = scheduleValue(todaySchedule, ['id', 'schedule_id'])
+    const subjectId = scheduleValue(todaySchedule, ['subject_id'])
     const subjectName = scheduleValue(todaySchedule, ['subject_name', 'subject', 'subject_title', 'subject_code']) || '—'
     console.log('[ATTENDANCE] Checking for existing record:', {
       studentId: student.id,
@@ -324,6 +325,7 @@ async function recordScan(rawValue) {
         student_id: student.id,
         section_id: student.section_id,
         schedule_id: scheduleId,
+        subject_id: subjectId,
         subject: subjectName,
         attendance_date: attendanceDate,
         time_in: timeIn,

@@ -4,7 +4,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 const SCHOOL_TIME_ZONE = 'Asia/Manila'
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-auto-absent-secret',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
@@ -40,6 +40,10 @@ function timeMinutes(time: unknown) {
 function formatMinutes(minutes: number) { return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}` }
 function normalizedStatus(status: unknown) { return String(status ?? '').trim().toLowerCase() }
 function isEmail(value: string) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) }
+function maskEmail(value: string) {
+  const [local, domain] = value.split('@')
+  return !local || !domain ? '[invalid email]' : `${local.slice(0, 2)}***@${domain}`
+}
 function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char] as string))
 }
@@ -47,7 +51,7 @@ function escapeHtml(value: string) {
 async function sendGuardianEmail(student: Student, schedule: Schedule, attendanceDate: string): Promise<EmailResult> {
   const recipient = student.guardian_email?.trim() ?? ''
   // This is intentionally profiles.guardian_email, never profiles.email.
-  console.log(`[AUTO-ABSENT][EMAIL] Student name=${student.name ?? 'unknown'}; uuid=${student.id}; profiles.guardian_email=${recipient || 'null/empty'}`)
+  console.log(`[AUTO-ABSENT][EMAIL] Guardian email found=${Boolean(recipient)}; student=${student.id}; recipient=${recipient ? maskEmail(recipient) : 'null/empty'}`)
   if (!recipient) {
     console.warn(`[AUTO-ABSENT][EMAIL] Validation=false; student=${student.id}; skipped because profiles.guardian_email is null, empty, or whitespace`)
     return { sent: false, reason: 'guardian email is empty' }
@@ -65,9 +69,10 @@ async function sendGuardianEmail(student: Student, schedule: Schedule, attendanc
     return { sent: false, reason: 'Brevo credentials are not configured' }
   }
   const section = String(value(schedule, ['section_name', 'section']) ?? '')
+  const subject = String(value(schedule, ['subject_name', 'subject', 'subject_title', 'subject_code']) ?? '')
   const start = String(value(schedule, ['start_time', 'time_start', 'start']) ?? '')
   try {
-    console.log(`[AUTO-ABSENT][EMAIL] Attempting Brevo request; student=${student.id}; recipient=${recipient}; from=${from}`)
+    console.log(`[AUTO-ABSENT][EMAIL] Sending Brevo request; student=${student.id}; recipient=${maskEmail(recipient)}; schedule=${String(value(schedule, ['id', 'schedule_id']) ?? 'unknown')}`)
     const response = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST', headers: { 'api-key': apiKey, 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({
@@ -84,6 +89,7 @@ async function sendGuardianEmail(student: Student, schedule: Schedule, attendanc
             <p>
               <strong>Date:</strong> ${escapeHtml(attendanceDate)}<br>
               <strong>Schedule:</strong> ${escapeHtml(start)}<br>
+              ${subject ? `<strong>Subject:</strong> ${escapeHtml(subject)}<br>` : ''}
               ${section ? `<strong>Section:</strong> ${escapeHtml(section)}` : ''}
             </p>
             <p>
@@ -114,6 +120,11 @@ async function sendGuardianEmail(student: Student, schedule: Schedule, attendanc
 serve(async req => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders })
   if (req.method !== 'POST') return json(405, { error: 'Method not allowed' })
+  const triggerSecret = Deno.env.get('AUTO_ABSENT_TRIGGER_SECRET')
+  if (triggerSecret && req.headers.get('x-auto-absent-secret') !== triggerSecret) {
+    console.warn('[AUTO-ABSENT] Rejected request with an invalid trigger secret')
+    return json(401, { error: 'Unauthorized auto-absent trigger' })
+  }
   const url = Deno.env.get('SUPABASE_URL')
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
   if (!url || !serviceKey) return json(500, { error: 'Supabase server credentials are not configured' })
@@ -129,8 +140,15 @@ serve(async req => {
   try {
     const { data: allSchedules, error: schedulesError } = await supabase.from('schedules').select('*')
     if (schedulesError) throw schedulesError
-    // EASPO is section-based: schedules.section_id = profiles.section_id. Do not query schedules.status.
-    const schedulesToday = (allSchedules || []).filter(schedule => normalizedDay(schedule.day) === normalizedDay(parts.weekday))
+    // EASPO is section-based: schedules.section_id = profiles.section_id.
+    const schedulesToday = (allSchedules || []).filter(schedule => {
+      const scheduleDate = value(schedule, ['schedule_date', 'date', 'scheduled_date'])
+      const scheduleDay = value(schedule, ['day_of_week', 'day', 'weekday'])
+      const status = normalizedStatus(schedule.status)
+      return schedule.active !== false && !['inactive', 'cancelled', 'canceled'].includes(status) &&
+        (!scheduleDate || String(scheduleDate).slice(0, 10) === today) &&
+        (!scheduleDay || normalizedDay(scheduleDay) === normalizedDay(parts.weekday))
+    })
     console.log(`[AUTO-ABSENT] Schedules total=${allSchedules?.length ?? 0}; schedules found today=${schedulesToday.length}`)
 
     for (const schedule of schedulesToday) {
@@ -171,6 +189,7 @@ serve(async req => {
         if (!attendance) {
           const { data, error } = await supabase.from('attendance').insert({
             student_id: student.id, section_id: sectionId, schedule_id: scheduleId,
+            subject_id: value(schedule, ['subject_id']),
             subject: value(schedule, ['subject_name', 'subject', 'subject_title', 'subject_code']),
             attendance_date: today, status: 'absent', time_in: null, is_late: false, guardian_email_sent: false,
           }).select().single()
@@ -190,14 +209,33 @@ serve(async req => {
         }
 
         if (!attendance || normalizedStatus(attendance.status) !== 'absent' || attendance.guardian_email_sent) continue
+
+        // Claim this email before sending it. This prevents two overlapping cron
+        // invocations from both sending an absence notification for one record.
+        const { data: claimed, error: claimError } = await supabase.from('attendance')
+          .update({ guardian_email_sending: true, guardian_email_sending_at: new Date().toISOString() })
+          .eq('id', attendance.id).eq('guardian_email_sent', false).eq('guardian_email_sending', false)
+          .select('id').maybeSingle()
+        if (claimError) {
+          console.error(`[AUTO-ABSENT][EMAIL] Could not claim email; attendance=${attendance.id}; student=${student.id}; schedule=${scheduleId}; error=${claimError.message}`)
+          continue
+        }
+        if (!claimed) {
+          console.log(`[AUTO-ABSENT][EMAIL] Email already claimed or sent; attendance=${attendance.id}; student=${student.id}; schedule=${scheduleId}`)
+          continue
+        }
         const email = await sendGuardianEmail(student, schedule, today)
         if (!email.sent) {
-          console.log(`[AUTO-ABSENT] Email not sent; schedule=${scheduleId}; student=${student.id}; reason=${email.reason}`)
+          const { error: releaseError } = await supabase.from('attendance')
+            .update({ guardian_email_sending: false, guardian_email_sending_at: null })
+            .eq('id', attendance.id).eq('guardian_email_sent', false)
+          console.error(`[AUTO-ABSENT][EMAIL] Email not sent; attendance=${attendance.id}; schedule=${scheduleId}; student=${student.id}; reason=${email.reason}; claimReleased=${!releaseError}`)
           continue
         }
         // Brevo has already accepted the message; only now persist the sent flag.
         const { data: updated, error: updateError } = await supabase.from('attendance')
-          .update({ guardian_email_sent: true }).eq('id', attendance.id).eq('guardian_email_sent', false).select('id')
+          .update({ guardian_email_sent: true, guardian_email_sending: false, guardian_email_sending_at: null })
+          .eq('id', attendance.id).eq('guardian_email_sent', false).select('id')
         if (updateError || !updated?.length) {
           console.error(`[AUTO-ABSENT] Email was accepted but guardian_email_sent could not be saved; student=${student.id}; error=${updateError?.message ?? 'record was already updated'}`)
           continue
