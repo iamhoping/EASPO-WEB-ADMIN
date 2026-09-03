@@ -1,0 +1,2 @@
+[functions.auto-mark-absent]
+verify_jwt = false

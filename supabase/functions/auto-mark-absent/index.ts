@@ -131,10 +131,18 @@ serve(async req => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders })
   if (req.method !== 'POST') return json(405, { error: 'Method not allowed' })
   const triggerSecret = Deno.env.get('AUTO_ABSENT_TRIGGER_SECRET')
-  if (triggerSecret && req.headers.get('x-auto-absent-secret') !== triggerSecret) {
+  const providedSecret = req.headers.get('x-auto-absent-secret')
+
+  if (!triggerSecret) {
+    console.error('[AUTO-ABSENT] AUTO_ABSENT_TRIGGER_SECRET is not configured')
+    return json(500, { error: 'Trigger secret is not configured' })
+  }
+
+  if (providedSecret !== triggerSecret) {
     console.warn('[AUTO-ABSENT] Rejected request with an invalid trigger secret')
     return json(401, { error: 'Unauthorized auto-absent trigger' })
   }
+  
   const url = Deno.env.get('SUPABASE_URL')
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
   if (!url || !serviceKey) return json(500, { error: 'Supabase server credentials are not configured' })
