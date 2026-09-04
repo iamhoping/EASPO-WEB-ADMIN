@@ -1,530 +1,504 @@
 // /js/modules/reports.js
-// Enhanced Reports & Analytics Module
-// Simplified, performance-focused, with clear UX
+// Reports & Analytics Module
 
 import { supabase } from '../services/supabaseClient.js'
 import { showToast } from '../ui/toast.js'
 
-// ============================================================================
-// STATE MANAGEMENT
-// ============================================================================
-
 let chartInstances = {}
-let activeReport = 'dashboard'
+let activeReport = 'overview'
 let reportData = emptyReportData()
-let isInitialized = false
+let hasRenderedShell = false
+let hasSubscribed = false
+let hasAttachedListeners = false
 
-// Filter state - kept minimal
 const filters = {
   gradeLevel: '',
-  dateStart: '',
-  dateEnd: ''
+  section: '',
+  subject: '',
+  teacher: '',
+  startDate: '',
+  endDate: ''
 }
 
-// Color palette for consistent charts
-const CHART_COLORS = ['#2563EB', '#059669', '#D97706', '#7C3AED', '#DC2626', '#0891B2']
-
-// ============================================================================
-// REPORT DEFINITIONS - Simplified to essential reports only
-// ============================================================================
-
 const REPORTS = [
-  { id: 'dashboard', label: 'Dashboard', icon: '📊' },
-  { id: 'attendance', label: 'Attendance', icon: '📋' },
-  { id: 'academic', label: 'Academic Performance', icon: '📈' },
-  { id: 'enrollment', label: 'Enrollment', icon: '👥' }
+  { id: 'overview', label: 'Dashboard Overview' },
+  { id: 'attendance', label: 'Attendance Reports' },
+  { id: 'academic', label: 'Academic Reports' },
+  { id: 'teacher', label: 'Teacher Reports' },
+  { id: 'section', label: 'Section Reports' },
+  { id: 'subject', label: 'Subject Reports' },
 ]
 
-// ============================================================================
-// DATA STRUCTURE & INITIALIZATION
-// ============================================================================
+const chartPalette = ['#2563EB', '#059669', '#D97706', '#7C3AED', '#DC2626', '#0891B2', '#DB2777', '#65A30D']
 
 function emptyReportData() {
   return {
     students: [],
     teachers: [],
+    parents: [],
     sections: [],
     subjects: [],
+    enrollments: [],
     attendance: [],
     grades: [],
-    enrollments: []
+    schedules: []
   }
 }
 
 export async function initReportsSection() {
-  if (isInitialized) return
-  
-  renderReportsUI()
-  attachEventListeners()
-  await loadAndRenderReports()
-  subscribeToChanges()
-  
-  isInitialized = true
+  renderReportsShell()
+  attachReportListeners()
+  await reloadReports()
+  if (!hasSubscribed) subscribeToReportUpdates()
 }
 
-// ============================================================================
-// UI RENDERING - Clean, minimal, semantic HTML
-// ============================================================================
-
-function renderReportsUI() {
+function renderReportsShell() {
   const section = document.getElementById('reportsSection')
-  if (!section || isInitialized) return
+  if (!section || hasRenderedShell) return
 
   section.innerHTML = `
-    <div class="reports-container">
-      <!-- Header with export buttons -->
-      <div class="reports-header">
-        <div class="reports-title">
-          <h2>Reports & Analytics</h2>
-          <p>View key metrics and performance data</p>
-        </div>
-        <div class="reports-actions">
-          <button class="btn btn-secondary" id="exportExcelBtn" title="Download as Excel">
-            Export Excel
-          </button>
-          <button class="btn btn-secondary" id="exportPdfBtn" title="Save as PDF">
-            Save PDF
-          </button>
-        </div>
+    <div class="page-header">
+      <div class="page-header-actions">
+        <button class="btn btn-secondary" id="printReportBtn">Print</button>
+        <button class="btn btn-secondary" id="exportPdfBtn">PDF</button>
+        <button class="btn btn-secondary" id="exportExcelBtn">Excel</button>
+        <button class="btn btn-primary" id="exportCsvBtn">CSV</button>
       </div>
+    </div>
 
-      <!-- Report tabs -->
-      <div class="reports-tabs" role="tablist">
+    <div class="reports-layout">
+      <aside class="reports-nav" aria-label="Reports navigation">
+        <div class="reports-nav-title">Reports</div>
         ${REPORTS.map(report => `
-          <button 
-            class="reports-tab" 
-            role="tab"
-            data-report="${report.id}"
-            aria-selected="${report.id === activeReport}"
-          >
-            <span class="tab-icon">${report.icon}</span>
-            <span class="tab-label">${report.label}</span>
+          <button class="reports-nav-btn" type="button" data-report-tab="${report.id}">
+            ${report.label}
           </button>
         `).join('')}
+      </aside>
+
+      <div class="reports-main">
+        <div class="panel report-filters-panel">
+          <div class="reports-filter-grid">
+            <label>
+              <span>Grade Level</span>
+              <select id="reportGradeFilter" class="filter-select">
+                <option value="">All Grades</option>
+                <option value="Grade 7">Grade 7</option>
+                <option value="Grade 8">Grade 8</option>
+                <option value="Grade 9">Grade 9</option>
+                <option value="Grade 10">Grade 10</option>
+                <option value="Grade 11">Grade 11</option>
+                <option value="Grade 12">Grade 12</option>
+              </select>
+            </label>
+            <label>
+              <span>Section</span>
+              <select id="reportSectionFilter" class="filter-select"></select>
+            </label>
+            <label>
+              <span>Subject</span>
+              <select id="reportSubjectFilter" class="filter-select"></select>
+            </label>
+            <label>
+              <span>Teacher</span>
+              <select id="reportTeacherFilter" class="filter-select"></select>
+            </label>
+            <label>
+              <span>Start Date</span>
+              <input type="date" id="reportStartDate" class="filter-select" />
+            </label>
+            <label>
+              <span>End Date</span>
+              <input type="date" id="reportEndDate" class="filter-select" />
+            </label>
+            <button class="btn btn-secondary btn-sm" id="reportRefreshBtn" type="button">Refresh</button>
+          </div>
+        </div>
+
+        <div id="reportContent" class="report-content"></div>
       </div>
-
-      <!-- Filters -->
-      <div class="reports-filters">
-        <label class="filter-group">
-          <span class="filter-label">Grade Level</span>
-          <select id="gradeFilter" class="filter-input">
-            <option value="">All Grades</option>
-            <option value="Grade 7">Grade 7</option>
-            <option value="Grade 8">Grade 8</option>
-            <option value="Grade 9">Grade 9</option>
-            <option value="Grade 10">Grade 10</option>
-            <option value="Grade 11">Grade 11</option>
-            <option value="Grade 12">Grade 12</option>
-          </select>
-        </label>
-
-        <label class="filter-group">
-          <span class="filter-label">From Date</span>
-          <input type="date" id="dateStartFilter" class="filter-input">
-        </label>
-
-        <label class="filter-group">
-          <span class="filter-label">To Date</span>
-          <input type="date" id="dateEndFilter" class="filter-input">
-        </label>
-
-        <button class="btn btn-primary" id="applyFiltersBtn">Apply</button>
-        <button class="btn btn-secondary" id="clearFiltersBtn">Clear</button>
-      </div>
-
-      <!-- Report content area -->
-      <div id="reportContent" class="report-content"></div>
     </div>
   `
 
-  injectStyles()
+  injectReportStyles()
+  hasRenderedShell = true
 }
 
-function attachEventListeners() {
-  // Report navigation
-  document.querySelectorAll('[data-report]').forEach(tab => {
-    tab.addEventListener('click', () => {
-      activeReport = tab.dataset.report
-      updateReportDisplay()
+function attachReportListeners() {
+  if (hasAttachedListeners) return
+  hasAttachedListeners = true
+
+  document.querySelectorAll('[data-report-tab]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      activeReport = btn.dataset.reportTab
+      renderActiveReport()
     })
   })
 
-  // Filter controls
-  document.getElementById('applyFiltersBtn')?.addEventListener('click', () => {
-    applyFilters()
-    showToast('Success', 'Filters applied', 'success')
-  })
+  ;['reportStartDate', 'reportEndDate', 'reportGradeFilter', 'reportSectionFilter', 'reportSubjectFilter', 'reportTeacherFilter']
+    .forEach(id => document.getElementById(id)?.addEventListener('change', applyReportFilters))
 
-  document.getElementById('clearFiltersBtn')?.addEventListener('click', () => {
-    clearFilters()
-    showToast('Success', 'Filters cleared', 'success')
-  })
+  document.getElementById('reportRefreshBtn')?.addEventListener('click', reloadReports)
+  document.getElementById('printReportBtn')?.addEventListener('click', () => window.print())
+  document.getElementById('exportPdfBtn')?.addEventListener('click', exportReportAsPDF)
+  document.getElementById('exportCsvBtn')?.addEventListener('click', exportReportAsCSV)
+  document.getElementById('exportExcelBtn')?.addEventListener('click', exportReportAsExcel)
 
-  // Export buttons
-  document.getElementById('exportPdfBtn')?.addEventListener('click', () => {
-    showToast('Info', 'Opening print dialog...', 'info')
-    window.print()
-  })
+  window.applyReportFilters = applyReportFilters
+  window.printReport = () => window.print()
+  window.exportReportPdf = exportReportAsPDF
+  window.exportReportCsv = exportReportAsCSV
+  window.exportReportAsPDF = exportReportAsPDF
+  window.exportReportAsCSV = exportReportAsCSV
+  window.exportReportAsExcel = exportReportAsExcel
 
-  document.getElementById('exportExcelBtn')?.addEventListener('click', exportAsExcel)
+  window.addEventListener('sectionChange', event => {
+    if (event.detail?.section === 'reports') renderActiveReport()
+  })
 }
 
-// ============================================================================
-// DATA LOADING & FILTERING
-// ============================================================================
-
-async function loadAndRenderReports() {
+async function reloadReports() {
   const content = document.getElementById('reportContent')
-  if (content) content.innerHTML = '<div class="loading">Loading data...</div>'
+  if (content) content.innerHTML = '<div class="panel report-loading">Loading reports...</div>'
 
-  reportData = await fetchReportData()
-  updateReportDisplay()
+  reportData = await loadReportData()
+  populateFilterOptions()
+  renderActiveReport()
 }
 
-async function fetchReportData() {
-  try {
-    const [
-      students,
-      teachers,
-      sections,
-      subjects,
-      attendance,
-      grades,
-      enrollments
-    ] = await Promise.all([
-      safeSelect('profiles', 'id,name,email,grade_level,status,role', q => q.eq('role', 'STUDENT')),
-      safeSelect('profiles', 'id,name,email,department,status,role', q => q.eq('role', 'TEACHER')),
-      safeSelect('sections', '*'),
-      safeSelect('subjects', '*'),
-      safeSelect('attendance', '*, student:student_id(name,grade_level)', q => q.order('attendance_date', { ascending: false })),
-      safeSelect('grades', '*, student:student_id(name,grade_level)', q => q.order('created_at', { ascending: false })),
-      safeSelect('enrollments', '*')
-    ])
+async function loadReportData() {
+  const [
+    students,
+    teachers,
+    parents,
+    sections,
+    subjects,
+    enrollments,
+    attendance,
+    grades,
+    schedules
+  ] = await Promise.all([
+    safeSelect('profiles', 'id,name,email,student_id,grade_level,status,role', query => query.eq('role', 'STUDENT')),
+    safeSelect('profiles', 'id,name,email,teacher_id,department,status,role', query => query.eq('role', 'TEACHER')),
+    safeSelect('profiles', 'id,name,email,status,role', query => query.eq('role', 'PARENT')),
+    safeSelect('sections', '*'),
+    safeSelect('subjects', '*'),
+    safeSelect('enrollments', '*'),
+    safeSelect('attendance', '*, profiles:student_id (name, student_id, grade_level)', query => query.order('attendance_date', { ascending: false })),
+    safeSelect('grades', '*, profiles:student_id (name, student_id, grade_level)', query => query.order('created_at', { ascending: false })),
+    safeSelect('schedules', '*')
+  ])
 
-    // Normalize attendance dates
-    const normalizedAttendance = (attendance || []).map(r => ({
-      ...r,
-      date: r.attendance_date || r.date
-    }))
-
-    return {
-      students: students || [],
-      teachers: teachers || [],
-      sections: sections || [],
-      subjects: subjects || [],
-      attendance: normalizedAttendance || [],
-      grades: grades || [],
-      enrollments: enrollments || []
-    }
-  } catch (error) {
-    console.error('Error fetching report data:', error)
-    showToast('Error', 'Failed to load reports', 'error')
-    return emptyReportData()
-  }
+  // Normalize attendance rows (map attendance_date -> date) for compatibility
+  const normalizedAttendance = (attendance || []).map(r => ({ ...r, date: r.attendance_date || r.date }))
+  return { students, teachers, parents, sections, subjects, enrollments, attendance: normalizedAttendance, grades, schedules }
 }
 
-async function safeSelect(table, columns = '*', queryFn) {
+async function safeSelect(table, columns = '*', applyQuery) {
   try {
     let query = supabase.from(table).select(columns)
-    if (queryFn) query = queryFn(query)
+    if (applyQuery) query = applyQuery(query)
     const { data, error } = await query
-    if (error) throw error
+    if (error) {
+      console.warn(`reports ${table}:`, error.message)
+      return []
+    }
     return data || []
   } catch (error) {
-    console.warn(`Failed to fetch ${table}:`, error.message)
+    console.warn(`reports ${table}:`, error.message)
     return []
   }
 }
 
-function applyFilters() {
-  filters.gradeLevel = document.getElementById('gradeFilter')?.value || ''
-  filters.dateStart = document.getElementById('dateStartFilter')?.value || ''
-  filters.dateEnd = document.getElementById('dateEndFilter')?.value || ''
-  updateReportDisplay()
+function applyReportFilters() {
+  filters.startDate = valueOf('reportStartDate')
+  filters.endDate = valueOf('reportEndDate')
+  filters.gradeLevel = valueOf('reportGradeFilter')
+  filters.section = valueOf('reportSectionFilter')
+  filters.subject = valueOf('reportSubjectFilter')
+  filters.teacher = valueOf('reportTeacherFilter')
+  renderActiveReport()
+  showToast('Filters Applied', 'Reports updated', 'success')
 }
 
-function clearFilters() {
-  filters.gradeLevel = ''
-  filters.dateStart = ''
-  filters.dateEnd = ''
-  document.getElementById('gradeFilter').value = ''
-  document.getElementById('dateStartFilter').value = ''
-  document.getElementById('dateEndFilter').value = ''
-  updateReportDisplay()
-}
-
-// ============================================================================
-// FILTERED DATA HELPERS - Simple, reusable
-// ============================================================================
-
-function getFilteredStudents() {
-  return reportData.students.filter(s => 
-    !filters.gradeLevel || s.grade_level === filters.gradeLevel
-  )
-}
-
-function getFilteredAttendance() {
-  return reportData.attendance.filter(a => {
-    const gradeMatch = !filters.gradeLevel || a.student?.grade_level === filters.gradeLevel
-    const dateMatch = isInDateRange(a.date)
-    return gradeMatch && dateMatch
+function renderActiveReport() {
+  document.querySelectorAll('[data-report-tab]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.reportTab === activeReport)
   })
-}
 
-function getFilteredGrades() {
-  return reportData.grades.filter(g => {
-    const gradeMatch = !filters.gradeLevel || g.student?.grade_level === filters.gradeLevel
-    const dateMatch = isInDateRange(g.created_at)
-    return gradeMatch && dateMatch
-  })
-}
-
-function getFilteredEnrollments() {
-  return reportData.enrollments.filter(e => 
-    isInDateRange(e.created_at)
-  )
-}
-
-function isInDateRange(dateStr) {
-  if (!dateStr || (!filters.dateStart && !filters.dateEnd)) return true
-  const date = String(dateStr).slice(0, 10)
-  return (!filters.dateStart || date >= filters.dateStart) && 
-         (!filters.dateEnd || date <= filters.dateEnd)
-}
-
-// ============================================================================
-// REPORT RENDERING - One function per report type
-// ============================================================================
-
-function updateReportDisplay() {
-  clearAllCharts()
-  updateTabIndicators()
+  Object.keys(chartInstances).forEach(destroyChart)
 
   const content = document.getElementById('reportContent')
   if (!content) return
 
-  const renderFunctions = {
-    dashboard: renderDashboard,
+  const renderers = {
+    overview: renderOverviewReport,
     attendance: renderAttendanceReport,
     academic: renderAcademicReport,
-    enrollment: renderEnrollmentReport
+    enrollment: renderEnrollmentReport,
+    teacher: renderTeacherReport,
+    section: renderSectionReport,
+    subject: renderSubjectReport,
+    export: renderExportReport
   }
 
-  const html = renderFunctions[activeReport]?.() || renderDashboard()
-  content.innerHTML = html
-  
-  // Render charts after DOM updates
-  requestAnimationFrame(renderChartsForCurrentReport)
+  content.innerHTML = renderers[activeReport]?.() || renderOverviewReport()
+  requestAnimationFrame(renderChartsForActiveReport)
 }
 
-function updateTabIndicators() {
-  document.querySelectorAll('[data-report]').forEach(tab => {
-    tab.setAttribute('aria-selected', tab.dataset.report === activeReport)
-    tab.classList.toggle('active', tab.dataset.report === activeReport)
-  })
-}
-
-// ============================================================================
-// DASHBOARD REPORT
-// ============================================================================
-
-function renderDashboard() {
-  const students = getFilteredStudents()
-  const teachers = reportData.teachers
-  const attendance = getFilteredAttendance()
-  const grades = getFilteredGrades()
-
-  const presentToday = attendance.filter(a => isToday(a.date) && normalize(a.status) === 'present').length
-  const avgGrade = calculateAverage(grades.map(g => Number(g.score || 0)))
+function renderOverviewReport() {
+  const students = filteredStudents()
+  const teachers = filteredTeachers()
+  const attendance = filteredAttendance()
+  const grades = filteredGrades()
+  const enrollments = filteredEnrollments()
+  const activeUsers = [...students, ...teachers, ...reportData.parents].filter(row => normalize(row.status) === 'active').length
 
   return `
-    <div class="report">
-      <h3>Dashboard</h3>
-      <p class="report-subtitle">Overview of key metrics and statistics</p>
-
-      ${renderStatCards([
-        ['Students', students.length],
-        ['Teachers', teachers.length],
-        ['Present Today', presentToday],
-        ['Avg Grade', avgGrade.toFixed(1)],
-        ['Attendance Records', attendance.length],
-        ['Sections', reportData.sections.length]
-      ])}
-
-      ${renderChartGrid([
-        ['Students per Grade', 'dashStudentsByGrade'],
-        ['Attendance Status', 'dashAttendanceStatus'],
-        ['Grade Distribution', 'dashGradeDistribution'],
-        ['Enrollment Trend', 'dashEnrollmentTrend']
-      ])}
-
-      ${renderDataTable('Recent Grades', 
-        ['Student', 'Subject', 'Score', 'Date'],
-        grades.slice(0, 10).map(g => [
-          g.student?.name || 'Unknown',
-          g.subject || '-',
-          g.score || '-',
-          formatDate(g.created_at)
-        ])
-      )}
-    </div>
+    ${sectionTitle('Dashboard Overview', 'Main analytics page using profiles, sections, subjects, enrollments, attendance, and grades.')}
+    ${summaryCards([
+      ['Total Students', students.length],
+      ['Total Teachers', teachers.length],
+      ['Total Parents', reportData.parents.length],
+      ['Total Sections', reportData.sections.length],
+      ['Total Subjects', reportData.subjects.length],
+    ])}
+    ${chartGrid([
+      ['Students per Grade Level', 'overviewStudentsGradeChart'],
+      ['Attendance Percentage', 'overviewAttendancePercentChart'],
+      ['Average Grades', 'overviewAverageGradesChart'],
+      ['Enrollment Trends', 'overviewEnrollmentTrendChart'],
+      ['Subject Distribution', 'overviewSubjectDistributionChart']
+    ])}
+    ${dataTable('Tables Used', ['Table', 'Records'], [
+      ['users', students.length + teachers.length],
+      ['sections', reportData.sections.length],
+      ['subjects', reportData.subjects.length],
+      ['enrollments', enrollments.length],
+      ['attendance', attendance.length],
+      ['grades', grades.length]
+    ])}
   `
 }
-
-// ============================================================================
-// ATTENDANCE REPORT
-// ============================================================================
 
 function renderAttendanceReport() {
-  const attendance = getFilteredAttendance()
-  const present = attendance.filter(a => normalize(a.status) === 'present').length
-  const absent = attendance.length - present
-
-  const byStudent = groupBy(attendance, a => a.student?.name || 'Unknown')
-  const topAbsentees = Object.entries(byStudent)
-    .map(([name, records]) => [name, records.filter(a => normalize(a.status) !== 'present').length])
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10)
+  const attendance = filteredAttendance()
+  const absent = attendance.filter(row => normalize(row.status) !== 'present')
+  const bySection = groupAttendanceBySection(attendance)
+  const bySubject = countBy(attendance, row => row.subject || 'No subject')
+  const byStudent = countBy(attendance, row => row.profiles?.name || row.student_id || 'Unknown')
 
   return `
-    <div class="report">
-      <h3>Attendance Reports</h3>
-      <p class="report-subtitle">Daily and student attendance monitoring</p>
-
-      ${renderStatCards([
-        ['Total Records', attendance.length],
-        ['Present', present],
-        ['Absent', absent],
-        ['Attendance Rate', attendance.length ? ((present / attendance.length) * 100).toFixed(1) + '%' : '-']
-      ])}
-
-      ${renderChartGrid([
-        ['Present vs Absent', 'attPresent'],
-        ['Attendance Trend', 'attTrend']
-      ])}
-
-      ${renderDataTable('Top Absent Students',
-        ['Student', 'Absences'],
-        topAbsentees
-      )}
-    </div>
+    ${sectionTitle('Attendance Reports', 'Daily, monthly, student, section, subject, and teacher attendance monitoring.')}
+    ${summaryCards([
+      ['Daily Attendance', countToday(attendance)],
+      ['Monthly Attendance', countThisMonth(attendance, 'date')],
+      ['Absent Students', absent.length],
+      ['Attendance by Section', Object.keys(bySection).length],
+      ['Attendance by Subject', Object.keys(bySubject).length],
+      ['Attendance by Student', Object.keys(byStudent).length],
+    ])}
+    ${chartGrid([
+      ['Present vs Absent', 'attendancePresentAbsentChart'],
+      ['Attendance Trend', 'attendanceTrendReportChart'],
+    ])}
+    ${dataTable('Absent Students', ['Date', 'Student', 'Grade', 'Subject'], absent.slice(0, 10).map(row => [
+      formatDate(row.date),
+      row.profiles?.name || row.student_id || 'Unknown',
+      row.profiles?.grade_level || '-',
+      row.subject || '-'
+    ]))}
   `
 }
-
-// ============================================================================
-// ACADEMIC REPORT
-// ============================================================================
 
 function renderAcademicReport() {
-  const grades = getFilteredGrades()
-  const scores = grades.map(g => Number(g.score || 0)).filter(s => Number.isFinite(s))
-  const passed = scores.filter(s => s >= 75).length
-  const failed = scores.filter(s => s < 75).length
-
-  const topPerformers = [...grades]
-    .sort((a, b) => Number(b.score || 0) - Number(a.score || 0))
-    .slice(0, 10)
+  const grades = filteredGrades()
+  const scores = grades.map(row => Number(row.score || row.grade || 0)).filter(score => Number.isFinite(score))
+  const passed = scores.filter(score => score >= 75).length
+  const failedRows = grades.filter(row => Number(row.score || row.grade || 0) < 75)
+  const topRows = [...grades].sort((a, b) => Number(b.score || 0) - Number(a.score || 0)).slice(0, 10)
 
   return `
-    <div class="report">
-      <h3>Academic Performance</h3>
-      <p class="report-subtitle">Student grades and performance metrics</p>
-
-      ${renderStatCards([
-        ['Total Grades', grades.length],
-        ['Passed', passed],
-        ['Failed', failed],
-        ['Average Score', scores.length ? calculateAverage(scores).toFixed(1) : '-'],
-        ['Highest Score', scores.length ? Math.max(...scores) : '-'],
-        ['Lowest Score', scores.length ? Math.min(...scores) : '-']
-      ])}
-
-      ${renderChartGrid([
-        ['Subject Averages', 'acadSubjectAvg'],
-        ['Passed vs Failed', 'acadPassFail'],
-        ['Score Distribution', 'acadDistribution']
-      ])}
-
-      ${renderDataTable('Top Performing Students',
-        ['Student', 'Subject', 'Score'],
-        topPerformers.map(g => [
-          g.student?.name || 'Unknown',
-          g.subject || '-',
-          g.score || '-'
-        ])
-      )}
-    </div>
+    ${sectionTitle('Academic Reports', 'Student grades, subject averages, performance rankings, distribution, and remarks analytics.')}
+    ${summaryCards([
+      ['Student Grades', grades.length],
+      ['Highest Grade', scores.length ? Math.max(...scores).toFixed(1) : '-'],
+      ['Lowest Grade', scores.length ? Math.min(...scores).toFixed(1) : '-'],
+      ['Average Grade', scores.length ? average(scores).toFixed(1) : '-'],
+      ['Passed', passed],
+      ['Failed', failedRows.length]
+    ])}
+    ${chartGrid([
+      ['Subject Averages', 'academicSubjectAverageChart'],
+      ['Student Performance Trend', 'academicTrendChart'],
+      ['Passed vs Failed', 'academicPassedFailedChart'],
+      ['Grade Distribution', 'academicDistributionChart']
+    ])}
+    ${dataTable('Top Performing Students', ['Student', 'Subject', 'Score', 'Remarks'], topRows.map(row => [
+      row.profiles?.name || row.student_id || 'Unknown',
+      row.subject || '-',
+      row.score || '-',
+      Number(row.score || 0) >= 75 ? 'Passed' : 'Failed'
+    ]))}
+    ${dataTable('Failed Students', ['Student', 'Subject', 'Score'], failedRows.slice(0, 10).map(row => [
+      row.profiles?.name || row.student_id || 'Unknown',
+      row.subject || '-',
+      row.score || '-'
+    ]))}
   `
 }
-
-// ============================================================================
-// ENROLLMENT REPORT
-// ============================================================================
 
 function renderEnrollmentReport() {
-  const enrollments = getFilteredEnrollments()
-  const byGrade = groupBy(enrollments, e => e.grade_level || 'Unassigned')
+  const enrollments = filteredEnrollments()
+  const bySection = countBy(enrollments, row => row.section || row.section_name || row.section_id || 'Unassigned')
+  const byGrade = countBy(enrollments, row => row.grade_level || row.profiles?.grade_level || 'Unassigned')
 
   return `
-    <div class="report">
-      <h3>Enrollment</h3>
-      <p class="report-subtitle">Student enrollment trends and distribution</p>
-
-      ${renderStatCards([
-        ['Total Enrolled', enrollments.length],
-        ['This Month', countThisMonth(enrollments, 'created_at')],
-        ['Grade Levels', Object.keys(byGrade).length]
-      ])}
-
-      ${renderChartGrid([
-        ['Enrollment Trend', 'enrollTrend'],
-        ['By Grade Level', 'enrollByGrade']
-      ])}
-
-      ${renderDataTable('Enrollment by Grade',
-        ['Grade Level', 'Students'],
-        Object.entries(byGrade).map(([grade, records]) => [grade, records.length])
-      )}
-    </div>
+    ${sectionTitle('Enrollment Reports', 'Enrollment totals, grade level grouping, section grouping, and growth trends.')}
+    ${summaryCards([
+      ['Total Enrolled Students', enrollments.length],
+      ['Enrollment by Section', Object.keys(bySection).length],
+      ['Enrollment by Grade Level', Object.keys(byGrade).length],
+      ['Enrollment Growth Trends', countThisMonth(enrollments, 'created_at')]
+    ])}
+    ${chartGrid([
+      ['Enrollment Growth', 'enrollmentGrowthChart'],
+      ['Students per Section', 'enrollmentSectionChart'],
+      ['Students per Grade Level', 'enrollmentGradeChart']
+    ])}
+    ${dataTable('Enrollment by Grade Level', ['Grade Level', 'Students'], objectRows(byGrade))}
   `
 }
 
-// ============================================================================
-// CHART RENDERING
-// ============================================================================
+function renderTeacherReport() {
+  const teachers = filteredTeachers()
+  const schedules = filteredSchedules()
+  const loadMap = teacherLoadMap()
 
-function renderChartsForCurrentReport() {
-  const renderers = {
-    dashboard: () => {
-      barChart('dashStudentsByGrade', 'Students', groupBy(getFilteredStudents(), s => s.grade_level || 'Unassigned'))
-      doughnutChart('dashAttendanceStatus', countAttendanceStatus(getFilteredAttendance()))
-      barChart('dashGradeDistribution', 'Students', getGradeDistribution(getFilteredGrades()))
-      lineChart('dashEnrollmentTrend', 'Enrollments', getMonthlyCounts(getFilteredEnrollments(), 'created_at'))
+  return `
+    ${sectionTitle('Teacher Reports', 'Teacher subject load and class schedule overview from schedules, grades, and attendance.')}
+    ${summaryCards([
+      ['Total Teachers', teachers.length],
+      ['Class Schedules', schedules.length],
+      ['Attendance Records', filteredAttendance().length]
+    ])}
+    ${chartGrid([
+      ['Subjects Handled', 'teacherSubjectsChart']
+    ])}
+    ${dataTable('Schedule Overview', ['Teacher', 'Subject', 'Section', 'Schedule'], schedules.slice(0, 20).map(row => [
+      teacherName(row.teacher_id || row.teacher || row.teacher_name),
+      row.subject || row.subject_name || row.subject_id || '-',
+      row.section || row.section_name || row.section_id || '-',
+      row.schedule || row.day || row.time || '-'
+    ]))}
+  `
+}
+
+function renderSectionReport() {
+  const studentsByGrade = countBy(filteredStudents(), row => row.grade_level || 'Unassigned')
+
+  return `
+    ${sectionTitle('Section Reports', 'Students per section and section performance.')}
+    ${summaryCards([
+      ['Total Sections', reportData.sections.length],
+      ['Section Performance', filteredGrades().length ? average(filteredGrades().map(row => Number(row.score || 0))).toFixed(1) : '-']
+    ])}
+    ${chartGrid([
+      ['Population per Section', 'sectionPopulationChart'],
+      ['Section Performance', 'sectionPerformanceChart']
+    ])}
+    ${dataTable('Students per Grade Level', ['Grade Level', 'Students'], objectRows(studentsByGrade))}
+  `
+}
+
+function renderSubjectReport() {
+  const gradeSubjects = countBy(filteredGrades(), row => row.subject || 'No subject')
+  const subjectRows = reportData.subjects.length
+    ? reportData.subjects.map(row => [row.name || row.subject_name || row.code || row.id, row.grade_level || row.department || '-'])
+    : objectRows(gradeSubjects)
+
+  return `
+    ${sectionTitle('Subject Reports', 'Subject distribution, usage in grades, and available subject records.')}
+    ${summaryCards([
+      ['Total Subjects', reportData.subjects.length || Object.keys(gradeSubjects).length],
+      ['Graded Subjects', Object.keys(gradeSubjects).length],
+      ['Grade Records', filteredGrades().length]
+    ])}
+    ${chartGrid([
+      ['Subject Distribution', 'subjectDistributionChart'],
+      ['Average Score per Subject', 'subjectAverageChart']
+    ])}
+    ${dataTable('Subjects', ['Subject', 'Details'], subjectRows.slice(0, 20))}
+  `
+}
+
+function renderExportReport() {
+  return `
+    ${sectionTitle('Export & Print', 'Export charts, tables, summary cards, and date-filtered report content.')}
+    <div class="report-export-grid">
+      ${exportAction('Print', 'printReportBtnMirror', 'Print current report page')}
+      ${exportAction('PDF', 'exportPdfBtnMirror', 'Open print dialog for Save as PDF')}
+      ${exportAction('Excel', 'exportExcelBtnMirror', 'Download workbook-compatible file')}
+      ${exportAction('CSV', 'exportCsvBtnMirror', 'Download report tables and summaries')}
+    </div>
+    ${summaryCards([
+      ['Charts', document.querySelectorAll('#reportContent canvas').length || 'All report charts'],
+      ['Tables', 'Included'],
+      ['Summary Cards', 'Included'],
+      ['Date Filters', filters.startDate || filters.endDate ? `${filters.startDate || 'Any'} to ${filters.endDate || 'Any'}` : 'All dates']
+    ])}
+  `
+}
+
+function renderChartsForActiveReport() {
+  const charts = {
+    overview: () => {
+      barChart('overviewStudentsGradeChart', 'Students', countBy(filteredStudents(), row => row.grade_level || 'Unassigned'))
+      doughnutChart('overviewAttendancePercentChart', countAttendanceStatuses(filteredAttendance()))
+      barChart('overviewAverageGradesChart', 'Average Grade', subjectAverages())
+      lineChart('overviewEnrollmentTrendChart', 'Enrollments', monthlyCounts(filteredEnrollments(), 'created_at'))
+      doughnutChart('overviewSubjectDistributionChart', countBy(filteredGrades(), row => row.subject || 'No subject'))
     },
     attendance: () => {
-      doughnutChart('attPresent', countAttendanceStatus(getFilteredAttendance()))
-      lineChart('attTrend', 'Records', getDailyCounts(getFilteredAttendance(), 'date'))
+      doughnutChart('attendancePresentAbsentChart', countAttendanceStatuses(filteredAttendance()))
+      lineChart('attendanceTrendReportChart', 'Attendance', dailyCounts(filteredAttendance(), 'date'))
+      barChart('attendanceSectionChart', 'Records', groupAttendanceBySection(filteredAttendance()))
     },
     academic: () => {
-      barChart('acadSubjectAvg', 'Avg Score', getSubjectAverages(getFilteredGrades()))
-      doughnutChart('acadPassFail', countPassFail(getFilteredGrades()))
-      barChart('acadDistribution', 'Students', getGradeDistribution(getFilteredGrades()))
+      barChart('academicSubjectAverageChart', 'Average Score', subjectAverages())
+      lineChart('academicTrendChart', 'Average Score', dailyAverage(filteredGrades(), 'created_at', 'score'))
+      doughnutChart('academicPassedFailedChart', passedFailedCounts(filteredGrades()))
+      barChart('academicDistributionChart', 'Students', gradeDistribution(filteredGrades()))
     },
     enrollment: () => {
-      lineChart('enrollTrend', 'Enrollments', getMonthlyCounts(getFilteredEnrollments(), 'created_at'))
-      barChart('enrollByGrade', 'Students', groupBy(getFilteredEnrollments(), e => e.grade_level || 'Unassigned'))
+      lineChart('enrollmentGrowthChart', 'Enrollments', monthlyCounts(filteredEnrollments(), 'created_at'))
+      barChart('enrollmentSectionChart', 'Students', countBy(filteredEnrollments(), row => row.section || row.section_name || row.section_id || 'Unassigned'))
+      barChart('enrollmentGradeChart', 'Students', countBy(filteredEnrollments(), row => row.grade_level || row.profiles?.grade_level || 'Unassigned'))
+    },
+    teacher: () => barChart('teacherSubjectsChart', 'Subjects', teacherLoadMap()),
+    section: () => {
+      barChart('sectionPopulationChart', 'Students', countBy(filteredStudents(), row => row.section || row.section_name || row.grade_level || 'Unassigned'))
+      barChart('sectionPerformanceChart', 'Average Score', sectionPerformance())
+    },
+    subject: () => {
+      doughnutChart('subjectDistributionChart', countBy(filteredGrades(), row => row.subject || 'No subject'))
+      barChart('subjectAverageChart', 'Average Score', subjectAverages())
+    },
+    export: () => {
+      document.getElementById('printReportBtnMirror')?.addEventListener('click', () => window.print())
+      document.getElementById('exportPdfBtnMirror')?.addEventListener('click', exportReportAsPDF)
+      document.getElementById('exportExcelBtnMirror')?.addEventListener('click', exportReportAsExcel)
+      document.getElementById('exportCsvBtnMirror')?.addEventListener('click', exportReportAsCSV)
     }
   }
 
-  renderers[activeReport]?.()
+  charts[activeReport]?.()
 }
 
 function createChart(canvasId, type, data, options = {}) {
   const canvas = document.getElementById(canvasId)
   if (!canvas || typeof Chart === 'undefined') return
-
   destroyChart(canvasId)
-  
   chartInstances[canvasId] = new Chart(canvas, {
     type,
     data,
@@ -532,7 +506,7 @@ function createChart(canvasId, type, data, options = {}) {
       responsive: true,
       maintainAspectRatio: false,
       plugins: { legend: { position: 'bottom' } },
-      scales: (type === 'doughnut' || type === 'pie') ? undefined : { y: { beginAtZero: true } },
+      scales: type === 'doughnut' || type === 'pie' ? undefined : { y: { beginAtZero: true } },
       ...options
     }
   })
@@ -545,93 +519,89 @@ function destroyChart(chartId) {
   }
 }
 
-function clearAllCharts() {
-  Object.keys(chartInstances).forEach(destroyChart)
-}
-
-function barChart(id, label, data) {
-  const keys = Object.keys(data)
-  createChart(id, 'bar', {
-    labels: keys.length ? keys : ['No data'],
+function barChart(canvasId, label, rows) {
+  const labels = Object.keys(rows)
+  createChart(canvasId, 'bar', {
+    labels: labels.length ? labels : ['No data'],
     datasets: [{
       label,
-      data: keys.length ? Object.values(data) : [0],
-      backgroundColor: CHART_COLORS,
+      data: labels.length ? Object.values(rows) : [0],
+      backgroundColor: chartPalette,
       borderRadius: 6
     }]
   }, { plugins: { legend: { display: false } } })
 }
 
-function lineChart(id, label, data) {
-  const keys = Object.keys(data)
-  createChart(id, 'line', {
-    labels: keys.length ? keys : ['No data'],
+function lineChart(canvasId, label, rows) {
+  const labels = Object.keys(rows)
+  createChart(canvasId, 'line', {
+    labels: labels.length ? labels : ['No data'],
     datasets: [{
       label,
-      data: keys.length ? Object.values(data) : [0],
+      data: labels.length ? Object.values(rows) : [0],
       borderColor: '#2563EB',
-      backgroundColor: 'rgba(37, 99, 235, 0.1)',
+      backgroundColor: 'rgba(37, 99, 235, .12)',
       fill: true,
-      tension: 0.35
+      tension: .35
     }]
   })
 }
 
-function doughnutChart(id, data) {
-  const keys = Object.keys(data)
-  createChart(id, 'doughnut', {
-    labels: keys.length ? keys : ['No data'],
+function doughnutChart(canvasId, rows) {
+  const labels = Object.keys(rows)
+  createChart(canvasId, 'doughnut', {
+    labels: labels.length ? labels : ['No data'],
     datasets: [{
-      data: keys.length ? Object.values(data) : [0],
-      backgroundColor: CHART_COLORS
+      data: labels.length ? Object.values(rows) : [0],
+      backgroundColor: chartPalette
     }]
   })
 }
 
-// ============================================================================
-// UI HELPER COMPONENTS
-// ============================================================================
-
-function renderStatCards(stats) {
+function sectionTitle(title, subtitle) {
   return `
-    <div class="stats-grid">
-      ${stats.map(([label, value]) => `
-        <div class="stat-card">
+    <div class="report-section-title">
+      <h3>${title}</h3>
+      <p>${subtitle}</p>
+    </div>
+  `
+}
+
+function summaryCards(items) {
+  return `
+    <div class="stats-grid report-stats-grid">
+      ${items.map(([label, value]) => `
+        <div class="stat-card report-stat-card">
           <div class="stat-value">${escapeHtml(value)}</div>
-          <div class="stat-label">${label}</div>
+          <div class="stat-label">${escapeHtml(label)}</div>
         </div>
       `).join('')}
     </div>
   `
 }
 
-function renderChartGrid(charts) {
+function chartGrid(charts) {
   return `
-    <div class="charts-grid">
+    <div class="charts-grid report-chart-grid">
       ${charts.map(([title, id]) => `
         <div class="chart-card">
-          <h4>${title}</h4>
-          <canvas id="${id}"></canvas>
+          <div class="chart-header"><h3>${title}</h3></div>
+          <div class="chart-body"><canvas id="${id}"></canvas></div>
         </div>
       `).join('')}
     </div>
   `
 }
 
-function renderDataTable(title, headers, rows) {
+function dataTable(title, headers, rows) {
   return `
-    <div class="data-table">
-      <h4>${title}</h4>
-      <div class="table-wrapper">
+    <div class="panel report-table-panel">
+      <h3>${title}</h3>
+      <div class="table-wrap">
         <table>
-          <thead>
-            <tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>
-          </thead>
+          <thead><tr>${headers.map(head => `<th>${head}</th>`).join('')}</tr></thead>
           <tbody>
-            ${rows.length 
-              ? rows.map(row => `<tr>${row.map(cell => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`).join('')
-              : `<tr><td colspan="${headers.length}" class="no-data">No records found</td></tr>`
-            }
+            ${rows.length ? rows.map(row => `<tr>${row.map(cell => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`).join('') : `<tr><td colspan="${headers.length}">No records found</td></tr>`}
           </tbody>
         </table>
       </div>
@@ -639,159 +609,209 @@ function renderDataTable(title, headers, rows) {
   `
 }
 
-// ============================================================================
-// DATA AGGREGATION HELPERS
-// ============================================================================
+function exportAction(label, id, text) {
+  return `
+    <button class="panel report-export-action" id="${id}" type="button">
+      <strong>${label}</strong>
+      <span>${text}</span>
+    </button>
+  `
+}
 
-function groupBy(arr, keyFn) {
-  return arr.reduce((acc, item) => {
-    const key = String(keyFn(item) || 'Unassigned')
-    if (!acc[key]) acc[key] = []
-    acc[key].push(item)
+function filteredStudents() {
+  return reportData.students.filter(row => !filters.gradeLevel || row.grade_level === filters.gradeLevel)
+}
+
+function filteredTeachers() {
+  return reportData.teachers.filter(row => !filters.teacher || row.id === filters.teacher || row.name === filters.teacher)
+}
+
+function filteredAttendance() {
+  return reportData.attendance.filter(row => {
+    const grade = row.profiles?.grade_level || row.grade_level || ''
+    return inDateRange(row.date) &&
+      (!filters.gradeLevel || grade === filters.gradeLevel) &&
+      (!filters.subject || row.subject === filters.subject || row.subject_id === filters.subject) &&
+      (!filters.teacher || row.teacher_id === filters.teacher || row.teacher === filters.teacher)
+  })
+}
+
+function filteredGrades() {
+  return reportData.grades.filter(row => {
+    const grade = row.profiles?.grade_level || row.grade_level || ''
+    return inDateRange(row.created_at || row.date) &&
+      (!filters.gradeLevel || grade === filters.gradeLevel) &&
+      (!filters.subject || row.subject === filters.subject || row.subject_id === filters.subject) &&
+      (!filters.teacher || row.teacher_id === filters.teacher || row.teacher === filters.teacher)
+  })
+}
+
+function filteredEnrollments() {
+  return reportData.enrollments.filter(row => {
+    return inDateRange(row.created_at || row.date) &&
+      (!filters.gradeLevel || row.grade_level === filters.gradeLevel) &&
+      (!filters.section || row.section_id === filters.section || row.section === filters.section || row.section_name === filters.section)
+  })
+}
+
+function filteredSchedules() {
+  return reportData.schedules.filter(row => {
+    return (!filters.section || row.section_id === filters.section || row.section === filters.section || row.section_name === filters.section) &&
+      (!filters.subject || row.subject_id === filters.subject || row.subject === filters.subject || row.subject_name === filters.subject) &&
+      (!filters.teacher || row.teacher_id === filters.teacher || row.teacher === filters.teacher || row.teacher_name === filters.teacher)
+  })
+}
+
+function populateFilterOptions() {
+  setOptions('reportSectionFilter', 'All Sections', reportData.sections.map(row => [row.id || row.name, row.name || row.section_name || row.id]))
+  setOptions('reportSubjectFilter', 'All Subjects', subjectOptions())
+  setOptions('reportTeacherFilter', 'All Teachers', reportData.teachers.map(row => [row.id, row.name || row.email || row.id]))
+}
+
+function subjectOptions() {
+  const options = reportData.subjects.map(row => [row.id || row.name || row.subject_name, row.name || row.subject_name || row.code || row.id])
+  if (options.length) return options
+  return Object.keys(countBy(reportData.grades, row => row.subject || '')).filter(Boolean).map(subject => [subject, subject])
+}
+
+function setOptions(id, allLabel, options) {
+  const el = document.getElementById(id)
+  if (!el) return
+  const current = el.value
+  const seen = new Set()
+  const normalized = options.filter(([value]) => value && !seen.has(value) && seen.add(value))
+  el.innerHTML = `<option value="">${allLabel}</option>` + normalized.map(([value, label]) => `<option value="${escapeAttr(value)}">${escapeHtml(label)}</option>`).join('')
+  el.value = current
+}
+
+function countBy(rows, getKey) {
+  return rows.reduce((acc, row) => {
+    const key = String(getKey(row) || 'Unassigned')
+    acc[key] = (acc[key] || 0) + 1
     return acc
   }, {})
 }
 
-function countAttendanceStatus(attendance) {
-  return {
-    Present: attendance.filter(a => normalize(a.status) === 'present').length,
-    Absent: attendance.filter(a => normalize(a.status) !== 'present').length
-  }
-}
-
-function countPassFail(grades) {
-  return {
-    Passed: grades.filter(g => Number(g.score || 0) >= 75).length,
-    Failed: grades.filter(g => Number(g.score || 0) < 75).length
-  }
-}
-
-function getGradeDistribution(grades) {
-  const dist = { 'A (90+)': 0, 'B (80-89)': 0, 'C (75-79)': 0, 'Below 75': 0 }
-  grades.forEach(g => {
-    const score = Number(g.score || 0)
-    if (score >= 90) dist['A (90+)']++
-    else if (score >= 80) dist['B (80-89)']++
-    else if (score >= 75) dist['C (75-79)']++
-    else dist['Below 75']++
-  })
-  return dist
-}
-
-function getSubjectAverages(grades) {
-  const groups = {}
-  grades.forEach(g => {
-    const subject = g.subject || 'Unassigned'
-    if (!groups[subject]) groups[subject] = []
-    groups[subject].push(Number(g.score || 0))
-  })
-  return Object.fromEntries(
-    Object.entries(groups).map(([subject, scores]) => [subject, calculateAverage(scores)])
-  )
-}
-
-function getDailyCounts(arr, dateField) {
-  return groupBy(arr, item => formatDate(item[dateField])).reduce((acc, item) => {
-    Object.entries(item).forEach(([date]) => {
-      acc[date] = (acc[date] || 0) + 1
-    })
-    return acc
-  }, {})
-}
-
-function getMonthlyCounts(arr, dateField) {
-  const counts = {}
-  arr.forEach(item => {
-    const date = item[dateField] ? new Date(item[dateField]) : null
-    if (date && !isNaN(date)) {
-      const key = date.toLocaleString('default', { month: 'short', year: '2-digit' })
-      counts[key] = (counts[key] || 0) + 1
-    }
+function countAttendanceStatuses(rows) {
+  const counts = { Present: 0, Absent: 0 }
+  rows.forEach(row => {
+    const status = normalize(row.status)
+    if (status === 'present') counts.Present++
+    else counts.Absent++
   })
   return counts
 }
 
-function countThisMonth(arr, dateField) {
+function groupAttendanceBySection(rows) {
+  return countBy(rows, row => row.section || row.section_name || row.profiles?.grade_level || 'Unassigned')
+}
+
+function subjectAverages() {
+  const groups = {}
+  filteredGrades().forEach(row => {
+    const subject = row.subject || 'No subject'
+    if (!groups[subject]) groups[subject] = []
+    groups[subject].push(Number(row.score || row.grade || 0))
+  })
+  return Object.fromEntries(Object.entries(groups).map(([key, values]) => [key, Number(average(values).toFixed(1))]))
+}
+
+function passedFailedCounts(rows) {
+  return rows.reduce((acc, row) => {
+    Number(row.score || row.grade || 0) >= 75 ? acc.Passed++ : acc.Failed++
+    return acc
+  }, { Passed: 0, Failed: 0 })
+}
+
+function gradeDistribution(rows) {
+  const ranges = { '90-100': 0, '80-89': 0, '75-79': 0, 'Below 75': 0 }
+  rows.forEach(row => {
+    const score = Number(row.score || row.grade || 0)
+    if (score >= 90) ranges['90-100']++
+    else if (score >= 80) ranges['80-89']++
+    else if (score >= 75) ranges['75-79']++
+    else ranges['Below 75']++
+  })
+  return ranges
+}
+
+function sectionPerformance() {
+  const groups = {}
+  filteredGrades().forEach(row => {
+    const key = row.section || row.section_name || row.profiles?.grade_level || 'Unassigned'
+    if (!groups[key]) groups[key] = []
+    groups[key].push(Number(row.score || row.grade || 0))
+  })
+  return Object.fromEntries(Object.entries(groups).map(([key, values]) => [key, Number(average(values).toFixed(1))]))
+}
+
+function teacherLoadMap() {
+  const fromSchedules = countBy(filteredSchedules(), row => teacherName(row.teacher_id || row.teacher || row.teacher_name))
+  if (Object.keys(fromSchedules).length) return fromSchedules
+  return countBy(filteredGrades(), row => teacherName(row.teacher_id || row.teacher || row.teacher_name || 'Unassigned'))
+}
+
+function dailyCounts(rows, field) {
+  return countBy(rows, row => formatDate(row[field]))
+}
+
+function dailyAverage(rows, dateField, valueField) {
+  const groups = {}
+  rows.forEach(row => {
+    const key = formatDate(row[dateField])
+    if (!groups[key]) groups[key] = []
+    groups[key].push(Number(row[valueField] || 0))
+  })
+  return Object.fromEntries(Object.entries(groups).slice(0, 14).map(([key, values]) => [key, Number(average(values).toFixed(1))]))
+}
+
+function monthlyCounts(rows, field) {
+  return countBy(rows, row => {
+    const date = row[field] ? new Date(row[field]) : null
+    return date && !Number.isNaN(date.valueOf()) ? date.toLocaleString('default', { month: 'short', year: '2-digit' }) : 'No date'
+  })
+}
+
+function countToday(rows) {
+  const today = new Date().toISOString().slice(0, 10)
+  return rows.filter(row => String(row.date || '').slice(0, 10) === today).length
+}
+
+function countThisMonth(rows, field) {
   const now = new Date()
-  return arr.filter(item => {
-    const date = item[dateField] ? new Date(item[dateField]) : null
+  return rows.filter(row => {
+    const date = row[field] ? new Date(row[field]) : null
     return date && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear()
   }).length
 }
 
-function calculateAverage(values) {
-  const nums = values.filter(Number.isFinite)
-  return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : 0
+function average(values) {
+  const nums = values.map(Number).filter(Number.isFinite)
+  return nums.length ? nums.reduce((sum, value) => sum + value, 0) / nums.length : 0
 }
 
-function isToday(dateStr) {
-  const today = new Date().toISOString().slice(0, 10)
-  return String(dateStr).slice(0, 10) === today
+function objectRows(obj) {
+  return Object.entries(obj).map(([key, value]) => [key, value])
 }
 
-// ============================================================================
-// EXPORT FUNCTIONALITY
-// ============================================================================
-
-async function exportAsExcel() {
-  const rows = buildExportData()
-  
-  if (window.XLSX) {
-    const ws = XLSX.utils.aoa_to_sheet(rows)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Reports')
-    XLSX.writeFile(wb, `reports-${new Date().toISOString().slice(0, 10)}.xlsx`)
-  } else {
-    const csv = rows.map(row => row.map(cell => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
-    downloadBlob(csv, `reports-${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8')
-  }
-  
-  showToast('Success', 'Report exported', 'success')
+function teacherName(value) {
+  const teacher = reportData.teachers.find(row => row.id === value || row.teacher_id === value || row.name === value)
+  return teacher?.name || value || 'Unassigned'
 }
 
-function buildExportData() {
-  const attendance = getFilteredAttendance()
-  const grades = getFilteredGrades()
-
-  return [
-    ['EASPO Reports'],
-    ['Generated', new Date().toLocaleString()],
-    ['Report', REPORTS.find(r => r.id === activeReport)?.label || 'Reports'],
-    [],
-    ['Summary Statistics'],
-    ['Total Students', getFilteredStudents().length],
-    ['Total Teachers', reportData.teachers.length],
-    ['Total Sections', reportData.sections.length],
-    ['Attendance Records', attendance.length],
-    ['Grade Records', grades.length],
-    [],
-    ['Attendance Data'],
-    ['Date', 'Student', 'Status', 'Subject'],
-    ...attendance.slice(0, 100).map(a => [formatDate(a.date), a.student?.name || '', a.status || '', a.subject || '']),
-    [],
-    ['Grades Data'],
-    ['Student', 'Subject', 'Score', 'Date'],
-    ...grades.slice(0, 100).map(g => [g.student?.name || '', g.subject || '', g.score || '', formatDate(g.created_at)])
-  ]
+function inDateRange(value) {
+  if (!value || (!filters.startDate && !filters.endDate)) return true
+  const date = String(value).slice(0, 10)
+  return (!filters.startDate || date >= filters.startDate) && (!filters.endDate || date <= filters.endDate)
 }
 
-function downloadBlob(content, filename, type) {
-  const blob = new Blob([content], { type })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = filename
-  link.click()
-  URL.revokeObjectURL(url)
+function formatDate(value) {
+  if (!value) return '-'
+  return String(value).slice(0, 10)
 }
 
-// ============================================================================
-// UTILITIES & HELPERS
-// ============================================================================
-
-function formatDate(dateStr) {
-  if (!dateStr) return '-'
-  return String(dateStr).slice(0, 10)
+function valueOf(id) {
+  return (document.getElementById(id)?.value || '').trim()
 }
 
 function normalize(value) {
@@ -799,327 +819,122 @@ function normalize(value) {
 }
 
 function escapeHtml(value) {
-  const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
-  return String(value ?? '').replace(/[&<>"']/g, char => map[char])
+  return String(value ?? '').replace(/[&<>"']/g, char => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[char]))
 }
 
-function subscribeToChanges() {
-  supabase.channel('reports-updates')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, loadAndRenderReports)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'grades' }, loadAndRenderReports)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'enrollments' }, loadAndRenderReports)
+function escapeAttr(value) {
+  return escapeHtml(value).replace(/`/g, '&#96;')
+}
+
+async function exportReportAsCSV() {
+  const rows = buildExportRows()
+  const csv = rows.map(row => row.map(cell => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
+  downloadBlob(csv, `reports-${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8;')
+  showToast('Success', 'Report exported as CSV', 'success')
+}
+
+async function exportReportAsExcel() {
+  const rows = buildExportRows()
+  if (window.XLSX) {
+    const worksheet = XLSX.utils.aoa_to_sheet(rows)
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Reports')
+    XLSX.writeFile(workbook, `reports-${new Date().toISOString().slice(0, 10)}.xlsx`)
+  } else {
+    const csv = rows.map(row => row.join(',')).join('\n')
+    downloadBlob(csv, `reports-${new Date().toISOString().slice(0, 10)}.xls`, 'application/vnd.ms-excel')
+  }
+  showToast('Success', 'Report exported as Excel', 'success')
+}
+
+function exportReportAsPDF() {
+  showToast('Info', 'Opening print dialog. Choose Save as PDF.', 'info')
+  window.print()
+}
+
+function buildExportRows() {
+  const attendance = filteredAttendance()
+  const grades = filteredGrades()
+  const enrollments = filteredEnrollments()
+  return [
+    ['EASPO Reports'],
+    ['Generated', new Date().toLocaleString()],
+    ['Report', REPORTS.find(row => row.id === activeReport)?.label || 'Reports'],
+    ['Date Filter', filters.startDate || 'Any', filters.endDate || 'Any'],
+    [],
+    ['Summary'],
+    ['Students', filteredStudents().length],
+    ['Teachers', filteredTeachers().length],
+    ['Parents', reportData.parents.length],
+    ['Sections', reportData.sections.length],
+    ['Subjects', reportData.subjects.length],
+    ['Enrollments', enrollments.length],
+    ['Attendance Records', attendance.length],
+    ['Grade Records', grades.length],
+    [],
+    ['Attendance', 'Date', 'Student', 'Status', 'Subject'],
+    ...attendance.slice(0, 200).map(row => ['', formatDate(row.date), row.profiles?.name || row.student_id || '', row.status || '', row.subject || '']),
+    [],
+    ['Grades', 'Student', 'Subject', 'Score', 'Date'],
+    ...grades.slice(0, 200).map(row => ['', row.profiles?.name || row.student_id || '', row.subject || '', row.score || '', formatDate(row.created_at)])
+  ]
+}
+
+function downloadBlob(content, filename, type) {
+  const blob = new Blob([content], { type })
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(blob)
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(link.href)
+}
+
+function subscribeToReportUpdates() {
+  hasSubscribed = true
+  supabase.channel('reports-realtime')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, reloadReports)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, reloadReports)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'grades' }, reloadReports)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'enrollments' }, reloadReports)
     .subscribe()
 }
 
-// ============================================================================
-// STYLES
-// ============================================================================
-
-function injectStyles() {
-  if (document.getElementById('reportsStyles')) return
-
-  const styles = document.createElement('style')
-  styles.id = 'reportsStyles'
-  styles.textContent = `
-    /* Container & Layout */
-    .reports-container {
-      max-width: 1400px;
-      margin: 0 auto;
-      padding: 0;
-    }
-
-    /* Header */
-    .reports-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 28px;
-      gap: 20px;
-    }
-
-    .reports-title h2 {
-      font-size: 1.8rem;
-      margin: 0 0 4px;
-      color: var(--text);
-    }
-
-    .reports-title p {
-      margin: 0;
-      color: var(--text2);
-      font-size: 0.95rem;
-    }
-
-    .reports-actions {
-      display: flex;
-      gap: 12px;
-    }
-
-    /* Tabs */
-    .reports-tabs {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-      gap: 8px;
-      margin-bottom: 28px;
-      padding-bottom: 16px;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .reports-tab {
-      padding: 12px 16px;
-      background: transparent;
-      border: 2px solid transparent;
-      border-radius: 8px;
-      cursor: pointer;
-      color: var(--text2);
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      transition: all 0.2s ease;
-    }
-
-    .reports-tab:hover {
-      background: var(--surface);
-      color: var(--text);
-    }
-
-    .reports-tab[aria-selected="true"],
-    .reports-tab.active {
-      border-color: var(--primary);
-      color: var(--primary);
-      background: var(--primary-dim);
-    }
-
-    .tab-icon {
-      font-size: 1.2rem;
-    }
-
-    /* Filters */
-    .reports-filters {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 12px;
-      margin-bottom: 28px;
-      padding: 16px;
-      background: var(--surface);
-      border-radius: 8px;
-      align-items: end;
-    }
-
-    .filter-group {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .filter-label {
-      font-size: 0.85rem;
-      font-weight: 600;
-      color: var(--text2);
-    }
-
-    .filter-input {
-      padding: 8px 12px;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      background: var(--bg);
-      color: var(--text);
-      font-size: 0.95rem;
-    }
-
-    /* Report Content */
-    .report-content {
-      min-height: 400px;
-    }
-
-    .report {
-      display: flex;
-      flex-direction: column;
-      gap: 24px;
-    }
-
-    .report h3 {
-      font-size: 1.5rem;
-      margin: 0;
-      color: var(--text);
-    }
-
-    .report-subtitle {
-      margin: -20px 0 0;
-      color: var(--text2);
-      font-size: 0.95rem;
-    }
-
-    .loading {
-      text-align: center;
-      padding: 60px 20px;
-      color: var(--text2);
-    }
-
-    /* Stats Grid */
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-      gap: 16px;
-    }
-
-    .stat-card {
-      padding: 20px;
-      background: var(--surface);
-      border-radius: 8px;
-      border: 1px solid var(--border);
-    }
-
-    .stat-value {
-      font-size: 1.8rem;
-      font-weight: 700;
-      color: var(--primary);
-      margin-bottom: 8px;
-    }
-
-    .stat-label {
-      font-size: 0.85rem;
-      color: var(--text2);
-      font-weight: 600;
-    }
-
-    /* Charts Grid */
-    .charts-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 20px;
-    }
-
-    .chart-card {
-      padding: 20px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      min-height: 350px;
-    }
-
-    .chart-card h4 {
-      margin: 0 0 16px;
-      font-size: 1rem;
-      color: var(--text);
-    }
-
-    .chart-card canvas {
-      max-height: 280px;
-    }
-
-    /* Data Tables */
-    .data-table {
-      margin-top: 24px;
-    }
-
-    .data-table h4 {
-      margin: 0 0 12px;
-      font-size: 1rem;
-      color: var(--text);
-    }
-
-    .table-wrapper {
-      overflow-x: auto;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-    }
-
-    .data-table table {
-      width: 100%;
-      border-collapse: collapse;
-      background: var(--surface);
-    }
-
-    .data-table th {
-      padding: 12px 16px;
-      text-align: left;
-      font-weight: 600;
-      color: var(--text2);
-      font-size: 0.85rem;
-      border-bottom: 1px solid var(--border);
-      background: var(--bg);
-    }
-
-    .data-table td {
-      padding: 12px 16px;
-      border-bottom: 1px solid var(--border);
-      font-size: 0.95rem;
-      color: var(--text);
-    }
-
-    .data-table tr:last-child td {
-      border-bottom: none;
-    }
-
-    .data-table .no-data {
-      text-align: center;
-      color: var(--text2);
-      padding: 20px;
-    }
-
-    /* Responsive */
-    @media (max-width: 768px) {
-      .reports-header {
-        flex-direction: column;
-      }
-
-      .reports-actions {
-        width: 100%;
-      }
-
-      .reports-tabs {
-        grid-template-columns: repeat(2, 1fr);
-      }
-
-      .reports-filters {
-        grid-template-columns: 1fr;
-      }
-
-      .charts-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .stats-grid {
-        grid-template-columns: repeat(2, 1fr);
-      }
-    }
-
-    @media (max-width: 640px) {
-      .reports-tabs {
-        grid-template-columns: 1fr;
-      }
-
-      .stats-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .report h3 {
-        font-size: 1.3rem;
-      }
-    }
-
-    /* Print Styles */
-    @media print {
-      .reports-header,
-      .reports-tabs,
-      .reports-filters,
-      .page-header-actions {
-        display: none !important;
-      }
-
-      .reports-container {
-        max-width: 100%;
-      }
-
-      .chart-card,
-      .data-table,
-      .stat-card {
-        break-inside: avoid;
-        page-break-inside: avoid;
-      }
-    }
+function injectReportStyles() {
+  if (document.getElementById('reportsModuleStyles')) return
+  const style = document.createElement('style')
+  style.id = 'reportsModuleStyles'
+  style.textContent = `
+    .reports-layout{display:grid;grid-template-columns:230px minmax(0,1fr);gap:20px;align-items:start}
+    .reports-nav{position:sticky;top:88px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;box-shadow:var(--shadow-sm)}
+    .reports-nav-title{font-weight:800;color:var(--text);font-size:.82rem;margin:4px 6px 10px}
+    .reports-nav-btn{width:100%;border:0;background:transparent;color:var(--text2);padding:10px 12px;border-radius:6px;text-align:left;font-weight:650;cursor:pointer}
+    .reports-nav-btn:hover,.reports-nav-btn.active{background:var(--primary-dim);color:var(--primary)}
+    .reports-main{min-width:0}
+    .report-filters-panel{margin-bottom:20px}
+    .reports-filter-grid{display:grid;grid-template-columns:repeat(6,minmax(130px,1fr)) auto;gap:12px;align-items:end}
+    .reports-filter-grid label span{display:block;font-size:12px;color:var(--text2);font-weight:700;margin-bottom:6px}
+    .report-section-title{margin:6px 0 16px}
+    .report-section-title h3{font-size:1.15rem;margin:0;color:var(--text)}
+    .report-section-title p{margin:4px 0 0;color:var(--text2);font-size:.9rem}
+    .report-stats-grid{margin-bottom:20px}
+    .report-stat-card{min-height:104px}
+    .report-chart-grid{margin-bottom:20px}
+    .report-table-panel{margin-top:20px}
+    .report-table-panel h3{margin:0 0 12px;font-size:1rem}
+    .report-export-grid{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:14px;margin-bottom:20px}
+    .report-export-action{display:flex;flex-direction:column;gap:6px;text-align:left;cursor:pointer;color:var(--text)}
+    .report-export-action span{color:var(--text2);font-size:.82rem}
+    .report-loading{text-align:center;padding:32px;color:var(--text2)}
+    .filter-select{padding:6px 8px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text);font-size:14px}
+    @media (max-width:1100px){.reports-layout{grid-template-columns:1fr}.reports-nav{position:static;display:grid;grid-template-columns:repeat(2,1fr)}.reports-nav-title{grid-column:1/-1}.reports-filter-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    @media (max-width:640px){.reports-nav,.reports-filter-grid,.report-export-grid{grid-template-columns:1fr}.reports-layout{gap:14px}}
+    @media print{.reports-nav,.report-filters-panel,.page-header-actions{display:none!important}.reports-layout{display:block}.chart-card,.report-table-panel,.stat-card{break-inside:avoid}}
   `
-
-  document.head.appendChild(styles)
+  document.head.appendChild(style)
 }
