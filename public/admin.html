@@ -99,6 +99,7 @@
       <button class="btn-logout" onclick="logout()">Sign out</button>
     </div>
   </aside>
+  <button class="sidebar-backdrop" id="sidebarBackdrop" type="button" aria-label="Close navigation"></button>
 
   <!-- ═══ MAIN CONTENT ══════════════════════════════════════ -->
   <div class="main-content">
@@ -106,6 +107,7 @@
     <!-- Topbar -->
     <header class="topbar">
       <div class="topbar-left">
+        <button class="mobile-menu-toggle" id="mobileMenuToggle" type="button" aria-label="Open navigation" aria-controls="sidebar" aria-expanded="false">☰</button>
         <div class="topbar-title" id="topbarTitle">Admin Dashboard</div>
         <div class="topbar-sub"  id="topbarSub">Overview of your school system</div>
       </div>
@@ -345,18 +347,10 @@
               </div>
             </div>
             <div class="toolbar-right">
-              <select class="filter-select" id="deptFilter">
-                <option value="">All Departments</option>
-                <option value="Science">Science</option>
-                <option value="Mathematics">Mathematics</option>
-                <option value="Arts & Humanities">Arts & Humanities</option>
-                <option value="Physical Education">Physical Education</option>
-                <option value="Technology">Technology</option>
-              </select>
               <select id="TeacherstatusFilter" class="filter-select">
-                  <option value="">All Status</option>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
+                  <option value="">All Assignment Statuses</option>
+                  <option value="assigned">Assigned</option>
+                  <option value="unassigned">Unassigned</option>
               </select>
             </div>
           </div>
@@ -368,15 +362,13 @@
                   <th class="cb-cell"><input type="checkbox" /></th>
                   <th>Teacher</th>
                   <th>Teacher ID</th>
-                  <th>Department</th>
-                  <th>Subjects</th>
                   <th>Contact</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody id="teachersTableBody">
-                <tr><td colspan="8"><div class="loader"><div class="spinner"></div></div></td></tr>
+                <tr><td colspan="6"><div class="loader"><div class="spinner"></div></div></td></tr>
               </tbody>
             </table>
           </div>
@@ -752,12 +744,12 @@
             <label class="form-label">Grade Level <span class="req">*</span></label>
             <select id="studentGrade" class="form-select" required>
               <option value="">Select grade...</option>
-              <option value="Grade 7">Grade 7</option>
-              <option value="Grade 8">Grade 8</option>
-              <option value="Grade 9">Grade 9</option>
-              <option value="Grade 10">Grade 10</option>
-              <option value="Grade 11">Grade 11</option>
-              <option value="Grade 12">Grade 12</option>
+              <option value="7">Grade 7</option>
+              <option value="8">Grade 8</option>
+              <option value="9">Grade 9</option>
+              <option value="10">Grade 10</option>
+              <option value="11">Grade 11</option>
+              <option value="12">Grade 12</option>
             </select>
           </div>
         </div>
@@ -821,12 +813,12 @@
             <label class="form-label">Grade Level</label>
             <select id="editStudentGrade" class="form-select">
               <option value="">Select grade...</option>
-              <option value="Grade 7">Grade 7</option>
-              <option value="Grade 8">Grade 8</option>
-              <option value="Grade 9">Grade 9</option>
-              <option value="Grade 10">Grade 10</option>
-              <option value="Grade 11">Grade 11</option>
-              <option value="Grade 12">Grade 12</option>
+              <option value="7">Grade 7</option>
+              <option value="8">Grade 8</option>
+              <option value="9">Grade 9</option>
+              <option value="10">Grade 10</option>
+              <option value="11">Grade 11</option>
+              <option value="12">Grade 12</option>
             </select>
           </div>
         </div>

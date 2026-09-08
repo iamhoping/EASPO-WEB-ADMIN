@@ -5,6 +5,7 @@ import { renderPagination } from '../ui/pagination.js';
 
 let allTeachers = []
 let filtered    = []
+let assignedTeacherIds = new Set()
 let currentPage = 1
 const PER_PAGE  = 10
 
@@ -15,18 +16,46 @@ const val       = id => (document.getElementById(id)?.value||'').trim()
 const openM     = id => document.getElementById(id)?.classList.remove('hidden')
 const closeM    = id => document.getElementById(id)?.classList.add('hidden')
 
-const DEPT_SUBJECTS = {
-  'Science'          : ['Biology','Chemistry','Physics','Earth Science'],
-  'Mathematics'      : ['Algebra','Calculus','Geometry','Statistics'],
-  'Arts & Humanities': ['English','History','Literature','Filipino'],
-  'Physical Education': ['Sports','Fitness','Health','Dance'],
-  'Technology'       : ['Computer Science','ICT','Programming','Robotics'],
+const assignmentTeacherKeys = [
+  'teacher_id', 'teacherId', 'teacher_profile_id', 'assigned_teacher_id',
+  'instructor_id', 'teacher', 'teacher_name', 'instructor', 'instructor_name'
+]
+
+function rowBelongsToTeacher(row, teacher) {
+  const teacherValues = [teacher.id, teacher.teacher_id, teacher.name]
+    .filter(Boolean)
+    .map(value => String(value).toLowerCase())
+
+  return assignmentTeacherKeys.some(key => {
+    const value = row?.[key]
+    if (!value || typeof value === 'object') return false
+    return teacherValues.includes(String(value).toLowerCase())
+  })
+}
+
+async function loadTeacherAssignments(teachers) {
+  const [sectionsResult, schedulesResult] = await Promise.all([
+    supabase.from('sections').select('*'),
+    supabase.from('schedules').select('*')
+  ])
+
+  const sections = sectionsResult.error ? [] : (sectionsResult.data || [])
+  const schedules = schedulesResult.error ? [] : (schedulesResult.data || [])
+  assignedTeacherIds = new Set(
+    teachers
+      .filter(teacher => sections.some(row => rowBelongsToTeacher(row, teacher)) || schedules.some(row => rowBelongsToTeacher(row, teacher)))
+      .map(teacher => String(teacher.id))
+  )
+}
+
+function teacherAssignmentStatus(teacher) {
+  return assignedTeacherIds.has(String(teacher.id)) ? 'assigned' : 'unassigned'
 }
 
 // ── Load ─────────────────────────────────────────────────────
 export async function loadTeachers() {
   const tbody = document.getElementById('teachersTableBody')
-  if (tbody) tbody.innerHTML = `<tr><td colspan="8"><div class="loader"><div class="spinner"></div></div></td></tr>`
+  if (tbody) tbody.innerHTML = `<tr><td colspan="6"><div class="loader"><div class="spinner"></div></div></td></tr>`
 
   const { data, error } = await supabase
     .from('profiles')
@@ -36,13 +65,13 @@ export async function loadTeachers() {
 
   if (error) { showToast('DB Error', error.message, 'error'); return }
   allTeachers = data || []
+  await loadTeacherAssignments(allTeachers)
   applyFilters()
 }
 
 // ── Filter ────────────────────────────────────────────────────
 export function applyFilters() {
   const q  = val('teacherSearch').toLowerCase()
-  const dp = document.getElementById('deptFilter')?.value || ''
   const tc = document.getElementById('TeacherstatusFilter')?.value || ''
 
   filtered = allTeachers.filter(t =>
@@ -52,9 +81,7 @@ export function applyFilters() {
       (t.email || '').toLowerCase().includes(q)
     ) &&
 
-    (!dp || t.department === dp) &&
-
-    (!tc || (t.status || '').toLowerCase() === tc.toLowerCase())
+    (!tc || teacherAssignmentStatus(t) === tc.toLowerCase())
   )
 
   currentPage = 1
@@ -69,7 +96,7 @@ function render() {
   if (!tbody) return
 
   if (!total) {
-    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">🧑‍🏫</div><div class="empty-title">No teachers found</div><div class="empty-sub">Adjust your search or add a new teacher.</div></div></td></tr>`
+    tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">🧑‍🏫</div><div class="empty-title">No teachers found</div><div class="empty-sub">Adjust your search or add a new teacher.</div></div></td></tr>`
     if(countEl) countEl.textContent = '0 teachers'
     document.getElementById('teachersPagination').innerHTML = ''
     return
@@ -80,11 +107,9 @@ function render() {
   const pages = Math.ceil(total/PER_PAGE)
 
   tbody.innerHTML = slice.map(t => {
-    const dept     = t.department || 'Unassigned'
-    const subjects = (DEPT_SUBJECTS[dept] || []).slice(0,2)
-    const st       = t.status || 'active'
-    const pillCls  = st==='active' ? 'pill-green' : st==='on leave' ? 'pill-yellow' : 'pill-grey'
-    const pillLbl  = st.split(' ').map(w=>w[0].toUpperCase()+w.slice(1)).join(' ')
+    const assignmentStatus = teacherAssignmentStatus(t)
+    const pillCls  = assignmentStatus === 'assigned' ? 'pill-green' : 'pill-grey'
+    const pillLbl  = assignmentStatus === 'assigned' ? 'Assigned' : 'Unassigned'
 
     return `
     <tr>
@@ -94,8 +119,6 @@ function render() {
         <div><div class="ent-name">${t.name||'—'}</div><div class="ent-sub">${t.email||'—'}</div></div>
       </div></td>
       <td><code style="font-size:.78rem;color:var(--text3)">${t.teacher_id||'—'}</code></td>
-      <td><span class="pill pill-purple">${dept}</span></td>
-      <td><div class="tag-row">${subjects.map(s=>`<span class="tag">${s}</span>`).join('')||'—'}</div></td>
       <td>${t.contact||'—'}</td>
       <td><span class="pill ${pillCls}">${pillLbl}</span></td>
       <td><div class="row-acts">
@@ -223,7 +246,6 @@ export function initTeachersSection() {
   // Listeners for buttons and inputs
   document.getElementById('addTeacherBtn')?.addEventListener('click',()=>{ openM('addTeacherModal'); generateTeacherId() })
   document.getElementById('teacherSearch')?.addEventListener('input', applyFilters)
-  document.getElementById('deptFilter')?.addEventListener('change', applyFilters)
   document.getElementById('TeacherstatusFilter')?.addEventListener('change', applyFilters)
   document.getElementById('exportTeachersBtn')?.addEventListener('click', exportCSV)
   loadTeachers()

@@ -265,6 +265,31 @@ function initDropdownMenu() {
   })
 }
 
+function initMobileNavigation() {
+  const sidebar = document.getElementById('sidebar')
+  const toggle = document.getElementById('mobileMenuToggle')
+  const backdrop = document.getElementById('sidebarBackdrop')
+  if (!sidebar || !toggle || !backdrop) return
+
+  const setOpen = open => {
+    sidebar.classList.toggle('open', open)
+    backdrop.classList.toggle('visible', open)
+    toggle.setAttribute('aria-expanded', String(open))
+    document.body.classList.toggle('nav-open', open)
+  }
+
+  toggle.addEventListener('click', () => setOpen(!sidebar.classList.contains('open')))
+  backdrop.addEventListener('click', () => setOpen(false))
+  sidebar.querySelectorAll('a, button').forEach(item => {
+    item.addEventListener('click', () => {
+      if (window.matchMedia('(max-width: 860px)').matches) setOpen(false)
+    })
+  })
+  window.addEventListener('resize', () => {
+    if (!window.matchMedia('(max-width: 860px)').matches) setOpen(false)
+  })
+}
+
 // ── Navigation ────────────────────────────────────────────────
 function setActiveSection(section) {
   if (section === activeSection) return
@@ -694,6 +719,7 @@ async function boot() {
     event.target.value = ''
   })
   initDropdownMenu()
+  initMobileNavigation()
   initSidebarSearch()
   initGlobalSearch()
 
