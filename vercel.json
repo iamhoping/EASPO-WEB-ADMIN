@@ -11,6 +11,10 @@
     {
       "source": "/login",
       "destination": "/index.html"
+    },
+    {
+      "source": "/teacher",
+      "destination": "/teacher.html"
     }
   ],
   "redirects": [
@@ -27,6 +31,11 @@
     {
       "source": "/index.html",
       "destination": "/login",
+      "permanent": true
+    },
+    {
+      "source": "/teacher.html",
+      "destination": "/teacher",
       "permanent": true
     }
   ]

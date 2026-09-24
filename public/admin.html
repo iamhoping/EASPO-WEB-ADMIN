@@ -66,6 +66,9 @@
             </a>
           </div>
         </div>
+        <a class="nav-link" data-section="schedules" href="#">
+          <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg></span> Schedule Management
+        </a>
         <a class="nav-link" data-section="attendance" href="#">
           <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chart-column-decreasing-icon lucide-chart-column-decreasing"><path d="M13 17V9"/><path d="M18 17v-3"/><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M8 17V5"/></svg></span> Attendance
         </a>
@@ -431,6 +434,50 @@
           <div class="table-footer">
             <span class="table-count" id="parentsCount">Loading...</span>
             <div class="pagination" id="parentsPagination"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ SCHEDULES SECTION ══════════════════════════════ -->
+      <section id="schedulesSection" class="hidden">
+        <div class="page-header">
+          <div class="page-header-actions">
+            <button class="btn btn-primary" id="addScheduleBtn">+ Add Schedule</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="toolbar">
+            <div class="toolbar-left">
+              <div class="search-box">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                <input id="scheduleSearch" type="search" placeholder="Search by room, teacher, section, or subject..." />
+              </div>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Day</th>
+                  <th>Time</th>
+                  <th>Room</th>
+                  <th>Teacher</th>
+                  <th>Section</th>
+                  <th>Subject</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="schedulesTableBody">
+                <tr><td colspan="7"><div class="loader"><div class="spinner"></div></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="table-footer">
+            <span class="table-count" id="schedulesCount">Loading...</span>
+            <div class="pagination" id="schedulesPagination"></div>
           </div>
         </div>
       </section>
@@ -1086,6 +1133,140 @@
     <div class="modal-foot">
       <button class="btn btn-secondary" onclick="closeModal('editParentModal')">Cancel</button>
       <button class="btn btn-primary" onclick="submitEditParent()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── ADD SCHEDULE ─────────────────────────────────────── -->
+<div id="addScheduleModal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2>Add Schedule</h2>
+      <button class="modal-close" onclick="closeModal('addScheduleModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form id="addScheduleForm" class="form-grid">
+        <div class="form-2col">
+          <div class="form-group">
+            <label class="form-label">Day <span class="req">*</span></label>
+            <select id="scheduleDay" class="form-select" required>
+              <option value="">Select day...</option>
+              <option value="Monday">Monday</option>
+              <option value="Tuesday">Tuesday</option>
+              <option value="Wednesday">Wednesday</option>
+              <option value="Thursday">Thursday</option>
+              <option value="Friday">Friday</option>
+              <option value="Saturday">Saturday</option>
+              <option value="Sunday">Sunday</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Room <span class="req">*</span></label>
+            <input id="scheduleRoom" class="form-input" type="text" list="scheduleRoomList" placeholder="e.g. Room 101" required />
+            <datalist id="scheduleRoomList"></datalist>
+          </div>
+        </div>
+        <div class="form-2col">
+          <div class="form-group">
+            <label class="form-label">Start Time <span class="req">*</span></label>
+            <input id="scheduleStartTime" class="form-input" type="time" min="07:00" max="18:00" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">End Time <span class="req">*</span></label>
+            <input id="scheduleEndTime" class="form-input" type="time" min="07:00" max="18:00" required />
+          </div>
+        </div>
+        <div class="form-2col">
+          <div class="form-group">
+            <label class="form-label">Teacher <span class="req">*</span></label>
+            <select id="scheduleTeacher" class="form-select" data-schedule-teacher required>
+              <option value="">Select teacher...</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Section <span class="req">*</span></label>
+            <select id="scheduleSection" class="form-select" data-schedule-section required>
+              <option value="">Select section...</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Subject <span class="req">*</span></label>
+          <select id="scheduleSubject" class="form-select" data-schedule-subject required>
+            <option value="">Select subject...</option>
+          </select>
+        </div>
+      </form>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('addScheduleModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitAddSchedule()">Save Schedule</button>
+    </div>
+  </div>
+</div>
+
+<div id="editScheduleModal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2>Edit Schedule</h2>
+      <button class="modal-close" onclick="closeModal('editScheduleModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form id="editScheduleForm" class="form-grid">
+        <input type="hidden" id="editScheduleId" />
+        <div class="form-2col">
+          <div class="form-group">
+            <label class="form-label">Day <span class="req">*</span></label>
+            <select id="editScheduleDay" class="form-select" required>
+              <option value="Monday">Monday</option>
+              <option value="Tuesday">Tuesday</option>
+              <option value="Wednesday">Wednesday</option>
+              <option value="Thursday">Thursday</option>
+              <option value="Friday">Friday</option>
+              <option value="Saturday">Saturday</option>
+              <option value="Sunday">Sunday</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Room <span class="req">*</span></label>
+            <input id="editScheduleRoom" class="form-input" type="text" list="scheduleRoomList" placeholder="e.g. Room 201" required />
+          </div>
+        </div>
+        <div class="form-2col">
+          <div class="form-group">
+            <label class="form-label">Start Time <span class="req">*</span></label>
+            <input id="editScheduleStartTime" class="form-input" type="time" min="07:00" max="18:00" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">End Time <span class="req">*</span></label>
+            <input id="editScheduleEndTime" class="form-input" type="time" min="07:00" max="18:00" required />
+          </div>
+        </div>
+        <div class="form-2col">
+          <div class="form-group">
+            <label class="form-label">Teacher <span class="req">*</span></label>
+            <select id="editScheduleTeacher" class="form-select" data-schedule-teacher required>
+              <option value="">Select teacher...</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Section <span class="req">*</span></label>
+            <select id="editScheduleSection" class="form-select" data-schedule-section required>
+              <option value="">Select section...</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Subject <span class="req">*</span></label>
+          <select id="editScheduleSubject" class="form-select" data-schedule-subject required>
+            <option value="">Select subject...</option>
+          </select>
+        </div>
+      </form>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('editScheduleModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitEditSchedule()">Save Changes</button>
     </div>
   </div>
 </div>

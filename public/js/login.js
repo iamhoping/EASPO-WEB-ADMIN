@@ -122,10 +122,12 @@ async function verifyAndRedirect(userId) {
 
   if (data.role === 'WEB_ADMIN') {
     window.location.href = 'admin.html'
+  } else if (data.role === 'TEACHER') {
+    window.location.href = 'teacher.html'
   } else if (data.role === 'SCANNER') {
     window.location.href = 'scanner-attendance.html'
   } else {
-    setStatus('Access denied. This portal is for administrators and scanners only.', 'error')
+    setStatus('Access denied. This portal is for administrators, teachers, and scanners only.', 'error')
     await supabase.auth.signOut()
     document.getElementById('loginBtn').disabled = false
     document.getElementById('loginBtn').textContent = 'Sign In'

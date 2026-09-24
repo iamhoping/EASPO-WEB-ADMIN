@@ -71,6 +71,13 @@ import {
   loadUserManagement,
 } from './modules/user-management.js'
 
+import {
+  initScheduleSection,
+  submitAddSchedule,
+  submitEditSchedule,
+  openEditScheduleModal,
+} from './modules/schedules.js'
+
 import { renderPagination } from './ui/pagination.js';
 
 function renderStudents(page = 1) {
@@ -118,6 +125,7 @@ const SECTIONS = {
   students   : { id: 'studentsSection',   title: 'Manage Students',       sub: 'Create, edit and manage student records' },
   teachers   : { id: 'teachersSection',   title: 'Manage Teachers',       sub: 'Manage faculty records and assignments' },
   parents    : { id: 'parentsSection',    title: 'Parents Management',    sub: 'Manage parent and guardian records' },
+  schedules  : { id: 'schedulesSection',  title: 'Schedule Management',   sub: 'Create, review, and validate class schedules' },
   attendance : { id: 'attendanceSection', title: 'Attendance Logs',       sub: 'Real-time tracking with manual override' },
   grades     : { id: 'gradesSection',     title: 'Grade Records',         sub: 'Manage student academic performance' },
   reports    : { id: 'reportsSection',    title: 'Analytics & Reports',   sub: 'View comprehensive dashboards and analytics' },
@@ -389,6 +397,11 @@ window.bulkMarkAttendance   = bulkMarkAttendance
 // Grades
 window.submitAddGrade       = submitAddGrade
 window.openEditGradeModal   = openEditGradeModal
+
+// Schedules
+window.submitAddSchedule    = submitAddSchedule
+window.submitEditSchedule   = submitEditSchedule
+window.openEditScheduleModal = openEditScheduleModal
 
 // ── Settings tabs ─────────────────────────────────────────────
 function initSettingsTabs() {
@@ -703,6 +716,7 @@ async function boot() {
   initStudentsSection()
   initTeachersSection()
   initParentsSection()
+  initScheduleSection()
   initAttendanceSection()
   initScannerAttendance()
   document.addEventListener('scanner-attendance-recorded', loadAttendance)
