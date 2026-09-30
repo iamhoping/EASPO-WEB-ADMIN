@@ -66,6 +66,12 @@
             </a>
           </div>
         </div>
+        <a class="nav-link" data-section="subjects" href="#">
+          <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/><path d="M8 7h8M8 11h8"/></svg></span> Subjects
+        </a>
+        <a class="nav-link" data-section="sections" href="#">
+          <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/><path d="M13 14h4M13 17h4"/></svg></span> Sections
+        </a>
         <a class="nav-link" data-section="schedules" href="#">
           <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg></span> Schedule Management
         </a>
@@ -267,6 +273,104 @@
           <div class="table-footer">
             <span class="table-count" id="studentsCount">Loading...</span>
             <div class="pagination" id="studentsPagination"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="subjectsSection" class="hidden">
+        <div class="page-header">
+          <div class="page-header-actions">
+            <button class="btn btn-primary" id="addSubjectBtn" type="button">+ Add Subject</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Subject Code</th>
+                  <th>Subject Name</th>
+                  <th>Grade Level</th>
+                  <th>Units</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="subjectsTableBody">
+                <tr><td colspan="5"><div class="loader"><div class="spinner"></div></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="table-footer">
+            <span class="table-count" id="subjectsCount">Loading...</span>
+            <div class="pagination" id="subjectsPagination"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="sectionsSection" class="hidden">
+        <div id="sectionsListView">
+          <div class="page-header">
+            <div class="page-header-actions">
+              <button class="btn btn-primary" id="addSectionBtn" type="button">+ Add Section</button>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="toolbar">
+              <div class="toolbar-left">
+                <div class="search-box">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                  <input id="sectionSearch" type="search" placeholder="Search sections..." />
+                </div>
+              </div>
+              <div class="toolbar-right">
+                <select class="filter-select" id="sectionGradeFilter">
+                  <option value="">All Grades</option>
+                  <option value="7">Grade 7</option>
+                  <option value="8">Grade 8</option>
+                  <option value="9">Grade 9</option>
+                  <option value="10">Grade 10</option>
+                  <option value="11">Grade 11</option>
+                  <option value="12">Grade 12</option>
+                </select>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Section Name</th><th>Grade Level</th><th>Number of Students</th><th>Actions</th></tr>
+                </thead>
+                <tbody id="sectionsTableBody">
+                  <tr><td colspan="4"><div class="loader"><div class="spinner"></div></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="table-footer">
+              <span class="table-count" id="sectionsCount">Loading...</span>
+              <div class="pagination" id="sectionsPagination"></div>
+            </div>
+          </div>
+        </div>
+
+        <div id="sectionStudentsPanel" class="panel hidden">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title" id="sectionDetailName">Section</div>
+              <div class="panel-sub" id="sectionDetailGrade">Grade Level: —</div>
+              <div class="panel-sub" id="sectionDetailCount">Students: 0</div>
+            </div>
+            <div class="panel-actions">
+              <button class="btn btn-secondary btn-sm" id="backToSectionsBtn" type="button">Back to Sections</button>
+              <button class="btn btn-primary btn-sm" id="addStudentToSectionBtn" type="button">+ Add Student</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Student</th><th>Student ID</th><th>Email</th><th>Grade Level</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody id="sectionStudentsTableBody">
+                <tr><td colspan="5"><div class="loader"><div class="spinner"></div></div></td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </section>
@@ -771,6 +875,107 @@
 <!-- ════════════════════════════════════════════════════════
      MODALS
      ════════════════════════════════════════════════════════ -->
+
+<div id="sectionModal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2 id="sectionModalTitle">Add Section</h2>
+      <button class="modal-close" type="button" data-close-section-modal aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form id="sectionForm" class="form-grid">
+        <div class="form-group">
+          <label class="form-label" for="sectionName">Section Name <span class="req">*</span></label>
+          <input id="sectionName" class="form-input" type="text" required autocomplete="off" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="sectionGradeLevel">Grade Level <span class="req">*</span></label>
+          <select id="sectionGradeLevel" class="form-select" required>
+            <option value="">Select grade...</option>
+            <option value="7">Grade 7</option>
+            <option value="8">Grade 8</option>
+            <option value="9">Grade 9</option>
+            <option value="10">Grade 10</option>
+            <option value="11">Grade 11</option>
+            <option value="12">Grade 12</option>
+          </select>
+        </div>
+      </form>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" type="button" data-close-section-modal>Cancel</button>
+      <button class="btn btn-primary" id="saveSectionBtn" type="submit" form="sectionForm">Save Section</button>
+    </div>
+  </div>
+</div>
+
+<div id="addStudentToSectionModal" class="modal-overlay hidden">
+  <div class="modal-box x-wide">
+    <div class="modal-head">
+      <h2 id="addStudentToSectionTitle">Add Student</h2>
+      <button class="modal-close" type="button" data-close-section-students-modal aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="toolbar-left" style="margin-bottom:14px">
+        <div class="search-box">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input id="sectionStudentSearch" type="search" placeholder="Search eligible students..." />
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Student</th><th>Student ID</th><th>Email</th><th>Grade Level</th><th>Action</th></tr></thead>
+          <tbody id="eligibleStudentsTableBody">
+            <tr><td colspan="4"><div class="loader"><div class="spinner"></div></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="subjectModal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2 id="subjectModalTitle">Add Subject</h2>
+      <button class="modal-close" type="button" data-close-subject-modal aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form id="subjectForm" class="form-grid">
+        <div class="form-group">
+          <label class="form-label" for="subjectCode">Subject Code <span class="req">*</span></label>
+          <input id="subjectCode" class="form-input" type="text" required autocomplete="off" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="subjectName">Subject Name <span class="req">*</span></label>
+          <input id="subjectName" class="form-input" type="text" required />
+        </div>
+        <div class="form-2col">
+          <div class="form-group">
+            <label class="form-label" for="subjectGradeLevel">Grade Level <span class="req">*</span></label>
+            <select id="subjectGradeLevel" class="form-select" required>
+              <option value="">Select grade...</option>
+              <option value="7">Grade 7</option>
+              <option value="8">Grade 8</option>
+              <option value="9">Grade 9</option>
+              <option value="10">Grade 10</option>
+              <option value="11">Grade 11</option>
+              <option value="12">Grade 12</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="subjectUnits">Units <span class="req">*</span></label>
+            <input id="subjectUnits" class="form-input" type="number" min="1" step="1" required />
+          </div>
+        </div>
+      </form>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" type="button" data-close-subject-modal>Cancel</button>
+      <button class="btn btn-primary" id="saveSubjectBtn" type="submit" form="subjectForm">Save Subject</button>
+    </div>
+  </div>
+</div>
 
 <!-- ── ADD STUDENT ──────────────────────────────────────── -->
 <div id="addStudentModal" class="modal-overlay hidden">

@@ -78,6 +78,9 @@ import {
   openEditScheduleModal,
 } from './modules/schedules.js'
 
+import { initSubjectsSection } from './modules/subjects.js'
+import { initSectionsSection } from './modules/sections.js'
+
 import { renderPagination } from './ui/pagination.js';
 
 function renderStudents(page = 1) {
@@ -124,6 +127,8 @@ const SECTIONS = {
   overview   : { id: 'overviewSection',   title: 'Admin Dashboard',       sub: 'Overview of your school system' },
   students   : { id: 'studentsSection',   title: 'Manage Students',       sub: 'Create, edit and manage student records' },
   teachers   : { id: 'teachersSection',   title: 'Manage Teachers',       sub: 'Manage faculty records and assignments' },
+  subjects   : { id: 'subjectsSection',   title: 'Subject Management',    sub: 'Create, edit and manage school subjects' },
+  sections   : { id: 'sectionsSection',   title: 'Section Management',    sub: 'Manage sections and student assignments' },
   parents    : { id: 'parentsSection',    title: 'Parents Management',    sub: 'Manage parent and guardian records' },
   schedules  : { id: 'schedulesSection',  title: 'Schedule Management',   sub: 'Create, review, and validate class schedules' },
   attendance : { id: 'attendanceSection', title: 'Attendance Logs',       sub: 'Real-time tracking with manual override' },
@@ -716,10 +721,16 @@ async function boot() {
   initStudentsSection()
   initTeachersSection()
   initParentsSection()
+  initSubjectsSection()
+  initSectionsSection()
   initScheduleSection()
   initAttendanceSection()
   initScannerAttendance()
   document.addEventListener('scanner-attendance-recorded', loadAttendance)
+  document.addEventListener('section-student-profile-updated', () => {
+    loadStudents()
+    loadUserManagement()
+  })
   initGradesSection()
   initReportsSection()
   initUserManagementSection()
