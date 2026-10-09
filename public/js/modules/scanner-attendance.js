@@ -20,6 +20,12 @@ function setText(id, value) {
   if (element) element.textContent = value ?? '—'
 }
 
+function showScanResult() {
+  getElement('scannerScanPrompt')?.classList.add('hidden')
+  getElement('scannerResult')?.classList.remove('hidden')
+  getElement('scannerPage')?.querySelector('.scanner-scan-area')?.classList.add('has-result')
+}
+
 function setScannerState(message, type = 'ready') {
   scannerState = type === 'busy' ? (message === 'Scanning...' ? 'SCANNING' : 'PROCESSING') : type.toUpperCase()
   setText('scannerStatus', message)
@@ -28,6 +34,8 @@ function setScannerState(message, type = 'ready') {
     indicator.className = `scanner-indicator ${type}`
     indicator.setAttribute('aria-label', `Scanner ${type}`)
   }
+  const badge = document.querySelector('.scanner-ready-badge')
+  if (badge) badge.className = `scanner-ready-badge ${type}`
 }
 
 function isAttendanceSectionActive() {
@@ -96,6 +104,7 @@ function showResult(student, sectionName, subjectName, scannedAt) {
   const result = getElement('scannerResult')
   if (!result) return
 
+  showScanResult()
   result.classList.remove('hidden', 'scanner-result-error', 'scanner-result-duplicate')
   setText('scannerResultTitle', 'Attendance Recorded Successfully')
   setText('scannerStudentName', student.name)
@@ -110,6 +119,7 @@ function showErrorResult(title, message, duplicate = false) {
   const result = getElement('scannerResult')
   if (!result) return
 
+  showScanResult()
   result.classList.remove('hidden', 'scanner-result-error', 'scanner-result-duplicate', 'scanner-result-info')
   result.classList.add(duplicate ? 'scanner-result-duplicate' : 'scanner-result-error')
   setText('scannerResultTitle', title)
@@ -180,6 +190,8 @@ async function findTodaySchedule(student, date, day) {
 
 function resetResult() {
   getElement('scannerResult')?.classList.add('hidden')
+  getElement('scannerScanPrompt')?.classList.remove('hidden')
+  getElement('scannerPage')?.querySelector('.scanner-scan-area')?.classList.remove('has-result')
   setScannerState('Ready to Scan', 'ready')
 }
 
@@ -353,6 +365,7 @@ async function recordScan(rawValue) {
       // Show late arrival message
       const resultDiv = getElement('scannerResult')
       if (resultDiv) {
+        showScanResult()
         resultDiv.classList.remove('hidden', 'scanner-result-error', 'scanner-result-duplicate', 'scanner-result-info')
         setText('scannerResultTitle', 'Late Arrival Recorded')
         setText('scannerStudentName', student.name)

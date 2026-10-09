@@ -61,6 +61,24 @@ function getSubjectName(schedule) {
   return '—'
 }
 
+function getFilteredSchedules() {
+  const query = (document.getElementById('scheduleSearch')?.value || '').trim().toLocaleLowerCase()
+  const selectedDay = normalizeDay(document.getElementById('scheduleDayFilter')?.value)
+  return allSchedules.filter(schedule => {
+    const room = String(schedule.room || '').toLocaleLowerCase()
+    const teacher = getTeacherName(schedule.teacher_id).toLocaleLowerCase()
+    const section = getSectionName(schedule.section_id).toLocaleLowerCase()
+    const subject = getSubjectName(schedule).toLocaleLowerCase()
+    const day = normalizeDay(schedule.day)
+    const matchesQuery = !query || room.includes(query) || teacher.includes(query) || section.includes(query) || subject.includes(query) || day.includes(query)
+    return matchesQuery && (!selectedDay || day === selectedDay)
+  })
+}
+
+function renderFilteredSchedules() {
+  renderScheduleRows(getFilteredSchedules())
+}
+
 function getSubjectOptions() {
   const fallbackSubjects = [
     'Mathematics',
@@ -311,7 +329,7 @@ export async function loadScheduleManagement() {
 
   populateScheduleSelects()
   currentPage = 1
-  renderScheduleRows(allSchedules)
+  renderFilteredSchedules()
 }
 
 function validateScheduleRecord(record, existingRows = allSchedules, ignoreId = '') {
@@ -532,16 +550,12 @@ export function initScheduleSection() {
   })
 
   document.getElementById('scheduleSearch')?.addEventListener('input', () => {
-    const query = (document.getElementById('scheduleSearch')?.value || '').toLowerCase()
-    const filtered = allSchedules.filter(schedule => {
-      const room = String(schedule.room || '').toLowerCase()
-      const teacher = getTeacherName(schedule.teacher_id).toLowerCase()
-      const section = getSectionName(schedule.section_id).toLowerCase()
-      const subject = getSubjectName(schedule).toLowerCase()
-      return !query || room.includes(query) || teacher.includes(query) || section.includes(query) || subject.includes(query) || (schedule.day || '').toLowerCase().includes(query)
-    })
     currentPage = 1
-    renderScheduleRows(filtered)
+    renderFilteredSchedules()
+  })
+  document.getElementById('scheduleDayFilter')?.addEventListener('change', () => {
+    currentPage = 1
+    renderFilteredSchedules()
   })
 
   loadScheduleManagement()

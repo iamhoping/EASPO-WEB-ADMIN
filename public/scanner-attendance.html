@@ -11,9 +11,8 @@
 <body class="scanner-page-shell">
   <main id="scannerPage" class="scanner-page">
     <header class="scanner-topbar">
-      <div><div class="scanner-brand">EASPO</div><div class="scanner-role">Attendance Scanner</div></div>
+      <div><div class="scanner-brand"><img class="scanner-brand-logo" src="logo.png" alt=""><span class="scanner-brand-name">EASTERN PORAC NATIONAL HIGH SCHOOL</span></div><div class="scanner-role">'_'</div></div>
       <div class="scanner-account">
-        <div><strong id="scannerAccountName">Scanner</strong><span id="scannerAccountEmail"></span></div>
         <button id="scannerLogout" class="scanner-logout" type="button">Sign out</button>
       </div>
     </header>
@@ -26,15 +25,20 @@
         </div>
         <div class="scanner-ready-badge"><span class="scanner-indicator" id="scannerIndicator" aria-hidden="true"></span><span id="scannerStatus" role="status" aria-live="polite">Ready to Scan</span></div>
       </div>
-      <div class="scanner-scan-area" aria-label="USB scanner input area"><div class="scanner-scan-icon" aria-hidden="true">[]</div><strong>Scan Student QR Code</strong><span>Waiting for scanner input</span></div>
-      <div class="scanner-result hidden" id="scannerResult" role="alert" aria-live="assertive">
-        <div class="scanner-result-title" id="scannerResultTitle"></div>
-        <div class="scanner-student-name" id="scannerStudentName"></div>
-        <div class="scanner-detail" id="scannerStudentId"></div>
-        <div class="scanner-detail" id="scannerStudentClass"></div>
-        <div class="scanner-detail" id="scannerSubject"></div>
-        <div class="scanner-result-status" id="scannerResultStatus"></div>
-        <div class="scanner-detail" id="scannerScannedAt"></div>
+      <div class="scanner-scan-area" aria-label="USB scanner input area">
+        <div class="scanner-scan-prompt" id="scannerScanPrompt">
+          <div class="scanner-scan-icon" aria-hidden="true"></div>
+          <strong>Scan Student QR Code</strong>
+          <span>Waiting for scanner input</span>
+        </div>
+        <div class="scanner-result hidden" id="scannerResult" role="alert" aria-live="assertive">
+          <div class="scanner-result-title" id="scannerResultTitle"></div>
+          <div class="scanner-student-name" id="scannerStudentName"></div>
+          <div class="scanner-detail" id="scannerStudentId"></div>
+          <div class="scanner-detail" id="scannerStudentClass"></div>
+          <div class="scanner-result-status" id="scannerResultStatus"></div>
+          <div class="scanner-detail" id="scannerScannedAt"></div>
+        </div>
       </div>
     </section>
     <footer class="scanner-footer">Attendance is recorded for the current eligible schedule.</footer>

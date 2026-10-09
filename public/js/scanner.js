@@ -22,8 +22,6 @@ async function bootScanner() {
     return
   }
 
-  document.getElementById('scannerAccountName').textContent = profile.name || user.email || 'Scanner'
-  document.getElementById('scannerAccountEmail').textContent = user.email || ''
   document.getElementById('scannerLogout').addEventListener('click', logout)
   initScannerAttendance()
 }

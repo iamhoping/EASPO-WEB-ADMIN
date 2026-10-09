@@ -35,9 +35,11 @@ const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character =>
 function filteredSectionRows() {
   const query = (byId('sectionSearch')?.value || '').trim().toLocaleLowerCase()
   const grade = byId('sectionGradeFilter')?.value || ''
+  const selectedSection = byId('sectionFilter')?.value || ''
   return sections.filter(section =>
     (!query || String(section.name || '').toLocaleLowerCase().includes(query)) &&
-    (!grade || String(gradeNumber(section.grade_level)) === grade)
+    (!grade || String(gradeNumber(section.grade_level)) === grade) &&
+    (!selectedSection || String(section.id) === selectedSection)
   )
 }
 
@@ -48,7 +50,7 @@ function renderSections() {
 
   visibleSections = filteredSectionRows()
   if (!visibleSections.length) {
-    tbody.innerHTML = '<tr><td colspan="4"><div class="empty-state"><div class="empty-title">No sections found</div><div class="empty-sub">Add a section or adjust your search and grade filter.</div></div></td></tr>'
+    tbody.innerHTML = '<tr><td colspan="4"><div class="empty-state"><div class="empty-title">No sections found</div><div class="empty-sub">Add a section or adjust your search and filters.</div></div></td></tr>'
     if (count) count.textContent = '0 sections'
     renderPagination('sectionsPagination', 1, 0, () => {})
     return
@@ -79,6 +81,18 @@ function renderSections() {
     currentPage = page
     renderSections()
   })
+}
+
+function populateSectionFilter() {
+  const filter = byId('sectionFilter')
+  if (!filter) return
+
+  const selectedValue = filter.value
+  filter.replaceChildren(new Option('All Sections', ''))
+  for (const section of sections) {
+    filter.add(new Option(section.name || 'Unnamed Section', String(section.id)))
+  }
+  filter.value = selectedValue
 }
 
 function renderAssignedStudents() {
@@ -147,6 +161,7 @@ async function loadSections() {
   }
 
   sections = sectionResult.data || []
+  populateSectionFilter()
   currentPage = 1
   sectionStudentCounts = new Map()
   if (studentResult.error) {
@@ -433,6 +448,10 @@ export function initSectionsSection() {
     renderSections()
   })
   byId('sectionGradeFilter')?.addEventListener('change', () => {
+    currentPage = 1
+    renderSections()
+  })
+  byId('sectionFilter')?.addEventListener('change', () => {
     currentPage = 1
     renderSections()
   })

@@ -285,6 +285,28 @@
         </div>
 
         <div class="panel">
+          <div class="toolbar">
+            <div class="toolbar-left">
+              <div class="search-box">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                <input id="subjectSearch" type="search" placeholder="Search subject name or code..." />
+              </div>
+            </div>
+            <div class="toolbar-right">
+              <select class="filter-select" id="subjectGradeFilter" aria-label="Filter subjects by grade level">
+                <option value="">All Grades</option>
+                <option value="7">Grade 7</option>
+                <option value="8">Grade 8</option>
+                <option value="9">Grade 9</option>
+                <option value="10">Grade 10</option>
+                <option value="11">Grade 11</option>
+                <option value="12">Grade 12</option>
+              </select>
+              <select class="filter-select" id="subjectFilter" aria-label="Filter by subject">
+                <option value="">All Subjects</option>
+              </select>
+            </div>
+          </div>
           <div class="table-wrap">
             <table>
               <thead>
@@ -332,6 +354,9 @@
                   <option value="10">Grade 10</option>
                   <option value="11">Grade 11</option>
                   <option value="12">Grade 12</option>
+                </select>
+                <select class="filter-select" id="sectionFilter" aria-label="Filter by section">
+                  <option value="">All Sections</option>
                 </select>
               </div>
             </div>
@@ -557,6 +582,16 @@
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
                 <input id="scheduleSearch" type="search" placeholder="Search by room, teacher, section, or subject..." />
               </div>
+            </div>
+            <div class="toolbar-right">
+              <select class="filter-select" id="scheduleDayFilter" aria-label="Filter schedules by weekday">
+                <option value="">All Weekdays</option>
+                <option value="Monday">Monday</option>
+                <option value="Tuesday">Tuesday</option>
+                <option value="Wednesday">Wednesday</option>
+                <option value="Thursday">Thursday</option>
+                <option value="Friday">Friday</option>
+              </select>
             </div>
           </div>
 

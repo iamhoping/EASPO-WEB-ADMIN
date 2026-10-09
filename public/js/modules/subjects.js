@@ -34,17 +34,26 @@ function renderSubjects() {
   const count = byId('subjectsCount')
   if (!tbody) return
 
-  if (!subjects.length) {
-    tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="empty-title">No subjects found</div><div class="empty-sub">Add a subject to start building the school subject list.</div></div></td></tr>'
+  const query = (byId('subjectSearch')?.value || '').trim().toLocaleLowerCase()
+  const grade = byId('subjectGradeFilter')?.value || ''
+  const selectedSubject = byId('subjectFilter')?.value || ''
+  const filteredSubjects = subjects.filter(subject =>
+    (!query || [subject.code, subject.name].some(value => String(value || '').toLocaleLowerCase().includes(query))) &&
+    (!grade || String(numericGradeLevel(subject.grade_level)) === grade) &&
+    (!selectedSubject || String(subject.id) === selectedSubject)
+  )
+
+  if (!filteredSubjects.length) {
+    tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="empty-title">No subjects found</div><div class="empty-sub">Adjust your search or filters to see more subjects.</div></div></td></tr>'
     if (count) count.textContent = '0 subjects'
     renderPagination('subjectsPagination', 1, 0, () => {})
     return
   }
 
-  const totalPages = Math.ceil(subjects.length / PER_PAGE)
+  const totalPages = Math.ceil(filteredSubjects.length / PER_PAGE)
   currentPage = Math.min(currentPage, totalPages)
   const start = (currentPage - 1) * PER_PAGE
-  const pageSubjects = subjects.slice(start, start + PER_PAGE)
+  const pageSubjects = filteredSubjects.slice(start, start + PER_PAGE)
 
   tbody.innerHTML = pageSubjects.map(subject => `
     <tr>
@@ -61,11 +70,24 @@ function renderSubjects() {
     </tr>
   `).join('')
 
-  if (count) count.textContent = `Showing ${start + 1}-${Math.min(start + PER_PAGE, subjects.length)} of ${subjects.length} subjects`
+  if (count) count.textContent = `Showing ${start + 1}-${Math.min(start + PER_PAGE, filteredSubjects.length)} of ${filteredSubjects.length} subjects`
   renderPagination('subjectsPagination', currentPage, totalPages, page => {
     currentPage = page
     renderSubjects()
   })
+}
+
+function populateSubjectFilter() {
+  const filter = byId('subjectFilter')
+  if (!filter) return
+
+  const selectedValue = filter.value
+  filter.replaceChildren(new Option('All Subjects', ''))
+  for (const subject of subjects) {
+    const label = subject.name && subject.code ? `${subject.name} (${subject.code})` : subject.name || subject.code || 'Unnamed Subject'
+    filter.add(new Option(label, String(subject.id)))
+  }
+  filter.value = selectedValue
 }
 
 export async function loadSubjects() {
@@ -87,6 +109,7 @@ export async function loadSubjects() {
   }
 
   subjects = data || []
+  populateSubjectFilter()
   currentPage = 1
   renderSubjects()
 }
@@ -202,6 +225,12 @@ async function deleteSubject(subject) {
 
 export function initSubjectsSection() {
   byId('addSubjectBtn')?.addEventListener('click', () => openSubjectModal())
+  for (const id of ['subjectSearch', 'subjectGradeFilter', 'subjectFilter']) {
+    byId(id)?.addEventListener(id === 'subjectSearch' ? 'input' : 'change', () => {
+      currentPage = 1
+      renderSubjects()
+    })
+  }
   byId('subjectForm')?.addEventListener('submit', saveSubject)
   document.querySelectorAll('[data-close-subject-modal]').forEach(button => {
     button.addEventListener('click', closeModal)
