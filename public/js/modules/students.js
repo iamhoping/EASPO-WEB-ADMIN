@@ -2,6 +2,7 @@
 import { supabase } from '../services/supabaseClient.js'
 import { showToast } from '../ui/toast.js'
 import { renderPagination } from '../ui/pagination.js';
+import { createAccount, setAccountStatus } from '../services/auth.js'
 
 let allStudents = []
 let filtered    = []
@@ -89,7 +90,9 @@ function render() {
       <td><span class="pill ${st==='active'?'pill-green':'pill-grey'}">${st[0].toUpperCase()+st.slice(1)}</span></td>
       <td><div class="row-acts">
         <button class="act-btn" title="Edit"   onclick="openEditStudentModal('${s.id}')">✏️</button>
-        <button class="act-btn danger" title="Delete" onclick="confirmDeleteStudent('${s.id}','${(s.name||'').replace(/'/g,"\\'")}')">🗑</button>
+        ${document.body.dataset.role === 'SCHOOL_ADMIN'
+          ? `<button class="btn btn-secondary btn-sm" onclick="setStudentStatus('${s.id}','${st === 'active' ? 'inactive' : 'active'}')">${st === 'active' ? 'Deactivate' : 'Reactivate'}</button>`
+          : `<button class="act-btn danger" title="Delete" onclick="confirmDeleteStudent('${s.id}','${(s.name||'').replace(/'/g,"\\'")}')">🗑</button>`}
       </div></td>
     </tr>`
   }).join('')
@@ -121,19 +124,26 @@ export async function submitAddStudent() {
     return showToast('Weak password','Min 6 characters','warning')
 
   try {
-    const {data:auth, error:ae} = await supabase.auth.signUp({email,password,options:{data:{name}}})
-    if(ae) throw ae
-    const {error:pe} = await supabase.from('profiles').insert([{
-      id:auth.user.id, name, email, student_id, grade_level,
+    await createAccount('STUDENT', {
+      name, email, password, student_id, grade_level,
       contact:contact||null, address:address||null,
-      guardian_email:guardian_email||null, role:'STUDENT', status:'active'
-    }])
-    if(pe) throw pe
+      guardian_email:guardian_email||null,
+    })
     showToast('Student Added', `${name} enrolled`, 'success')
     closeM('addStudentModal')
     document.getElementById('addStudentForm').reset()
     loadStudents()
   } catch(e) { showToast('Error', e.message, 'error') }
+}
+
+window.setStudentStatus = async function(id, status) {
+  try {
+    await setAccountStatus(id, 'STUDENT', status)
+    showToast('Account updated', `Student account ${status === 'active' ? 'reactivated' : 'deactivated'}.`, 'success')
+    await loadStudents()
+  } catch (error) {
+    showToast('Account not updated', error.message || 'Could not update this student account.', 'error')
+  }
 }
 
 // ── Edit ─────────────────────────────────────────────────────
@@ -148,7 +158,9 @@ export async function openEditStudentModal(id) {
   document.getElementById('editStudentContact').value  = s.contact||''
   document.getElementById('editStudentAddress').value  = s.address||''
   document.getElementById('editGuardianEmail').value    = s.guardian_email||''
-  document.getElementById('editStudentStatus').value   = s.status||'' 
+  const statusField = document.getElementById('editStudentStatus')
+  statusField.value = s.status || ''
+  statusField.disabled = document.body.dataset.role === 'SCHOOL_ADMIN'
   openM('editStudentModal')
 }
 
@@ -158,14 +170,17 @@ export async function submitEditStudent() {
   const email= val('editStudentEmail')
   if(!name||!email) return showToast('Missing fields','Name and email required','warning')
 
-  const {error} = await supabase.from('profiles').update({
+  const updates = {
     name, email,
     grade_level   : val('editStudentGrade')||null,
     contact       : val('editStudentContact')||null,
     address       : val('editStudentAddress')||null,
     guardian_email : val('editGuardianEmail')||null,
-    status        : val('editStudentStatus')||null,
-  }).eq('id',id)
+  }
+  if (document.body.dataset.role !== 'SCHOOL_ADMIN') {
+    updates.status = val('editStudentStatus') || null
+  }
+  const {error} = await supabase.from('profiles').update(updates).eq('id',id)
 
   if(error) return showToast('Error',error.message,'error')
   showToast('Saved',`${name} updated`,'success')

@@ -23,3 +23,22 @@ export async function getUserProfile(userId) {
     .single()
   return { data, error }
 }
+
+export async function createAccount(role, profile) {
+  const { data, error } = await supabase.functions.invoke('create-school-account', {
+    body: { role, profile },
+  })
+  if (error) throw error
+  if (!data?.userId) throw new Error('The account was created without a user ID.')
+  return data.userId
+}
+
+export async function setAccountStatus(userId, role, status) {
+  if (!['STUDENT', 'TEACHER', 'PARENT'].includes(role) || !['active', 'inactive'].includes(status)) {
+    throw new Error('Invalid account status change.')
+  }
+  const { error } = await supabase.functions.invoke('set-school-account-status', {
+    body: { userId, role, status },
+  })
+  if (error) throw error
+}

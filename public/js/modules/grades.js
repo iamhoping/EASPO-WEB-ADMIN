@@ -4,6 +4,7 @@ import { showToast } from '../ui/toast.js'
 
 let allGrades   = []
 let allStudents = []
+let allSections = []
 let filtered    = []
 let currentPage = 1
 const PER_PAGE  = 15
@@ -69,7 +70,7 @@ export async function loadGrades() {
   .from('grades')
   .select(`
       *,
-      profiles:student_id (name, grade_level)
+      profiles:student_id (name, grade_level, section_id)
     `)
   .order('created_at', { ascending: false })
 
@@ -80,8 +81,38 @@ export async function loadGrades() {
     allGrades = data || []
   }
 
+  const { data: sections, error: sectionsError } = await supabase
+    .from('sections')
+    .select('id,name')
+    .order('name', { ascending: true })
+  if (sectionsError) {
+    showToast('Section filters unavailable', sectionsError.message, 'error')
+    allSections = []
+  } else {
+    allSections = sections || []
+  }
+  populateGradeFilters()
   updateGradeStats()
   applyFilters()
+}
+
+function populateGradeFilters() {
+  const subjects = [...new Set(allGrades.map(grade => grade.subject).filter(Boolean))].sort()
+  const subjectFilter = document.getElementById('gradeSubjectFilter')
+  if (subjectFilter) {
+    const selected = subjectFilter.value
+    subjectFilter.replaceChildren(new Option('All Subjects', ''))
+    subjects.forEach(subject => subjectFilter.add(new Option(subject, subject)))
+    subjectFilter.value = selected
+  }
+
+  const sectionFilter = document.getElementById('gradeSectionFilter')
+  if (sectionFilter) {
+    const selected = sectionFilter.value
+    sectionFilter.replaceChildren(new Option('All Sections', ''))
+    allSections.forEach(section => sectionFilter.add(new Option(section.name, String(section.id))))
+    sectionFilter.value = selected
+  }
 }
 
 // ── Stats ─────────────────────────────────────────────────────
@@ -102,7 +133,8 @@ function updateGradeStats() {
 export function applyFilters() {
   const q  = val('gradesSearch').toLowerCase()
   const gr = document.getElementById('gradesGradeFilter')?.value  || ''
-  const sb = document.getElementById('subjectFilter')?.value      || ''
+  const sb = document.getElementById('gradeSubjectFilter')?.value || ''
+  const sectionId = document.getElementById('gradeSectionFilter')?.value || ''
   const qt = document.getElementById('quarterFilter')?.value      || ''
 
   filtered = allGrades.filter(g => {
@@ -112,6 +144,7 @@ export function applyFilters() {
       (!q  || name.toLowerCase().includes(q) || (g.subject||'').toLowerCase().includes(q)) &&
       (!gr || grade === gr) &&
       (!sb || g.subject === sb) &&
+      (!sectionId || String(g.profiles?.section_id || '') === sectionId) &&
       (!qt || g.quarter === qt)
     )
   })
@@ -178,11 +211,11 @@ function render() {
       <td>
         <div class="grade-badge ${clr}">${letter}</div>
       </td>
-      <td>
+      <td>${document.body.dataset.role === 'SCHOOL_ADMIN' ? '' : `
         <div class="row-acts">
-          <button class="act-btn" title="Edit"   onclick="openEditGradeModal('${g.id}')">✏️</button>
+          <button class="act-btn" title="Edit" onclick="openEditGradeModal('${g.id}')">✏️</button>
           <button class="act-btn danger" title="Delete" onclick="confirmDeleteGrade('${g.id}','${name.replace(/'/g,"\\'")}')">🗑</button>
-        </div>
+        </div>`}
       </td>
     </tr>`
   }).join('')
@@ -348,7 +381,8 @@ export function initGradesSection() {
 
   document.getElementById('gradesSearch')?.addEventListener('input', applyFilters)
   document.getElementById('gradesGradeFilter')?.addEventListener('change', applyFilters)
-  document.getElementById('subjectFilter')?.addEventListener('change', applyFilters)
+  document.getElementById('gradeSubjectFilter')?.addEventListener('change', applyFilters)
+  document.getElementById('gradeSectionFilter')?.addEventListener('change', applyFilters)
   document.getElementById('quarterFilter')?.addEventListener('change', applyFilters)
   document.getElementById('exportGradesBtn')?.addEventListener('click', exportCSV)
 

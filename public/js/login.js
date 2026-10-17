@@ -1,6 +1,9 @@
 // /js/login.js
 import { login } from './services/auth.js'
 import { supabase } from './services/supabaseClient.js'
+import { loadSchoolBranding } from './modules/school-branding.js'
+
+loadSchoolBranding()
 
 window.handleLogin = async function (event) {
   event.preventDefault()
@@ -110,7 +113,7 @@ function showRecoveryForm() {
 async function verifyAndRedirect(userId) {
   const { data, error } = await supabase
     .from('profiles')
-    .select('role, name')
+    .select('role, name, status')
     .eq('id', userId)
     .single()
 
@@ -120,14 +123,27 @@ async function verifyAndRedirect(userId) {
     return
   }
 
+  if (
+    ['STUDENT', 'TEACHER', 'PARENT'].includes(data.role) &&
+    String(data.status || '').toLowerCase() === 'inactive'
+  ) {
+    setStatus('This account has been deactivated. Contact your school administrator.', 'error')
+    await supabase.auth.signOut()
+    document.getElementById('loginBtn').disabled = false
+    document.getElementById('loginBtn').textContent = 'Sign In'
+    return
+  }
+
   if (data.role === 'WEB_ADMIN') {
+    window.location.href = 'admin.html'
+  } else if (data.role === 'SCHOOL_ADMIN') {
     window.location.href = 'admin.html'
   } else if (data.role === 'TEACHER') {
     window.location.href = 'teacher.html'
   } else if (data.role === 'SCANNER') {
     window.location.href = 'scanner-attendance.html'
   } else {
-    setStatus('Access denied. This portal is for administrators, teachers, and scanners only.', 'error')
+    setStatus('Access denied. This account is not authorized to use this portal.', 'error')
     await supabase.auth.signOut()
     document.getElementById('loginBtn').disabled = false
     document.getElementById('loginBtn').textContent = 'Sign In'

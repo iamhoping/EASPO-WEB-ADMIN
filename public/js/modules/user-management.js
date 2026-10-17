@@ -37,7 +37,8 @@ function usernameFor(user) {
 
 function roleLabel(role) {
   return ({
-    WEB_ADMIN: 'Administrator',
+    WEB_ADMIN: 'Web Admin',
+    SCHOOL_ADMIN: 'School Administration',
     STUDENT: 'Student',
     TEACHER: 'Teacher',
     PARENT: 'Parent',
@@ -48,12 +49,22 @@ function roleLabel(role) {
 function rolePill(role) {
   return ({
     WEB_ADMIN: 'pill-purple',
+    SCHOOL_ADMIN: 'pill-blue',
     STUDENT: 'pill-blue',
     TEACHER: 'pill-orange',
     PARENT: 'pill-green',
     SCANNER: 'pill-yellow',
   })[role] || 'pill-grey'
 }
+
+const ROLES = [
+  ['WEB_ADMIN', 'Web Admin'],
+  ['SCHOOL_ADMIN', 'School Administration'],
+  ['TEACHER', 'Teacher'],
+  ['STUDENT', 'Student'],
+  ['PARENT', 'Parent'],
+  ['SCANNER', 'Scanner'],
+]
 
 function normalizeStatus(status) {
   return (status || 'active').toLowerCase()
@@ -158,7 +169,16 @@ function renderUsers() {
         <td data-label="Role"><span class="pill ${rolePill(user.role)}">${escapeHtml(roleLabel(user.role))}</span></td>
         <td data-label="Status"><span class="pill ${status === 'active' ? 'pill-green' : 'pill-grey'}">${escapeHtml(statusLabel)}</span></td>
         <td data-label="Actions">
-          <button class="btn btn-secondary btn-sm" type="button" onclick="openChangeUserPasswordModal('${escapeHtml(user.id)}')">Change Password</button>
+          ${document.body.dataset.role === 'WEB_ADMIN' ? `
+            <select class="filter-select" aria-label="Role for ${escapeHtml(name)}" data-user-role="${escapeHtml(user.id)}" ${user.id === window.currentUserId ? 'disabled' : ''}>
+              ${ROLES.map(([role, label]) => `<option value="${role}" ${user.role === role ? 'selected' : ''}>${label}</option>`).join('')}
+            </select>
+            <button class="btn btn-secondary btn-sm" type="button" data-user-action="change-role" data-user-id="${escapeHtml(user.id)}" data-user-name="${escapeHtml(name)}" ${user.id === window.currentUserId ? 'disabled' : ''}>Save Role</button>
+            <button class="btn btn-secondary btn-sm" type="button" onclick="openChangeUserPasswordModal('${escapeHtml(user.id)}')">Reset Password</button>
+          ` : ''}
+          ${document.body.dataset.role === 'WEB_ADMIN' && user.id === window.currentUserId
+            ? '<span class="ent-sub">Your role cannot be changed here.</span>'
+            : ''}
         </td>
       </tr>
     `
@@ -169,6 +189,34 @@ function renderUsers() {
     currentPage = page
     renderUsers()
   })
+}
+
+async function changeUserRole(userId, name) {
+  if (document.body.dataset.role !== 'WEB_ADMIN') {
+    return showToast('Not authorized', 'Only a Web Admin can change user roles.', 'error')
+  }
+  if (userId === window.currentUserId) {
+    return showToast('Role not changed', 'You cannot change your own role.', 'warning')
+  }
+  const select = document.querySelector(`[data-user-role="${CSS.escape(userId)}"]`)
+  const role = select?.value
+  if (!ROLES.some(([supportedRole]) => supportedRole === role)) {
+    return showToast('Role not changed', 'Select a supported role.', 'warning')
+  }
+  const currentUser = allUsers.find(user => user.id === userId)
+  if (!currentUser || currentUser.role === role) return
+  if (!window.confirm(`Change ${name}'s role from ${roleLabel(currentUser.role)} to ${roleLabel(role)}?`)) return
+
+  try {
+    const { error } = await supabase.functions.invoke('change-user-role', {
+      body: { userId, role },
+    })
+    if (error) throw error
+    showToast('Role updated', `${name}'s role is now ${roleLabel(role)}.`, 'success')
+    await loadUserManagement()
+  } catch (error) {
+    showToast('Role not changed', await functionErrorMessage(error), 'error')
+  }
 }
 
 export function openChangeUserPasswordModal(userId) {
@@ -269,6 +317,10 @@ export function initUserManagementSection() {
   document.getElementById('userManagementSort')?.addEventListener('change', applyUserManagementFilters)
   document.getElementById('changePasswordNew')?.addEventListener('input', updatePasswordRules)
   document.getElementById('changePasswordConfirm')?.addEventListener('input', updatePasswordRules)
+  document.getElementById('userManagementTableBody')?.addEventListener('click', event => {
+    const button = event.target.closest('[data-user-action="change-role"]')
+    if (button) changeUserRole(button.dataset.userId, button.dataset.userName)
+  })
   loadUserManagement()
 }
 

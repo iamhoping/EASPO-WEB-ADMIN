@@ -51,11 +51,12 @@ serve(async req => {
 
   const { data: callerProfile, error: profileError } = await adminClient
     .from('profiles')
-    .select('role')
+    .select('role,status')
     .eq('id', callerData.user.id)
     .single()
 
-  if (profileError || callerProfile?.role !== 'WEB_ADMIN') {
+  if (profileError || callerProfile?.role !== 'WEB_ADMIN' ||
+      String(callerProfile.status || '').toLowerCase() === 'inactive') {
     return jsonResponse(403, { error: 'Only administrators can change user passwords.' })
   }
 
@@ -83,6 +84,20 @@ serve(async req => {
   })
 
   if (updateError) return jsonResponse(400, { error: updateError.message })
+
+  const { error: auditError } = await adminClient.from('activity_logs').insert({
+    actor_id: callerData.user.id,
+    actor_role: callerProfile.role,
+    action: 'password_reset',
+    table_name: 'auth.users',
+    record_id: userId,
+    before_data: null,
+    after_data: { password_reset: true },
+  })
+  if (auditError) {
+    console.error('Password changed but the security audit record could not be saved:', auditError.message)
+    return jsonResponse(500, { error: 'The password was changed but the audit record could not be saved. Contact support.' })
+  }
 
   return jsonResponse(200, { ok: true })
 })

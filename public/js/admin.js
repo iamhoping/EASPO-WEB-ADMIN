@@ -80,6 +80,7 @@ import {
 
 import { initSubjectsSection } from './modules/subjects.js'
 import { initSectionsSection } from './modules/sections.js'
+import { initAdminSystem, loadPublicSystemSettings } from './modules/admin-system.js'
 
 import { renderPagination } from './ui/pagination.js';
 
@@ -109,16 +110,18 @@ async function authGuard() {
   // Verify WEB_ADMIN role
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, name, email')
+    .select('role, name, email, status')
     .eq('id', user.id)
     .single()
 
-  if (!profile || profile.role !== 'WEB_ADMIN') {
+  if (!profile || !['WEB_ADMIN', 'SCHOOL_ADMIN'].includes(profile.role) ||
+      String(profile.status || '').toLowerCase() === 'inactive') {
     await supabase.auth.signOut()
     window.location.href = 'index.html'
     return null
   }
 
+  currentRole = profile.role
   return { user, profile }
 }
 
@@ -135,11 +138,18 @@ const SECTIONS = {
   grades     : { id: 'gradesSection',     title: 'Grade Records',         sub: 'Manage student academic performance' },
   reports    : { id: 'reportsSection',    title: 'Analytics & Reports',   sub: 'View comprehensive dashboards and analytics' },
   userManagement: { id: 'userManagementSection', title: 'User Management', sub: 'Manage user accounts and password resets' },
+  activityLogs: { id: 'activityLogsSection', title: 'Activity Logs', sub: 'Review recorded account and academic data changes' },
+  systemMonitoring: { id: 'systemMonitoringSection', title: 'System Monitoring', sub: 'Monitor live service checks and operational telemetry' },
+  security: { id: 'securitySection', title: 'Security', sub: 'Review security events and protected account workflows' },
+  backupRecovery: { id: 'backupRecoverySection', title: 'Backup & Recovery', sub: 'Review verified backup history and recovery guidance' },
+  systemSettings: { id: 'systemSettingsSection', title: 'System Settings', sub: 'Configure non-secret school and academic settings' },
 }
 
+const WEB_ADMIN_SECTIONS = new Set(['userManagement', 'activityLogs', 'systemMonitoring', 'security', 'backupRecovery', 'systemSettings'])
 let activeSection = 'overview'
 let settingsUser = null
 let pendingTwoFactor = null
+let currentRole = null
 
 async function saveAdminProfile() {
   const name = document.getElementById('profileName')?.value.trim() || ''
@@ -305,6 +315,8 @@ function initMobileNavigation() {
 
 // ── Navigation ────────────────────────────────────────────────
 function setActiveSection(section) {
+  if (currentRole === 'SCHOOL_ADMIN' && WEB_ADMIN_SECTIONS.has(section)) return
+  if (!SECTIONS[section]) return
   if (section === activeSection) return
   activeSection = section
 
@@ -317,8 +329,12 @@ function setActiveSection(section) {
   // Update topbar
   const cfg = SECTIONS[section]
   if (cfg) {
-    setText('topbarTitle', cfg.title)
-    setText('topbarSub',   cfg.sub)
+    setText('topbarTitle', currentRole === 'SCHOOL_ADMIN' && section === 'overview'
+      ? 'School Administration'
+      : cfg.title)
+    setText('topbarSub', currentRole === 'SCHOOL_ADMIN' && section === 'overview'
+      ? 'Academic and school operations overview'
+      : cfg.sub)
   }
 
   // Update nav links (main links like Dashboard)
@@ -357,6 +373,7 @@ function setActiveSection(section) {
 
 // ── Modal Helpers (global) ────────────────────────────────────
 window.openModal = function(id) {
+  if (currentRole === 'SCHOOL_ADMIN' && id === 'settingsModal') return
   const el = document.getElementById(id)
   if (el) el.classList.remove('hidden')
   if (id === 'settingsModal' && settingsUser) refreshSecuritySettings()
@@ -704,6 +721,20 @@ async function boot() {
   if (!auth) return
 
   const { user } = auth
+  const isSchoolAdmin = auth.profile.role === 'SCHOOL_ADMIN'
+  window.currentUserId = user.id
+  document.body.dataset.role = auth.profile.role
+  document.body.dataset.brandTitle = isSchoolAdmin ? 'School Administration' : 'Admin Dashboard'
+  document.title = isSchoolAdmin ? 'EASPO — School Administration' : 'EASPO — Admin Dashboard'
+  setText('sidebarRole', isSchoolAdmin ? 'School Administration' : 'Administrator')
+  await loadPublicSystemSettings()
+  if (isSchoolAdmin) {
+    document.querySelector('[data-section="userManagement"]')?.remove()
+    document.getElementById('userManagementSection')?.remove()
+    document.getElementById('manualEntryBtn')?.remove()
+    document.querySelectorAll('#gradesSection .row-acts').forEach(actions => actions.remove())
+    document.querySelectorAll('[data-web-admin-only]').forEach(element => element.remove())
+  }
 
   // Load admin profile into sidebar/header
   await loadAdminProfile(user.id)
@@ -733,9 +764,12 @@ async function boot() {
   })
   initGradesSection()
   initReportsSection()
-  initUserManagementSection()
-  initSettingsTabs()
-  initSecuritySettings(user)
+  if (!isSchoolAdmin) {
+    initUserManagementSection()
+    initSettingsTabs()
+    initSecuritySettings(user)
+    initAdminSystem()
+  }
   document.getElementById('updateProfileBtn')?.addEventListener('click', saveAdminProfile)
   const photoInput = document.getElementById('profilePhotoInput')
   document.getElementById('changeProfilePhotoBtn')?.addEventListener('click', () => photoInput?.click())
@@ -760,6 +794,9 @@ async function boot() {
       if (section === 'settings') { window.openModal('settingsModal'); return }
       if (section === 'profile')  { window.openModal('profileModal');  return }
       setActiveSection(section)
+    })
+    document.querySelectorAll('button[data-section]').forEach(button => {
+      button.addEventListener('click', () => setActiveSection(button.dataset.section))
     })
   })
 

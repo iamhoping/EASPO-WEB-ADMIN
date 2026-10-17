@@ -22,6 +22,17 @@ function json(status: number, body: Record<string, unknown>) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 }
 
+async function recordHealthEvent(
+  client: ReturnType<typeof createClient>,
+  component: 'auto_absence' | 'email_notifications' | 'application',
+  status: 'healthy' | 'warning' | 'error',
+  result: string,
+  details: Record<string, unknown> = {},
+) {
+  const { error } = await client.from('system_health_events').insert({ component, status, result, details })
+  if (error) console.error('[MONITORING] Health event could not be recorded:', error.message)
+}
+
 function schoolParts(date = new Date()) {
   return Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
     timeZone: SCHOOL_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit',
@@ -153,9 +164,26 @@ serve(async req => {
   const nowMinutes = Number(parts.hour) * 60 + Number(parts.minute)
   let markedAbsent = 0
   let emailsSent = 0
+  let operationErrors = 0
   console.log(`[AUTO-ABSENT] Philippine now=${today} ${parts.hour}:${parts.minute}; day=${parts.weekday}; timezone=${SCHOOL_TIME_ZONE}`)
 
   try {
+    const [graceResult, emailSettingResult] = await Promise.all([
+      supabase.from('system_settings').select('value').eq('key', 'auto_absent_grace_minutes').maybeSingle(),
+      supabase.from('system_settings').select('value').eq('key', 'email_notifications_enabled').maybeSingle(),
+    ])
+    if (graceResult.error) throw graceResult.error
+    if (emailSettingResult.error) throw emailSettingResult.error
+
+    const configuredGrace = Number(graceResult.data?.value ?? 60)
+    if (!Number.isInteger(configuredGrace) || configuredGrace < 0 || configuredGrace > 240) {
+      throw new Error('The configured auto-absence grace period is invalid.')
+    }
+    const emailNotificationsEnabled = emailSettingResult.data?.value !== false
+    if (!emailNotificationsEnabled) {
+      await recordHealthEvent(supabase, 'email_notifications', 'warning', 'Email notifications are disabled in system settings.')
+    }
+
     const { data: allSchedules, error: schedulesError } = await supabase.from('schedules').select('*')
     if (schedulesError) throw schedulesError
     // EASPO is section-based: schedules.section_id = profiles.section_id.
@@ -178,8 +206,8 @@ serve(async req => {
         console.warn(`[AUTO-ABSENT] Skipping malformed schedule; id=${String(scheduleId)}; sectionId=${String(sectionId)}; startTime=${String(startTime)}`)
         continue
       }
-      const thresholdMinutes = startMinutes + 60
-      console.log(`[AUTO-ABSENT] Schedule id=${scheduleId}; sectionId=${sectionId}; start=${startTime}; oneHourThreshold=${today} ${formatMinutes(thresholdMinutes)}; now=${formatMinutes(nowMinutes)}`)
+      const thresholdMinutes = startMinutes + configuredGrace
+      console.log(`[AUTO-ABSENT] Schedule id=${scheduleId}; sectionId=${sectionId}; start=${startTime}; absenceThreshold=${today} ${formatMinutes(thresholdMinutes)}; now=${formatMinutes(nowMinutes)}`)
       if (nowMinutes < thresholdMinutes) {
         console.log(`[AUTO-ABSENT] Schedule id=${scheduleId} skipped: one-hour threshold has not been reached`)
         continue
@@ -192,6 +220,8 @@ serve(async req => {
         .eq('section_id', sectionId)
       if (studentsError) {
         console.error(`[AUTO-ABSENT] Student lookup failed; schedule=${scheduleId}; section=${sectionId}; error=${studentsError.message}`)
+        operationErrors++
+        await recordHealthEvent(supabase, 'application', 'error', 'Auto-absence student lookup failed.', { operation: 'student_lookup' })
         continue
       }
       console.log(`[AUTO-ABSENT] Schedule id=${scheduleId}; students found in section=${students?.length ?? 0}; studentIds=${(students || []).map(student => student.id).join(',') || 'none'}`)
@@ -201,6 +231,8 @@ serve(async req => {
           .eq('student_id', student.id).eq('schedule_id', scheduleId).eq('attendance_date', today).maybeSingle()
         if (attendanceError) {
           console.error(`[AUTO-ABSENT] Attendance lookup failed; schedule=${scheduleId}; student=${student.id}; error=${attendanceError.message}`)
+          operationErrors++
+          await recordHealthEvent(supabase, 'application', 'error', 'Auto-absence attendance lookup failed.', { operation: 'attendance_lookup' })
           continue
         }
         console.log(`[AUTO-ABSENT] Attendance record; schedule=${scheduleId}; student=${student.id}; found=${Boolean(existing)}; status=${existing?.status ?? 'none'}`)
@@ -217,10 +249,16 @@ serve(async req => {
           if (error?.code === '23505') {
             const { data: reread, error: rereadError } = await supabase.from('attendance').select('*')
               .eq('student_id', student.id).eq('schedule_id', scheduleId).eq('attendance_date', today).maybeSingle()
-            if (rereadError) console.error(`[AUTO-ABSENT] Duplicate reread failed; schedule=${scheduleId}; student=${student.id}; error=${rereadError.message}`)
+            if (rereadError) {
+              console.error(`[AUTO-ABSENT] Duplicate reread failed; schedule=${scheduleId}; student=${student.id}; error=${rereadError.message}`)
+              operationErrors++
+              await recordHealthEvent(supabase, 'application', 'error', 'Auto-absence duplicate recovery failed.', { operation: 'attendance_reread' })
+            }
             attendance = reread
           } else if (error) {
             console.error(`[AUTO-ABSENT] Could not mark absent; schedule=${scheduleId}; student=${student.id}; error=${error.message}`)
+            operationErrors++
+            await recordHealthEvent(supabase, 'application', 'error', 'Auto-absence attendance insertion failed.', { operation: 'attendance_insert' })
             continue
           } else {
             attendance = data
@@ -230,6 +268,7 @@ serve(async req => {
         }
 
         if (!attendance || normalizedStatus(attendance.status) !== 'absent' || attendance.guardian_email_sent) continue
+        if (!emailNotificationsEnabled) continue
 
         // Claim this email before sending it. This prevents two overlapping cron
         // invocations from both sending an absence notification for one record.
@@ -239,6 +278,8 @@ serve(async req => {
           .select('id').maybeSingle()
         if (claimError) {
           console.error(`[AUTO-ABSENT][EMAIL] Could not claim email; attendance=${attendance.id}; student=${student.id}; schedule=${scheduleId}; error=${claimError.message}`)
+          operationErrors++
+          await recordHealthEvent(supabase, 'email_notifications', 'error', 'The notification could not be claimed for sending.')
           continue
         }
         if (!claimed) {
@@ -251,6 +292,17 @@ serve(async req => {
             .update({ guardian_email_sending: false, guardian_email_sending_at: null })
             .eq('id', attendance.id).eq('guardian_email_sent', false)
           console.error(`[AUTO-ABSENT][EMAIL] Email not sent; attendance=${attendance.id}; schedule=${scheduleId}; student=${student.id}; reason=${email.reason}; claimReleased=${!releaseError}`)
+          const failedDelivery = Boolean(email.reason?.startsWith('Brevo returned') || email.reason?.includes('request failed'))
+          await recordHealthEvent(
+            supabase,
+            'email_notifications',
+            failedDelivery || releaseError ? 'error' : 'warning',
+            releaseError ? 'Notification was not sent and its pending claim could not be released.' : 'The notification was not accepted; review function logs for details.',
+          )
+          if (releaseError) {
+            operationErrors++
+            await recordHealthEvent(supabase, 'application', 'error', 'The pending notification claim could not be released.', { operation: 'email_claim_release' })
+          }
           continue
         }
         // Brevo has already accepted the message; only now persist the sent flag.
@@ -259,16 +311,27 @@ serve(async req => {
           .eq('id', attendance.id).eq('guardian_email_sent', false).select('id')
         if (updateError || !updated?.length) {
           console.error(`[AUTO-ABSENT] Email was accepted but guardian_email_sent could not be saved; student=${student.id}; error=${updateError?.message ?? 'record was already updated'}`)
+          operationErrors++
+          await recordHealthEvent(supabase, 'email_notifications', 'error', 'Brevo accepted a notification but its sent status could not be saved.')
           continue
         }
         emailsSent++
+        await recordHealthEvent(supabase, 'email_notifications', 'healthy', 'Brevo accepted an attendance notification.')
         console.log(`[AUTO-ABSENT] Guardian email marked sent; schedule=${scheduleId}; student=${student.id}`)
       }
     }
     console.log(`[AUTO-ABSENT] Completed; markedAbsent=${markedAbsent}; emailsSent=${emailsSent}`)
+    await recordHealthEvent(
+      supabase,
+      'auto_absence',
+      operationErrors ? 'warning' : 'healthy',
+      operationErrors ? 'The auto-absence run completed with failed operations.' : 'The auto-absence run completed successfully.',
+      { markedAbsent, emailsSent, failedOperations: operationErrors },
+    )
     return json(200, { ok: true, date: today, markedAbsent, emailsSent })
   } catch (error) {
     console.error('[AUTO-ABSENT] Failed:', error)
+    await recordHealthEvent(supabase, 'auto_absence', 'error', 'The auto-absence run failed; review Edge Function logs.')
     return json(500, { error: error instanceof Error ? error.message : 'Unknown error' })
   }
 })

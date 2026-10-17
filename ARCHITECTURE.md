@@ -450,3 +450,132 @@ Query Performance:
 6. **SMS Notifications**: Add SMS option for guardians
 7. **Calendar Integration**: Sync with calendar apps
 8. **Machine Learning**: Predict likely absences
+
+## School Administration Role
+
+`SCHOOL_ADMIN` signs in through Supabase Auth and is routed to the role-aware
+admin dashboard. The dashboard reuses the existing student, teacher, parent,
+subject, section, schedule, attendance, grade, and report modules. It hides
+Web Admin user management and security settings.
+
+The `20261017000000_school_admin_role_and_policies.sql` migration adds the
+role checks, scoped RLS policies, account-status enforcement, and database
+validation for student/section and schedule assignments. School Admins can
+manage student, teacher, and parent profiles, subjects, sections, and
+schedules; attendance and grade records remain read-only. Scanner attendance
+and Teacher grade-entry policies remain in place.
+
+The `20261017000001_web_admin_activity_and_system_admin.sql` migration adds
+immutable activity logs, operational health telemetry, non-secret system
+settings, and a protected backup-history table. Activity triggers exclude
+authentication credentials and passwords from snapshots. Web Admin-only
+operations are enforced by RLS and authenticated Edge Functions, not just by
+the dashboard navigation. The scheduled absence process consumes its configured
+absence grace period and email-enabled setting; scanners can read only the
+non-secret late-arrival grace setting, which defaults to zero minutes to
+preserve existing scan behavior.
+
+The `20261017000002_web_admin_auth_login_history.sql` migration adds a
+Web-Admin-only function to read recent sign-in events from
+`auth.audit_log_entries`. Enable **Write audit logs to the database** in
+Supabase Dashboard → Authentication → Audit Logs for this source to return
+records. This database source reports completed sign-ins; failed sign-in
+attempts require a separate trusted Auth log export/Log Explorer integration
+and are not synthesized by the application.
+
+The `20261017000004_school_branding_storage.sql` migration creates the public-read,
+Web-Admin-write `school-assets` bucket and the narrow
+`get_public_school_branding()` RPC. Apply it with `supabase db push` before
+using School Name and the School Logo upload in System Settings. The uploaded
+PNG/JPG/WebP logo (maximum 2 MiB) and configured school name are stored and
+loaded on the login, Web Admin, School Admin, Teacher, and Scanner pages. No
+anonymous or School Admin upload permissions are granted.
+
+Deploy the migrations and Edge Functions:
+
+```bash
+supabase db push
+supabase functions deploy create-school-account
+supabase functions deploy set-school-account-status
+supabase functions deploy change-user-role
+supabase functions deploy system-health
+supabase functions deploy change-user-password
+supabase functions deploy auto-mark-absent
+supabase functions deploy record-backup-run
+```
+
+Role assignment is available to Web Admins in User Management; the server
+rejects self-role changes and School Admin promotion to Web Admin. Account
+creation, status changes, password resets, role changes, and health checks
+must use their authenticated Edge Functions. Keep the Supabase service-role
+key and notification credentials in server-side environment variables only.
+
+System Monitoring checks the dashboard API/database live and shows only
+telemetry emitted by instrumented background processes. Authentication login
+history is not available unless a trusted Supabase Auth-log integration is
+configured. ### Automated off-site database backups
+
+`scripts/backup_database.py` and `.github/workflows/daily-database-backup.yml`
+provide a daily encrypted PostgreSQL backup to AWS S3 or another S3-compatible
+provider. The workflow runs daily at 02:00 UTC (10:00 Asia/Manila) and can also
+be started manually from GitHub Actions. It creates a custom-format
+`pg_dump` archive, validates its TOC with `pg_restore --list`, encrypts it with
+age before upload, downloads the uploaded object and compares its SHA-256 and
+size, and deletes objects older than 30 days under `backups/easpo-db/`. A
+history row is marked `verified` only after these checks succeed; this verifies
+archive readability and the remote copy, not an end-to-end database restore.
+
+Apply the backup metadata migration after the other system migrations:
+
+```bash
+supabase db push
+```
+
+Create an age keypair on a trusted operator machine. Save the private key
+offline with the recovery procedure; add only the public recipient (the
+`age1...` value printed by `age-keygen`) to the GitHub repository secret
+`BACKUP_AGE_RECIPIENT`.
+
+Configure these GitHub Actions repository secrets:
+
+| Secret | Purpose |
+| --- | --- |
+| `SUPABASE_DB_URL` | PostgreSQL connection URI used by `pg_dump`; use an SSL-enabled session-pooler URI if the project requires IPv4/pooler access. |
+| `SUPABASE_URL` | Project URL used to record backup-run status. |
+| `SUPABASE_ANON_KEY` | Supabase publishable/anon key sent to the backup-history Edge Function. |
+| `BACKUP_RUNNER_SECRET` | Random shared secret; configure the same value as a Supabase Edge Function secret and a GitHub Actions secret. |
+| `S3_BUCKET` | Private bucket name. |
+| `S3_REGION` | S3 region (use the provider's required value, commonly `auto` for Cloudflare R2). |
+| `S3_ENDPOINT_URL` | S3-compatible endpoint; leave empty for AWS S3. |
+| `S3_ACCESS_KEY_ID` | Bucket-scoped upload/list/download/delete access key. |
+| `S3_SECRET_ACCESS_KEY` | Secret half of the bucket-scoped access key. |
+| `BACKUP_AGE_RECIPIENT` | Public age encryption recipient; the matching private key stays offline. |
+
+Grant the bucket key only list access to the `backups/easpo-db/` prefix and
+object get/put/delete permissions on that prefix. Require TLS and keep the
+bucket private. The 30-day cleanup requires delete permission. The job uses
+age encryption before upload, so the provider stores only ciphertext.
+
+Generate a long random runner secret, store it as an Edge Function secret, and
+add the identical value to GitHub Actions:
+
+```bash
+openssl rand -hex 32
+supabase secrets set BACKUP_RUNNER_SECRET="<generated-value>"
+```
+
+Do not put the service-role key in GitHub. The Edge Function keeps it
+server-side and only accepts constrained start/verified/failed history events
+authenticated with the runner secret.
+
+Run **Daily encrypted database backup** manually from GitHub Actions to test
+setup. A successful run should appear in the Web Admin **Backup & Recovery**
+page with status `verified`, object size, and SHA-256. A failed run is recorded
+as `failed`; check the action logs for its sanitized error.
+
+For a restore drill, retrieve an encrypted object using operator credentials,
+decrypt it offline with the private age key, inspect it using
+`pg_restore --list`, and restore it into a separate isolated Supabase project.
+Validate representative tables and application behavior there. Never run a
+restore drill against production. A successful upload/checksum does not claim
+that a restore has been tested.

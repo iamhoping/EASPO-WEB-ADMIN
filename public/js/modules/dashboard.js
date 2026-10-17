@@ -135,11 +135,15 @@ export async function loadDashboard(monthValue) {
     { count: teacherCount },
     { count: parentCount  },
     { count: gradeCount   },
+    { count: sectionCount },
+    { count: subjectCount },
   ] = await Promise.all([
     supabase.from('profiles').select('*',{count:'exact',head:true}).eq('role','STUDENT'),
     supabase.from('profiles').select('*',{count:'exact',head:true}).eq('role','TEACHER'),
     supabase.from('profiles').select('*',{count:'exact',head:true}).eq('role','PARENT'),
     supabase.from('grades').select('*',{count:'exact',head:true}),
+    supabase.from('sections').select('*',{count:'exact',head:true}),
+    supabase.from('subjects').select('*',{count:'exact',head:true}),
   ]);
 
   // Stat cards
@@ -147,6 +151,8 @@ export async function loadDashboard(monthValue) {
   setText('totalTeachers', teacherCount ?? '—')
   setText('totalParents',  parentCount  ?? '—')
   setText('totalGrades',   gradeCount   ?? '—')
+  setText('totalSections', sectionCount ?? '—')
+  setText('totalSubjects', subjectCount ?? '—')
 
   // Calendar is now handled by initCalendar() - no chart loading needed here
 }

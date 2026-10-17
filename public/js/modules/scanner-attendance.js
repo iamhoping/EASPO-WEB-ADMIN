@@ -10,6 +10,8 @@ let idleTimer = null
 let initialized = false
 let processing = false
 let scannerState = 'READY'
+let cachedLateGraceMinutes = 0
+let lateGraceLoadedAt = 0
 
 function getElement(id) {
   return document.getElementById(id)
@@ -85,11 +87,27 @@ function formatLocalDate(date) {
   return `${parts.year}-${parts.month}-${parts.day}`
 }
 
-function isLateForSchedule(schedule, scannedAt) {
+async function getLateGraceMinutes() {
+  if (Date.now() - lateGraceLoadedAt < 60_000) return cachedLateGraceMinutes
+  const { data, error } = await supabase.from('system_settings')
+    .select('value')
+    .eq('key', 'late_grace_minutes')
+    .maybeSingle()
+  if (error) throw error
+  const minutes = Number(data?.value ?? 0)
+  if (!Number.isInteger(minutes) || minutes < 0 || minutes > 240) {
+    throw new Error('The configured late-arrival grace period is invalid.')
+  }
+  cachedLateGraceMinutes = minutes
+  lateGraceLoadedAt = Date.now()
+  return cachedLateGraceMinutes
+}
+
+function isLateForSchedule(schedule, scannedAt, graceMinutes) {
   const start = String(scheduleValue(schedule, ['start_time', 'time_start', 'start']) || '00:00')
   const [hour = '0', minute = '0'] = start.split(':')
   const parts = schoolDateParts(scannedAt)
-  return Number(parts.hour) * 60 + Number(parts.minute) > Number(hour) * 60 + Number(minute)
+  return Number(parts.hour) * 60 + Number(parts.minute) > Number(hour) * 60 + Number(minute) + graceMinutes
 }
 
 function getStudentIdCandidates(scannedValue) {
@@ -288,7 +306,8 @@ async function recordScan(rawValue) {
     if (existingError) throw existingError
 
     // Determine if this is a late scan (updating Absent to Present)
-    let isLate = isLateForSchedule(todaySchedule, scannedAt)
+    const lateGraceMinutes = await getLateGraceMinutes()
+    let isLate = isLateForSchedule(todaySchedule, scannedAt, lateGraceMinutes)
     let attendance = null
     let insertError = null
 

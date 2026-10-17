@@ -4,19 +4,19 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>EASPO — Teacher Dashboard</title>
-  <link rel="icon" type="image/png" href="logo.png" />
+  <link rel="icon" type="image/png" href="logo.png" data-school-logo />
   <link rel="stylesheet" href="css/style.css" />
   <script src="https://unpkg.com/lucide@latest"></script>
 </head>
-<body>
+<body data-brand-title="Teacher Dashboard">
   <div class="admin-layout">
     <aside class="sidebar" id="sidebar">
       <div class="sb-brand">
         <div class="sb-brand-icon">
-          <img src="logo.png" alt="Logo" class="sidebar-logo" />
+          <img src="logo.png" alt="Logo" class="sidebar-logo" data-school-logo />
         </div>
         <div>
-          <div class="sb-brand-text">EASPO</div>
+          <div class="sb-brand-text" data-school-name>EASPO</div>
           <div class="sb-brand-sub">Teacher Portal</div>
         </div>
       </div>
@@ -75,7 +75,8 @@
           <button class="mobile-menu-toggle" id="mobileMenuToggle" type="button" aria-label="Open navigation" aria-controls="sidebar" aria-expanded="false">☰</button>
           <div>
             
-            <div class="topbar-sub"></div>
+            <div class="topbar-title" id="teacherTopbarTitle">Teacher Dashboard</div>
+            <div class="topbar-sub" id="teacherTopbarSub">Your classes, attendance, and grade records</div>
           </div>
         </div>
         <div class="topbar-right">
@@ -87,6 +88,10 @@
 
       <div class="page-body">
         <section id="overviewSection">
+          <div class="dashboard-intro">
+            <div class="dashboard-intro-mark" aria-hidden="true"><i data-lucide="graduation-cap"></i></div>
+            <div><h2>Your teaching overview</h2><p>A quick view of your assigned subjects, sections, students, and schedule.</p></div>
+          </div>
           <div class="stats-grid">
             <div class="stat-card c-green">
               <div class="stat-row">

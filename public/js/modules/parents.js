@@ -2,6 +2,7 @@
 import { supabase } from '../services/supabaseClient.js'
 import { showToast } from '../ui/toast.js'
 import { renderPagination } from '../ui/pagination.js';
+import { createAccount, setAccountStatus } from '../services/auth.js'
 
 let allParents  = []
 let allStudents = []   // for dropdowns
@@ -122,7 +123,9 @@ function render() {
       <td style="font-size:.82rem">${p.email||'—'}</td>
       <td><div class="row-acts">
         <button class="act-btn" title="Edit"   onclick="openEditParentModal('${p.id}')">✏️</button>
-        <button class="act-btn danger" title="Delete" onclick="confirmDeleteParent('${p.id}','${(p.name||'').replace(/'/g,"\\'")}')">🗑</button>
+        ${document.body.dataset.role === 'SCHOOL_ADMIN'
+          ? `<button class="btn btn-secondary btn-sm" onclick="setParentStatus('${p.id}','${(p.status || 'active') === 'active' ? 'inactive' : 'active'}')">${(p.status || 'active') === 'active' ? 'Deactivate' : 'Reactivate'}</button>`
+          : `<button class="act-btn danger" title="Delete" onclick="confirmDeleteParent('${p.id}','${(p.name||'').replace(/'/g,"\\'")}')">🗑</button>`}
       </div></td>
     </tr>`
   }).join('')
@@ -147,28 +150,14 @@ export async function submitAddParent() {
   const address    = val('parentAddress')
 
   try {
-    // 1. Create auth account
-    const { data: auth, error: ae } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { name } }
-    })
-    
-    if (ae) throw ae
-    if (!auth.user) throw new Error("Sign up failed")
-
-    // 2. Single insert into profiles table
-    const { error: pe } = await supabase.from('profiles').insert([{
-      id: auth.user.id,
+    await createAccount('PARENT', {
       name, 
       email, 
+      password,
       relation,
       contact: contact || null,
       address: address || null,
-      role: 'PARENT' // CRITICAL: This ensures it shows up in loadParents()
-    }])
-
-    if (pe) throw pe
+    })
 
     showToast('Parent Added', `${name} registered`, 'success')
     closeM('addParentModal')
@@ -179,6 +168,16 @@ export async function submitAddParent() {
     
   } catch (e) { 
     showToast('Error', e.message, 'error') 
+  }
+}
+
+window.setParentStatus = async function(id, status) {
+  try {
+    await setAccountStatus(id, 'PARENT', status)
+    showToast('Account updated', `Parent account ${status === 'active' ? 'reactivated' : 'deactivated'}.`, 'success')
+    await loadParents()
+  } catch (error) {
+    showToast('Account not updated', error.message || 'Could not update this parent account.', 'error')
   }
 }
 

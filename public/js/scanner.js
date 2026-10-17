@@ -1,6 +1,9 @@
 import { supabase } from './services/supabaseClient.js'
 import { logout } from './services/auth.js'
 import { initScannerAttendance } from './modules/scanner-attendance.js'
+import { loadSchoolBranding } from './modules/school-branding.js'
+
+loadSchoolBranding()
 
 async function bootScanner() {
   const { data: { session } = {}, error: sessionError } = await supabase.auth.getSession()
@@ -12,11 +15,12 @@ async function bootScanner() {
 
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('role, name')
+    .select('role, name, status')
     .eq('id', user.id)
     .single()
 
-  if (profileError || profile?.role !== 'SCANNER') {
+  if (profileError || profile?.role !== 'SCANNER' ||
+      String(profile?.status || '').toLowerCase() === 'inactive') {
     await supabase.auth.signOut()
     window.location.href = 'index.html'
     return

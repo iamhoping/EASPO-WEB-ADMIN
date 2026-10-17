@@ -2,6 +2,9 @@ import { supabase } from './services/supabaseClient.js'
 import { logout } from './services/auth.js'
 import { renderPagination } from './ui/pagination.js'
 import { showToast } from './ui/toast.js'
+import { loadSchoolBranding } from './modules/school-branding.js'
+
+loadSchoolBranding()
 
 const state = {
   teacher: null,
@@ -46,6 +49,13 @@ function getSectionLabel(sectionId) {
 }
 
 function setupNavigation() {
+  const sectionTitles = {
+    overview: ['Teacher Dashboard', 'Your classes, attendance, and grade records'],
+    schedule: ['My Schedule', 'Your assigned classes and teaching times'],
+    attendance: ['Attendance', 'Attendance records for students in your assigned schedules'],
+    grades: ['Grades', 'Enter and review grades for your assigned students'],
+    profile: ['My Profile', 'Your teacher account information'],
+  }
   document.querySelectorAll('.nav-link').forEach(link => {
     link.addEventListener('click', (event) => {
       event.preventDefault()
@@ -55,6 +65,9 @@ function setupNavigation() {
         const visible = panel.id === `${section}Section`
         panel.classList.toggle('hidden', !visible)
       })
+      const [title, subtitle] = sectionTitles[section] || sectionTitles.overview
+      setText('teacherTopbarTitle', title)
+      setText('teacherTopbarSub', subtitle)
 
       const sidebar = document.getElementById('sidebar')
       const backdrop = document.getElementById('sidebarBackdrop')
@@ -80,7 +93,8 @@ async function loadTeacherProfile() {
     .eq('id', user.id)
     .single()
 
-  if (profileError || !profile || profile.role !== 'TEACHER') {
+  if (profileError || !profile || profile.role !== 'TEACHER' ||
+      String(profile.status || '').toLowerCase() === 'inactive') {
     await supabase.auth.signOut()
     window.location.href = 'index.html'
     return null
@@ -582,6 +596,7 @@ async function initTeacherDashboard() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  window.lucide?.createIcons()
   if (window.showToast) {
     window.logout = logout
   }

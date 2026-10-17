@@ -1,6 +1,7 @@
 // /js/modules/teachers.js
 import { supabase } from '../services/supabaseClient.js'
 import { showToast } from '../ui/toast.js'
+import { createAccount, setAccountStatus } from '../services/auth.js'
 import { renderPagination } from '../ui/pagination.js';
 
 let allTeachers = []
@@ -123,7 +124,9 @@ function render() {
       <td><span class="pill ${pillCls}">${pillLbl}</span></td>
       <td><div class="row-acts">
         <button class="act-btn" title="Edit"   onclick="openEditTeacherModal('${t.id}')">✏️</button>
-        <button class="act-btn danger" title="Delete" onclick="confirmDeleteTeacher('${t.id}','${(t.name||'').replace(/'/g,"\\'")}')">🗑</button>
+        ${document.body.dataset.role === 'SCHOOL_ADMIN'
+          ? `<button class="btn btn-secondary btn-sm" onclick="setTeacherStatus('${t.id}','${(t.status || 'active') === 'active' ? 'inactive' : 'active'}')">${(t.status || 'active') === 'active' ? 'Deactivate' : 'Reactivate'}</button>`
+          : `<button class="act-btn danger" title="Delete" onclick="confirmDeleteTeacher('${t.id}','${(t.name||'').replace(/'/g,"\\'")}')">🗑</button>`}
       </div></td>
     </tr>`
   }).join('')
@@ -153,22 +156,27 @@ export async function submitAddTeacher() {
     return showToast('Weak password','Min 6 characters','warning')
 
   try {
-    const {data:auth,error:ae} = await supabase.auth.signUp({email,password,options:{data:{name}}})
-    if(ae) throw ae
-    const {error:pe} = await supabase.from('profiles').insert([{
-      id:auth.user.id, name, email,
+    await createAccount('TEACHER', {
+      name, email,
       teacher_id : tid,
       department : dept||null,
       contact    : contact||null,
-      role       : 'TEACHER',
-      status     : 'active'
-    }])
-    if(pe) throw pe
+    })
     showToast('Teacher Added',`${name} added successfully`,'success')
     closeM('addTeacherModal')
     document.getElementById('addTeacherForm').reset()
     loadTeachers()
   } catch(e) { showToast('Error',e.message,'error') }
+}
+
+window.setTeacherStatus = async function(id, status) {
+  try {
+    await setAccountStatus(id, 'TEACHER', status)
+    showToast('Account updated', `Teacher account ${status === 'active' ? 'reactivated' : 'deactivated'}.`, 'success')
+    await loadTeachers()
+  } catch (error) {
+    showToast('Account not updated', error.message || 'Could not update this teacher account.', 'error')
+  }
 }
 
 // ── Edit ──────────────────────────────────────────────────────
@@ -181,7 +189,9 @@ export async function openEditTeacherModal(id) {
   document.getElementById('editTeacherContact').value = t.contact||''
   document.getElementById('editTeacherDept').value    = t.department||''
   document.getElementById('editTeacherGender').value  = t.gender||''
-  document.getElementById('editTeacherStatus').value  = t.status||''
+  const statusField = document.getElementById('editTeacherStatus')
+  statusField.value = t.status || ''
+  statusField.disabled = document.body.dataset.role === 'SCHOOL_ADMIN'
   openM('editTeacherModal')
 }
 
@@ -191,13 +201,16 @@ export async function submitEditTeacher() {
   const email= val('editTeacherEmail')
   if(!name||!email) return showToast('Missing fields','Name and email required','warning')
 
-  const {error} = await supabase.from('profiles').update({
+  const updates = {
     name, email,
     contact    : val('editTeacherContact')||null,
     department : val('editTeacherDept')||null,
     gender     : val('editTeacherGender')||null,
-    status     : val('editTeacherStatus')||null,
-  }).eq('id',id)
+  }
+  if (document.body.dataset.role !== 'SCHOOL_ADMIN') {
+    updates.status = val('editTeacherStatus') || null
+  }
+  const {error} = await supabase.from('profiles').update(updates).eq('id',id)
 
   if(error) return showToast('Error',error.message,'error')
   showToast('Saved',`${name} updated`,'success')

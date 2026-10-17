@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>EASPO — Admin Dashboard</title>
-  <link rel="icon" type="image/png" href="logo.png">
+  <link rel="icon" type="image/png" href="logo.png" data-school-logo>
   <link rel="stylesheet" href="css/style.css">
   <script src="https://unpkg.com/lucide@latest"></script>
   <!-- Chart.js -->
@@ -14,17 +14,17 @@
   <!-- SheetJS for Excel export -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
-<body>
+<body data-brand-title="Admin Dashboard">
 <div class="admin-layout">
 
   <!-- ═══ SIDEBAR ═══════════════════════════════════════════ -->
   <aside class="sidebar" id="sidebar">
     <div class="sb-brand">
       <div class="sb-brand-icon">
-        <img src="logo.png" alt="Logo" class="sidebar-logo">
+        <img src="logo.png" alt="Logo" class="sidebar-logo" data-school-logo>
       </div>
       <div>
-        <div class="sb-brand-text">EASPO</div>
+        <div class="sb-brand-text" data-school-name>EASPO</div>
         <div class="sb-brand-sub">School Admin</div>
       </div>
     </div>
@@ -41,6 +41,9 @@
         <div class="nav-group-label">Main</div>
         <a class="nav-link active" data-section="overview" href="#">
           <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-layout-dashboard-icon lucide-layout-dashboard"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg></span> Dashboard
+        </a>
+        <a class="nav-link" data-section="userManagement" href="#">
+          <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 21a8 8 0 0 0-16 0"/><circle cx="10" cy="8" r="5"/><path d="M22 20c0-3.37-2-6.5-5-7.87"/><path d="M17 3.13a5 5 0 0 0 0 9.74"/></svg></span> User Management
         </a>
         
         <!-- Users Dropdown Menu -->
@@ -84,13 +87,14 @@
         <a class="nav-link" data-section="reports" href="#">
           <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bar-chart-3"><path d="M3 3v18a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2z"/><rect x="7" y="5" width="5" height="12"/><rect x="16" y="5" width="5" height="7"/></svg></span> Reports
         </a>
-        <a class="nav-link" data-section="userManagement" href="#">
-          <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 21a8 8 0 0 0-16 0"/><circle cx="10" cy="8" r="5"/><path d="M22 20c0-3.37-2-6.5-5-7.87"/><path d="M17 3.13a5 5 0 0 1 0 9.74"/><path d="M19 8h3"/><path d="M20.5 6.5v3"/></svg></span> User Management
-        </a>
       </div>
 
       <div class="nav-group">
         <div class="nav-group-label">System</div>
+        <a class="nav-link" data-section="activityLogs" data-web-admin-only href="#"><span class="nav-icon">≋</span> Activity Logs</a>
+        <a class="nav-link" data-section="systemMonitoring" data-web-admin-only href="#"><span class="nav-icon">◉</span> System Monitoring</a>
+        <a class="nav-link" data-section="security" data-web-admin-only href="#"><span class="nav-icon">⌑</span> Security</a>
+        <a class="nav-link" data-section="systemSettings" data-web-admin-only href="#"><span class="nav-icon">⚙</span> System Settings</a>
         <a class="nav-link" data-section="profile" href="#">
           <span class="nav-icon">👤</span> My Profile
         </a>
@@ -102,7 +106,7 @@
         <div class="sb-avatar" id="sidebarInitials">WA</div>
         <div>
           <div class="sb-user-name" id="sidebarName">Web Admin</div>
-          <div class="sb-user-role">Administrator</div>
+          <div class="sb-user-role" id="sidebarRole">Administrator</div>
         </div>
       </div>
       <button class="btn-logout" onclick="logout()">Sign out</button>
@@ -132,6 +136,10 @@
 
       <!-- ══ OVERVIEW SECTION ══════════════════════════════ -->
       <section id="overviewSection">
+        <div class="dashboard-intro">
+          <div class="dashboard-intro-mark" aria-hidden="true"><i data-lucide="panels-top-left"></i></div>
+          <div><h2>School overview</h2><p>A live snapshot of enrollment, staffing, attendance, and academic activity.</p></div>
+        </div>
         <div class="stats-grid">
           <div class="stat-card c-green">
             <div class="stat-row">
@@ -164,6 +172,28 @@
             </div>
             <div class="stat-value" id="totalGrades"></div>
             <div class="stat-label">Grade Records</div>
+          </div>
+          <div class="stat-card c-green">
+            <div class="stat-row"><div class="stat-icon"></div></div>
+            <div class="stat-value" id="totalSections">—</div>
+            <div class="stat-label">Sections</div>
+          </div>
+          <div class="stat-card c-green">
+            <div class="stat-row"><div class="stat-icon"></div></div>
+            <div class="stat-value" id="totalSubjects">—</div>
+            <div class="stat-label">Subjects</div>
+          </div>
+        </div>
+
+        <div class="panel admin-recent-activity" id="recentActivityPanel" data-web-admin-only>
+          <div class="panel-header">
+            <div><div class="panel-title">Recent Administrative Activity</div><div class="panel-sub">Latest recorded system changes</div></div>
+            <button class="btn btn-secondary btn-sm" type="button" data-section="activityLogs">View Activity Logs</button>
+          </div>
+          <div class="table-wrap">
+            <table><thead><tr><th>When</th><th>User</th><th>Action</th><th>Record</th></tr></thead>
+              <tbody id="recentActivityBody"><tr><td colspan="4">Loading activity...</td></tr></tbody>
+            </table>
           </div>
         </div>
 
@@ -420,6 +450,7 @@
               <select class="filter-select" id="userManagementRoleFilter">
                 <option value="">All Roles</option>
                 <option value="WEB_ADMIN">Administrator</option>
+                <option value="SCHOOL_ADMIN">School Administration</option>
                 <option value="STUDENT">Student</option>
                 <option value="TEACHER">Teacher</option>
                 <option value="PARENT">Parent</option>
@@ -708,6 +739,12 @@
                 <option value="11">Grade 11</option>
                 <option value="12">Grade 12</option>
               </select>
+              <select class="filter-select" id="gradeSubjectFilter" aria-label="Filter by subject">
+                <option value="">All Subjects</option>
+              </select>
+              <select class="filter-select" id="gradeSectionFilter" aria-label="Filter by section">
+                <option value="">All Sections</option>
+              </select>
               <select class="filter-select" id="quarterFilter">
                 <option value="">All Quarters</option>
                 <option value="Quarter 1">Quarter 1</option>
@@ -901,6 +938,176 @@
             </div>
           </div>
         </div>
+      </section>
+
+      <div id="systemMaintenanceNotice" class="system-maintenance-notice hidden" role="status"></div>
+
+      <section id="activityLogsSection" class="hidden" data-web-admin-only>
+        <div class="page-header admin-tool-heading">
+          <div><h2>Activity Logs</h2><p>Review important account, grade, attendance, schedule, and system changes.</p></div>
+        </div>
+        <div class="admin-tool-card">
+          <div class="admin-tool-card-heading">
+            <div><h3>Audit trail</h3><p>Filter recorded actions by user, event type, date, or affected record.</p></div>
+            <span class="admin-tool-count" id="activityLogsCount">Loading...</span>
+          </div>
+          <div class="toolbar admin-audit-toolbar"><div class="toolbar-left">
+            <input class="filter-select" id="activityRecordSearch" type="search" placeholder="Search affected record ID" aria-label="Search affected record ID">
+            <select class="filter-select" id="activityUserFilter" aria-label="Filter by user"><option value="">All users</option></select>
+            <select class="filter-select" id="activityActionFilter" aria-label="Filter by action">
+              <option value="">All actions</option>
+              <option value="account_created">Account created</option><option value="account_updated">Account updated</option>
+              <option value="account_deactivated">Account deactivated</option><option value="account_reactivated">Account reactivated</option>
+              <option value="account_deleted">Account deleted</option><option value="role_changed">Role changed</option>
+              <option value="grade_created">Grade created</option><option value="grade_changed">Grade changed</option>
+              <option value="grade_deleted">Grade deleted</option><option value="attendance_recorded">Attendance recorded</option>
+              <option value="attendance_corrected">Attendance corrected</option><option value="attendance_auto_marked_absent">Auto-marked absent</option>
+              <option value="schedule_created">Schedule created</option><option value="schedule_changed">Schedule changed</option>
+              <option value="schedule_deleted">Schedule deleted</option><option value="system_setting_changed">System setting changed</option>
+              <option value="password_reset">Password reset</option>
+            </select>
+            <label class="filter-date">From <input class="filter-select" id="activityStartDate" type="date"></label>
+            <label class="filter-date">To <input class="filter-select" id="activityEndDate" type="date"></label>
+            <select class="filter-select" id="activitySort" aria-label="Sort activity logs"><option value="desc">Newest first</option><option value="asc">Oldest first</option></select>
+            <button class="btn btn-secondary" id="activityRefreshBtn" type="button">Refresh</button>
+          </div></div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Timestamp</th><th>User</th><th>Action</th><th>Affected record</th><th>Changes</th></tr></thead>
+            <tbody id="activityLogsBody"><tr><td colspan="5">Loading activity logs...</td></tr></tbody>
+          </table></div>
+          <div class="table-footer"><span class="admin-audit-footnote">Audit entries are read-only and cannot be edited or deleted here.</span><div class="pagination" id="activityLogsPagination"></div></div>
+        </div>
+      </section>
+
+      <section id="systemMonitoringSection" class="hidden" data-web-admin-only>
+        <div class="page-header admin-tool-heading">
+          <div><h2>System Monitoring</h2><p>Live checks and recent results reported by configured application services.</p></div>
+          <div class="page-header-actions"><span class="admin-tool-count" id="healthCheckedAt">Not checked</span><button class="btn btn-secondary" id="refreshHealthBtn" type="button">Refresh checks</button></div>
+        </div>
+        <div class="stats-grid admin-health-grid">
+          <article class="stat-card c-blue"><div class="admin-health-card-top"><span class="admin-health-indicator" aria-hidden="true"></span><span class="stat-label">Admin API</span></div><div class="stat-value" data-health-status="api">Unknown</div><div class="stat-change" data-health-detail="api">Not checked</div></article>
+          <article class="stat-card c-green"><div class="admin-health-card-top"><span class="admin-health-indicator" aria-hidden="true"></span><span class="stat-label">Supabase Database</span></div><div class="stat-value" data-health-status="database">Unknown</div><div class="stat-change" data-health-detail="database">Not checked</div></article>
+          <article class="stat-card c-purple"><div class="admin-health-card-top"><span class="admin-health-indicator" aria-hidden="true"></span><span class="stat-label">Health Telemetry</span></div><div class="stat-value" data-health-status="telemetry">Unknown</div><div class="stat-change" data-health-detail="telemetry">Not checked</div></article>
+          <article class="stat-card c-yellow"><div class="admin-health-card-top"><span class="admin-health-indicator" aria-hidden="true"></span><span class="stat-label">Automatic Absence</span></div><div class="stat-value" data-health-status="autoAbsence">Unknown</div><div class="stat-change" data-health-detail="autoAbsence">No run reported</div></article>
+          <article class="stat-card c-purple"><div class="admin-health-card-top"><span class="admin-health-indicator" aria-hidden="true"></span><span class="stat-label">Email Notifications</span></div><div class="stat-value" data-health-status="emailNotifications">Unknown</div><div class="stat-change" data-health-detail="emailNotifications">No result reported</div></article>
+        </div>
+        <div class="admin-tool-card"><div class="admin-tool-card-heading"><div><h3>Recent errors &amp; failed operations</h3><p>Only errors emitted by instrumented processes are shown.</p></div></div>
+          <div class="table-wrap"><table><thead><tr><th>Time</th><th>Component</th><th>Result</th></tr></thead><tbody id="healthErrorsBody"><tr><td colspan="3">Loading monitoring data...</td></tr></tbody></table></div>
+        </div>
+      </section>
+
+      <section id="securitySection" class="hidden" data-web-admin-only>
+        <div class="page-header admin-tool-heading">
+          <div><h2>Security</h2><p>Review available authentication events and sensitive administrative actions.</p></div>
+          <div class="page-header-actions"><button class="btn btn-secondary" type="button" data-section="userManagement">Account Management</button></div>
+        </div>
+        <div class="security-status-card">
+          <span class="security-status-icon" aria-hidden="true"><i data-lucide="shield-check"></i></span>
+          <div><h3 id="authLoginHistoryStatus">Loading Supabase Auth audit logs...</h3>
+            <p id="authLoginHistoryMessage">Retrieving recorded sign-in events from Supabase Auth.</p>
+            <p class="security-status-footnote">Failed sign-in attempts are not shown unless an approved Auth log source is configured. No synthetic login events are displayed.</p>
+          </div>
+        </div>
+        <div class="admin-tool-card"><div class="admin-tool-card-heading"><div><h3>Recent sign-ins</h3><p>Most recent sign-in events present in Supabase Auth's database audit log.</p></div><button class="btn btn-secondary" id="refreshAuthLoginHistoryBtn" type="button">Refresh</button></div>
+          <div class="table-wrap"><table><thead><tr><th>Time</th><th>User</th><th>Event</th><th>IP address</th><th>Provider</th></tr></thead><tbody id="authLoginHistoryBody"><tr><td colspan="5">Loading sign-in history...</td></tr></tbody></table></div>
+        </div>
+        <div class="admin-tool-card"><div class="admin-tool-card-heading"><div><h3>Sensitive administrative actions</h3><p>Role changes, account status changes, and password-reset events.</p></div></div>
+          <div class="table-wrap"><table><thead><tr><th>Time</th><th>Administrator</th><th>Action</th><th>Target</th></tr></thead><tbody id="securityEventsBody"><tr><td colspan="4">Loading security events...</td></tr></table></div>
+        </div>
+        <div class="admin-security-guidance"><span class="security-guidance-icon" aria-hidden="true"><i data-lucide="lock-keyhole"></i></span><div><h3>Protected account workflows</h3><p>Account deactivation and password resets require confirmation and are authorized server-side in User Management. Password values and authentication tokens are never displayed or written to activity logs.</p></div></div>
+      </section>
+
+      <section id="backupRecoverySection" class="hidden" data-web-admin-only>
+        <div class="panel" id="backupSetupNotice">
+          <div class="panel-title">Off-site backup job status</div>
+          <p id="backupSetupMessage">No successful encrypted backup upload has been recorded. Configure the daily GitHub Actions workflow and required repository secrets described in ARCHITECTURE.md.</p>
+          <p>A “Verified” run means the PostgreSQL archive passed pg_restore listing, was age-encrypted, uploaded, downloaded again, and matched its SHA-256 checksum. This does not mean a database restore has been tested.</p>
+        </div>
+        <div class="panel"><div class="panel-header"><div><div class="panel-title">Backup history</div><div class="panel-sub" id="backupHistorySummary">Checking for verified records...</div></div><button class="btn btn-secondary" id="refreshBackupsBtn" type="button">Refresh</button></div>
+          <div class="table-wrap"><table><thead><tr><th>Started</th><th>Completed</th><th>Verified</th><th>Status</th><th>Size</th><th>SHA-256</th><th>Artifact key</th><th>Result</th></tr></thead><tbody id="backupHistoryBody"><tr><td colspan="8">Loading backup history...</td></tr></tbody></table></div>
+        </div>
+        <div class="panel">
+          <div class="panel-title">Recovery guidance</div>
+          <p>Restore only into a separate, isolated Supabase project. Download the encrypted object from the configured S3-compatible bucket, decrypt it with the offline age private key, inspect the archive with <code>pg_restore --list</code>, then restore and validate data in staging. Never test by restoring over production.</p>
+          <p>The dashboard does not expose download links, decryption keys, or restore controls. A successful upload/checksum is not a substitute for a periodic restore drill.</p>
+        </div>
+      </section>
+
+      <section id="systemSettingsSection" class="hidden" data-web-admin-only>
+        <div class="page-header system-settings-heading">
+          <div>
+            <h2>System Settings</h2>
+            <p>Manage your school identity, academic calendar, and day-to-day system behavior.</p>
+          </div>
+        </div>
+        <form id="systemSettingsForm" class="system-settings-form">
+          <section class="system-settings-card" aria-labelledby="settingsBrandHeading">
+            <div class="system-settings-card-heading">
+              <span class="system-settings-icon" aria-hidden="true"><i data-lucide="school"></i></span>
+              <div><h3 id="settingsBrandHeading">School identity</h3><p>Personalize the name and logo shown throughout EASPO.</p></div>
+            </div>
+            <div class="system-settings-brand-grid">
+              <div class="form-group">
+                <label class="form-label" for="systemSchoolName">School name</label>
+                <input class="form-input" id="systemSchoolName" maxlength="160" placeholder="Enter your school name">
+                <span class="form-hint">This name appears on the login page and all role dashboards.</span>
+              </div>
+              <div class="school-logo-control">
+                <div class="school-logo-preview-wrap">
+                  <img id="systemSchoolLogoPreview" class="school-logo-preview" src="logo.png" alt="Current school logo preview">
+                </div>
+                <div class="school-logo-upload">
+                  <label class="form-label" for="systemSchoolLogoFile">School logo</label>
+                  <input class="form-input school-logo-file" id="systemSchoolLogoFile" type="file" accept="image/png,image/jpeg,image/webp">
+                  <span class="form-hint">PNG, JPG, or WebP · up to 2 MB. Replaces the logo across login, admin, teacher, and scanner pages.</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="system-settings-card" aria-labelledby="settingsAcademicHeading">
+            <div class="system-settings-card-heading">
+              <span class="system-settings-icon" aria-hidden="true"><i data-lucide="calendar-days"></i></span>
+              <div><h3 id="settingsAcademicHeading">Academic calendar</h3><p>Set the active school year and reporting period.</p></div>
+            </div>
+            <div class="form-2col">
+              <div class="form-group"><label class="form-label" for="systemSchoolYear">School year</label><input class="form-input" id="systemSchoolYear" maxlength="20" placeholder="e.g. 2026-2027"></div>
+              <div class="form-group"><label class="form-label" for="systemAcademicPeriod">Academic period</label><input class="form-input" id="systemAcademicPeriod" maxlength="40" placeholder="e.g. Quarter 1"></div>
+            </div>
+          </section>
+
+          <section class="system-settings-card" aria-labelledby="settingsAttendanceHeading">
+            <div class="system-settings-card-heading">
+              <span class="system-settings-icon" aria-hidden="true"><i data-lucide="clock-3"></i></span>
+              <div><h3 id="settingsAttendanceHeading">Attendance rules</h3><p>Configure the timing thresholds used by attendance processing.</p></div>
+            </div>
+            <div class="form-2col">
+              <div class="form-group"><label class="form-label" for="systemAbsenceGrace">Auto-absence grace period</label><div class="system-settings-input-suffix"><input class="form-input" id="systemAbsenceGrace" type="number" min="0" max="240" step="1" value="60" required><span>minutes</span></div><span class="form-hint">Defaults to 60 minutes; used by the scheduled absence process.</span></div>
+              <div class="form-group"><label class="form-label" for="systemLateGrace">Late-arrival grace period</label><div class="system-settings-input-suffix"><input class="form-input" id="systemLateGrace" type="number" min="0" max="240" step="1" value="0" required><span>minutes</span></div><span class="form-hint">Defaults to 0 minutes; used by the attendance scanner when determining lateness.</span></div>
+            </div>
+          </section>
+
+          <section class="system-settings-card" aria-labelledby="settingsCommunicationHeading">
+            <div class="system-settings-card-heading">
+              <span class="system-settings-icon" aria-hidden="true"><i data-lucide="bell-ring"></i></span>
+              <div><h3 id="settingsCommunicationHeading">Communications</h3><p>Control notification behavior and messages shown to users.</p></div>
+            </div>
+            <label class="system-settings-toggle" for="systemEmailEnabled">
+              <span><strong>Email notifications</strong><small>Enable system-generated email notifications where configured.</small></span>
+              <input id="systemEmailEnabled" type="checkbox" checked>
+            </label>
+            <div class="form-group">
+              <label class="form-label" for="systemMaintenance">Maintenance announcement</label>
+              <textarea class="form-input" id="systemMaintenance" rows="3" maxlength="500" placeholder="Leave empty to hide the announcement"></textarea>
+              <span class="form-hint">Leave blank when there is no announcement. Maximum 500 characters.</span>
+            </div>
+          </section>
+
+          <div class="system-settings-footer">
+            <span class="system-settings-save-status" id="systemSettingsStatus" role="status" aria-live="polite">Loading settings...</span>
+            <button class="btn btn-primary system-settings-save" id="saveSystemSettingsBtn" type="submit"><i data-lucide="save" aria-hidden="true"></i> Save changes</button>
+          </div>
+        </form>
       </section>
 
     </div><!-- /page-body -->
