@@ -217,6 +217,7 @@ serve(async req => {
         .from('profiles')
         .select('id, name, guardian_email, section_id, grade_level')
         .eq('role', 'STUDENT')
+        .or('status.is.null,status.neq.archived')
         .eq('section_id', sectionId)
       if (studentsError) {
         console.error(`[AUTO-ABSENT] Student lookup failed; schedule=${scheduleId}; section=${sectionId}; error=${studentsError.message}`)

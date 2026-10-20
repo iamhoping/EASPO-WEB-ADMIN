@@ -1,216 +1,206 @@
-// /js/modules/dashboard.js
 import { supabase } from '../services/supabaseClient.js'
 import { showToast } from '../ui/toast.js'
+import { isSchoolDay, SCHOOL_YEAR_2025_2026 } from './school-calendar-2025-2026.js'
 
-// ── Month range helpers ────────────────────────────────────────
-function getMonthRange(monthValue) {
-  const d     = monthValue ? new Date(`${monthValue}-01`) : new Date()
-  const start = new Date(d.getFullYear(), d.getMonth(), 1)
-  const end   = new Date(d.getFullYear(), d.getMonth() + 1, 0)
-  return {
-    start  : start.toISOString().slice(0,10),
-    end    : end.toISOString().slice(0,10),
-    labels : Array.from({ length: end.getDate() }, (_, i) => {
-      const day = new Date(start.getFullYear(), start.getMonth(), i+1)
-      return day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-    }),
-    dateKeys : Array.from({ length: end.getDate() }, (_, i) => {
-      const day = new Date(start.getFullYear(), start.getMonth(), i+1)
-      return day.toISOString().slice(0,10)
-    })
+const dashboardCharts = {}
+const DATA_PAGE_SIZE = 1000
+
+async function fetchAllRows(buildQuery) {
+  const rows = []
+  for (let offset = 0; ; offset += DATA_PAGE_SIZE) {
+    const { data, error } = await buildQuery(offset, offset + DATA_PAGE_SIZE - 1)
+    if (error) return { data: null, error }
+    rows.push(...(data || []))
+    if (!data || data.length < DATA_PAGE_SIZE) return { data: rows, error: null }
   }
 }
 
-// ── Chart renderer ─────────────────────────────────────────────
-function renderLineChart(canvasId, labels, values) {
+function getSchoolYearMonths() {
+  const months = []
+  const start = new Date(`${SCHOOL_YEAR_2025_2026.startDate}T00:00:00`)
+  const end = new Date(`${SCHOOL_YEAR_2025_2026.endDate}T00:00:00`)
+  for (let month = new Date(start.getFullYear(), start.getMonth(), 1); month <= end; month.setMonth(month.getMonth() + 1)) {
+    months.push(new Date(month))
+  }
+  return months
+}
+
+function showChartMessage(canvasId, message) {
+  const canvas = document.getElementById(canvasId)
+  const emptyState = document.getElementById(canvasId.replace('Chart', 'Empty'))
+  if (dashboardCharts[canvasId]) {
+    dashboardCharts[canvasId].destroy()
+    delete dashboardCharts[canvasId]
+  }
+  if (canvas) canvas.hidden = true
+  if (emptyState) {
+    emptyState.textContent = message
+    emptyState.classList.remove('hidden')
+  }
+}
+
+function renderDashboardChart(canvasId, type, data, options = {}) {
   const canvas = document.getElementById(canvasId)
   if (!canvas) return
-  const ctx    = canvas.getContext('2d')
-  const dpr    = window.devicePixelRatio || 1
-  const W      = canvas.clientWidth  || 600
-  const H      = canvas.clientHeight || 200
+  const emptyState = document.getElementById(canvasId.replace('Chart', 'Empty'))
 
-  canvas.width  = W * dpr
-  canvas.height = H * dpr
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-  ctx.clearRect(0, 0, W, H)
-
-  if (!values.length) return
-
-  const PAD_L = 44, PAD_R = 20, PAD_T = 28, PAD_B = 36
-  const chartW = W - PAD_L - PAD_R
-  const chartH = H - PAD_T - PAD_B
-  const maxVal = 100
-
-  // Resolve CSS variables
-  const style   = getComputedStyle(document.documentElement)
-  const PRIMARY = style.getPropertyValue('--primary').trim()       || '#38BDF8'
-  const GREEN   = style.getPropertyValue('--green').trim()         || '#34D399'
-  const SURFACE2= style.getPropertyValue('--surface2').trim()      || '#1A2238'
-  const TEXT3   = style.getPropertyValue('--text3').trim()         || '#4E6580'
-  const TEXT2   = style.getPropertyValue('--text2').trim()         || '#8FA3BF'
-
-  const toX = i => PAD_L + (chartW / Math.max(values.length - 1, 1)) * i
-  const toY = v => PAD_T + chartH * (1 - Math.min(v, maxVal) / maxVal)
-
-  // Grid lines at 0, 25, 50, 75, 100
-  ctx.strokeStyle = SURFACE2
-  ctx.lineWidth   = 1
-  ;[0, 25, 50, 75, 100].forEach(pct => {
-    const y = toY(pct)
-    ctx.beginPath()
-    ctx.setLineDash([4, 4])
-    ctx.moveTo(PAD_L, y)
-    ctx.lineTo(W - PAD_R, y)
-    ctx.stroke()
-    ctx.setLineDash([])
-    // Y label
-    ctx.fillStyle  = TEXT3
-    ctx.font       = '11px DM Sans, sans-serif'
-    ctx.textAlign  = 'right'
-    ctx.textBaseline = 'middle'
-    ctx.fillText(pct + '%', PAD_L - 6, y)
-  })
-
-  const points = values.map((v, i) => ({ x: toX(i), y: toY(v), v }))
-
-  // Gradient fill under line
-  const grad = ctx.createLinearGradient(0, PAD_T, 0, PAD_T + chartH)
-  grad.addColorStop(0,   'rgba(56,189,248,.18)')
-  grad.addColorStop(1,   'rgba(56,189,248,0)')
-  ctx.beginPath()
-  ctx.moveTo(points[0].x, PAD_T + chartH)
-  points.forEach(p => ctx.lineTo(p.x, p.y))
-  ctx.lineTo(points[points.length-1].x, PAD_T + chartH)
-  ctx.closePath()
-  ctx.fillStyle = grad
-  ctx.fill()
-
-  // Line
-  ctx.beginPath()
-  ctx.strokeStyle = PRIMARY
-  ctx.lineWidth   = 2.5
-  ctx.lineJoin    = 'round'
-  ctx.lineCap     = 'round'
-  points.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y))
-  ctx.stroke()
-
-  // Dots + value labels
-  const step = Math.ceil(labels.length / 8)
-  points.forEach((p, i) => {
-    // Dot
-    ctx.beginPath()
-    ctx.arc(p.x, p.y, p.v > 0 ? 4 : 2, 0, Math.PI * 2)
-    ctx.fillStyle   = p.v > 0 ? PRIMARY : SURFACE2
-    ctx.strokeStyle = '#0A0E1A'
-    ctx.lineWidth   = 1.5
-    ctx.fill()
-    if (p.v > 0) ctx.stroke()
-
-    // X labels
-    if (i % step === 0 || i === labels.length - 1) {
-      ctx.fillStyle    = TEXT3
-      ctx.font         = '10px DM Sans, sans-serif'
-      ctx.textAlign    = 'center'
-      ctx.textBaseline = 'top'
-      ctx.fillText(labels[i], p.x, PAD_T + chartH + 8)
-    }
-
-    // Value labels on hover sim — show on peaks and endpoints
-    if (p.v > 0 && (i === 0 || i === labels.length - 1 || p.v >= Math.max(...values) || p.v <= Math.min(...values.filter(x=>x>0)))) {
-      ctx.fillStyle    = TEXT2
-      ctx.font         = 'bold 10px DM Sans, sans-serif'
-      ctx.textAlign    = 'center'
-      ctx.textBaseline = 'bottom'
-      ctx.fillText(p.v + '%', p.x, p.y - 6)
-    }
-  })
-}
-
-// ── Load dashboard data ────────────────────────────────────────
-export async function loadDashboard(monthValue) {
-  // Parallel fetches
-  const [
-    { count: studentCount },
-    { count: teacherCount },
-    { count: parentCount  },
-    { count: gradeCount   },
-    { count: sectionCount },
-    { count: subjectCount },
-  ] = await Promise.all([
-    supabase.from('profiles').select('*',{count:'exact',head:true}).eq('role','STUDENT'),
-    supabase.from('profiles').select('*',{count:'exact',head:true}).eq('role','TEACHER'),
-    supabase.from('profiles').select('*',{count:'exact',head:true}).eq('role','PARENT'),
-    supabase.from('grades').select('*',{count:'exact',head:true}),
-    supabase.from('sections').select('*',{count:'exact',head:true}),
-    supabase.from('subjects').select('*',{count:'exact',head:true}),
-  ]);
-
-  // Stat cards
-  setText('totalStudents', studentCount ?? '—')
-  setText('totalTeachers', teacherCount ?? '—')
-  setText('totalParents',  parentCount  ?? '—')
-  setText('totalGrades',   gradeCount   ?? '—')
-  setText('totalSections', sectionCount ?? '—')
-  setText('totalSubjects', subjectCount ?? '—')
-
-  // Calendar is now handled by initCalendar() - no chart loading needed here
-}
-
-// ── Attendance chart ───────────────────────────────────────────
-async function loadAttendanceChart(monthValue) {
-  const range = getMonthRange(monthValue)
-
-  const { data: histData, error } = await supabase
-    .from('attendance')
-    .select('attendance_date, status')
-    .gte('attendance_date', range.start)
-    .lte('attendance_date', range.end)
-    .order('attendance_date', { ascending: true })
-
-  if (error) {
-    console.warn('chart data error:', error.message)
-    renderLineChart('attendanceChart', range.labels, Array(range.dateKeys.length).fill(0))
+  if (typeof globalThis.Chart === 'undefined') {
+    showChartMessage(canvasId, 'Charts are unavailable. Check your connection and reload the dashboard.')
+    console.error('Chart.js is unavailable; dashboard charts were not rendered.')
     return
   }
 
-  // Aggregate by date
-  const summary = {}
-  ;(histData || []).forEach(item => {
-    const dt = item.attendance_date || item.date
-    if (!summary[dt]) summary[dt] = { total: 0, present: 0 }
-    summary[dt].total++
-    if (item.status === 'present') summary[dt].present++
+  if (dashboardCharts[canvasId]) dashboardCharts[canvasId].destroy()
+  canvas.hidden = false
+  emptyState?.classList.add('hidden')
+  dashboardCharts[canvasId] = new globalThis.Chart(canvas, {
+    type,
+    data,
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      ...options
+    }
   })
-
-  const values = range.dateKeys.map(date => {
-    const e = summary[date]
-    return e ? Math.round((e.present / e.total) * 100) : 0
-  })
-
-  renderLineChart('attendanceChart', range.labels, values)
 }
 
-// ── Admin profile load ─────────────────────────────────────────
+function renderAttendanceTrend(rows) {
+  const monthly = new Map()
+  for (const row of rows) {
+    const date = row.attendance_date
+    if (!date || !isSchoolDay(date)) continue
+    const monthKey = date.slice(0, 7)
+    if (!monthly.has(monthKey)) monthly.set(monthKey, { total: 0, present: 0 })
+    const month = monthly.get(monthKey)
+    month.total++
+    if (String(row.status || '').toLowerCase() === 'present') month.present++
+  }
+
+  const months = getSchoolYearMonths().map(date => {
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+    const totals = monthly.get(key)
+    return {
+      label: date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+      rate: totals ? Math.round((totals.present / totals.total) * 100) : null
+    }
+  })
+
+  if (!months.some(month => month.rate !== null)) {
+    showChartMessage('dashboardAttendanceChart', 'No school-day attendance records are available for this school year.')
+    return
+  }
+
+  renderDashboardChart('dashboardAttendanceChart', 'line', {
+    labels: months.map(month => month.label),
+    datasets: [{
+      label: 'Attendance rate',
+      data: months.map(month => month.rate),
+      borderColor: '#16a34a',
+      backgroundColor: 'rgba(22, 163, 74, .12)',
+      fill: true,
+      tension: .3
+    }]
+  }, {
+    scales: { y: { beginAtZero: true, max: 100, ticks: { callback: value => `${value}%` } } },
+    plugins: { legend: { display: false }, tooltip: { callbacks: { label: context => `${context.parsed.y}% of recorded attendance` } } }
+  })
+}
+
+function renderGradeDistribution(rows) {
+  const counts = new Map()
+  for (const row of rows) {
+    const grade = String(row.grade_level || '').trim() || 'Unassigned'
+    counts.set(grade, (counts.get(grade) || 0) + 1)
+  }
+  const grades = [...counts.entries()].sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
+  if (!grades.length) {
+    showChartMessage('dashboardGradeChart', 'No student profile records are available.')
+    return
+  }
+
+  renderDashboardChart('dashboardGradeChart', 'bar', {
+    labels: grades.map(([grade]) => grade),
+    datasets: [{
+      label: 'Students',
+      data: grades.map(([, count]) => count),
+      backgroundColor: '#0ea5e9',
+      borderRadius: 5
+    }]
+  }, {
+    indexAxis: 'y',
+    scales: { x: { beginAtZero: true, ticks: { precision: 0 } } }
+  })
+}
+
+export async function loadDashboard() {
+  window.refreshChart = () => loadDashboard()
+  const [
+    studentsResult,
+    { count: teacherCount, error: teacherError },
+    { count: parentCount, error: parentError },
+    { count: sectionCount, error: sectionError },
+    attendanceResult
+  ] = await Promise.all([
+    fetchAllRows((from, to) => supabase.from('profiles')
+      .select('id,grade_level')
+      .eq('role', 'STUDENT')
+      .or('status.is.null,status.neq.archived')
+      .range(from, to)),
+    supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'TEACHER').or('status.is.null,status.neq.archived'),
+    supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'PARENT').or('status.is.null,status.neq.archived'),
+    supabase.from('sections').select('id', { count: 'exact', head: true }),
+    fetchAllRows((from, to) => supabase.from('attendance')
+      .select('attendance_date,status')
+      .gte('attendance_date', SCHOOL_YEAR_2025_2026.startDate)
+      .lte('attendance_date', SCHOOL_YEAR_2025_2026.endDate)
+      .order('attendance_date', { ascending: true })
+      .range(from, to))
+  ])
+
+  setText('totalStudents', studentsResult.error ? '—' : studentsResult.data.length)
+  setText('totalTeachers', teacherError ? '—' : teacherCount)
+  setText('totalParents', parentError ? '—' : parentCount)
+  setText('totalSections', sectionError ? '—' : sectionCount)
+
+  const failedQueries = [
+    studentsResult.error && `students: ${studentsResult.error.message}`,
+    teacherError && `teachers: ${teacherError.message}`,
+    parentError && `parents: ${parentError.message}`,
+    sectionError && `sections: ${sectionError.message}`,
+    attendanceResult.error && `attendance: ${attendanceResult.error.message}`
+  ].filter(Boolean)
+
+  if (failedQueries.length) {
+    console.error('Dashboard data query failures:', failedQueries)
+    showToast(`Some dashboard data could not be loaded: ${failedQueries.join('; ')}`, 'error')
+  }
+
+  if (studentsResult.error) showChartMessage('dashboardGradeChart', 'Student data could not be loaded.')
+  else renderGradeDistribution(studentsResult.data)
+  if (attendanceResult.error) showChartMessage('dashboardAttendanceChart', 'Attendance data could not be loaded.')
+  else renderAttendanceTrend(attendanceResult.data)
+}
+
 export async function loadAdminProfile(userId) {
   const { data: { user } = {} } = await supabase.auth.getUser()
-  const { data, error } = await supabase
+  const { data } = await supabase
     .from('profiles')
     .select('name, role')
     .eq('id', userId)
     .single()
 
   const name = data?.name || 'Admin'
-  const ini  = name.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase()
+  const ini = name.split(' ').map(word => word[0] || '').join('').slice(0, 2).toUpperCase()
 
   setText('sidebarName', name)
   setText('sidebarInitials', ini)
   setText('profileInitials', ini)
   setProfileAvatar(null, ini)
 
-  const profileName  = document.getElementById('profileName')
+  const profileName = document.getElementById('profileName')
   const profileEmail = document.getElementById('profileEmail')
-  if (profileName)  profileName.value  = name
+  if (profileName) profileName.value = name
   if (profileEmail) profileEmail.value = user?.email || ''
 }
 
@@ -231,14 +221,11 @@ export function setProfileAvatar(url, initials = 'WA') {
   })
 }
 
-// ── Init overview section ──────────────────────────────────────
 export function initOverviewSection() {
-  // Calendar is now initialized separately via initCalendar()
-  // No additional setup needed here
+  // Calendar is initialized separately via initCalendar().
 }
 
-// ── Helper ─────────────────────────────────────────────────────
-function setText(id, val) {
-  const el = document.getElementById(id)
-  if (el) el.textContent = val ?? '—'
+function setText(id, value) {
+  const element = document.getElementById(id)
+  if (element) element.textContent = value ?? '—'
 }

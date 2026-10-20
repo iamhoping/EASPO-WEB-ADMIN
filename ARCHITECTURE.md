@@ -491,18 +491,37 @@ PNG/JPG/WebP logo (maximum 2 MiB) and configured school name are stored and
 loaded on the login, Web Admin, School Admin, Teacher, and Scanner pages. No
 anonymous or School Admin upload permissions are granted.
 
+The `20261018000000_account_archiving.sql` migration adds archive metadata and
+prevents archived accounts from authenticating, being assigned to sections or
+new schedules, or recording scanner attendance. Archiving preserves the profile
+and academic history, stores the student's prior section ID as text (so it
+supports existing numeric as well as UUID section IDs), and clears the student's
+active section assignment. The `20261020000000_account_archived_section_text.sql`
+migration converts existing archive metadata to that compatible type. The Archived Accounts page
+supports confirmation-only archive/restore for students, teachers, and parents.
+Student archives receive the default `Graduated` reason; teacher and parent
+archives receive `Inactive`. Reasons are retained in account metadata but are
+not displayed in the Archived Accounts list. Restored students return without a
+section assignment and must be assigned again.
+
 Deploy the migrations and Edge Functions:
 
 ```bash
 supabase db push
 supabase functions deploy create-school-account
 supabase functions deploy set-school-account-status
+supabase functions deploy manage-archived-account
 supabase functions deploy change-user-role
 supabase functions deploy system-health
 supabase functions deploy change-user-password
 supabase functions deploy auto-mark-absent
 supabase functions deploy record-backup-run
 ```
+
+Account archiving also requires deploying `manage-archived-account`; deploying
+`set-school-account-status` alone does not install the archive/restore endpoint.
+Run `supabase db push` first so the archive metadata columns and RLS policies
+exist before invoking that function.
 
 Role assignment is available to Web Admins in User Management; the server
 rejects self-role changes and School Admin promotion to Web Admin. Account

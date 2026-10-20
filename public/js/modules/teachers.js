@@ -16,6 +16,9 @@ const avColor   = n => { let s=0;for(const c of(n||''))s+=c.charCodeAt(0);return
 const val       = id => (document.getElementById(id)?.value||'').trim()
 const openM     = id => document.getElementById(id)?.classList.remove('hidden')
 const closeM    = id => document.getElementById(id)?.classList.add('hidden')
+const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+})[character])
 
 const assignmentTeacherKeys = [
   'teacher_id', 'teacherId', 'teacher_profile_id', 'assigned_teacher_id',
@@ -62,6 +65,7 @@ export async function loadTeachers() {
     .from('profiles')
     .select('id,name,email,contact,teacher_id,department,status')
     .eq('role','TEACHER')
+    .or('status.is.null,status.neq.archived')
     .order('name',{ascending:true})
 
   if (error) { showToast('DB Error', error.message, 'error'); return }
@@ -76,6 +80,7 @@ export function applyFilters() {
   const tc = document.getElementById('TeacherstatusFilter')?.value || ''
 
   filtered = allTeachers.filter(t =>
+    (t.status || '').toLowerCase() !== 'archived' &&
     (!q ||
       (t.name || '').toLowerCase().includes(q) ||
       (t.teacher_id || '').toLowerCase().includes(q) ||
@@ -126,7 +131,8 @@ function render() {
         <button class="act-btn" title="Edit"   onclick="openEditTeacherModal('${t.id}')">✏️</button>
         ${document.body.dataset.role === 'SCHOOL_ADMIN'
           ? `<button class="btn btn-secondary btn-sm" onclick="setTeacherStatus('${t.id}','${(t.status || 'active') === 'active' ? 'inactive' : 'active'}')">${(t.status || 'active') === 'active' ? 'Deactivate' : 'Reactivate'}</button>`
-          : `<button class="act-btn danger" title="Delete" onclick="confirmDeleteTeacher('${t.id}','${(t.name||'').replace(/'/g,"\\'")}')">🗑</button>`}
+          : ''}
+        <button class="btn btn-secondary btn-sm" type="button" data-archive-account="${t.id}" data-account-role="TEACHER" data-account-name="${escapeHtml(t.name || 'Teacher')}">Archive</button>
       </div></td>
     </tr>`
   }).join('')
@@ -216,32 +222,6 @@ export async function submitEditTeacher() {
   showToast('Saved',`${name} updated`,'success')
   closeM('editTeacherModal')
   loadTeachers()
-}
-
-// ── Delete ────────────────────────────────────────────────────
-window.confirmDeleteTeacher = async function(id, name) {
-
-  if (!confirm(`Delete teacher "${name}"? This cannot be undone.`)) return
-
-  try {
-
-    const { error } = await supabase.functions.invoke('delete-user', {
-      body: {
-        userId: id
-      }
-    })
-
-    if (error) throw error
-
-    showToast('Deleted', `${name} removed`, 'success')
-
-    await loadTeachers()
-
-  } catch (e) {
-
-    showToast('Error', e.message, 'error')
-
-  }
 }
 
 // ── Export ────────────────────────────────────────────────────

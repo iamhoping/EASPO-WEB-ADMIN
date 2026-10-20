@@ -232,9 +232,10 @@ async function recordScan(rawValue) {
   try {
     const exactLookup = await supabase
       .from('profiles')
-      .select('id, student_id, name, grade_level, section_id')
+      .select('id, student_id, name, grade_level, section_id, status')
       .eq('student_id', scannedValue)
       .eq('role', 'STUDENT')
+      .or('status.is.null,status.neq.archived')
       .maybeSingle()
 
     let student = exactLookup.data
@@ -247,9 +248,10 @@ async function recordScan(rawValue) {
       console.log('[STUDENT] Exact ID not found; trying normalized candidates', candidates)
       const normalizedLookup = await supabase
         .from('profiles')
-        .select('id, student_id, name, grade_level, section_id')
+        .select('id, student_id, name, grade_level, section_id, status')
         .in('student_id', candidates)
         .eq('role', 'STUDENT')
+        .or('status.is.null,status.neq.archived')
         .maybeSingle()
 
       student = normalizedLookup.data

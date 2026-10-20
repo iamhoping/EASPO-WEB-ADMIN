@@ -42,7 +42,7 @@ serve(async req => {
     .eq('id', callerData.user.id)
     .single()
   if (callerProfileError || !['WEB_ADMIN', 'SCHOOL_ADMIN'].includes(callerProfile?.role) ||
-      String(callerProfile.status || '').toLowerCase() === 'inactive') {
+      ['inactive', 'archived'].includes(String(callerProfile.status || '').toLowerCase())) {
     return jsonResponse(403, { error: 'Only authorized school administrators can deactivate accounts.' })
   }
 
@@ -69,25 +69,40 @@ serve(async req => {
   if (targetError || !target || target.role !== role) {
     return jsonResponse(404, { error: 'The selected account was not found or its role has changed.' })
   }
+  if (String(target.status || '').toLowerCase() === 'archived') {
+    return jsonResponse(409, { error: 'Archived accounts must be restored from Archived Accounts.' })
+  }
 
   const { error: authError } = await adminClient.auth.admin.updateUserById(userId, {
     ban_duration: status === 'inactive' ? '876000h' : 'none',
   })
   if (authError) return jsonResponse(400, { error: authError.message })
 
-  const { data: updatedProfile, error: profileError } = await adminClient
+  let profileUpdateQuery = adminClient
     .from('profiles')
     .update({ status })
     .eq('id', userId)
     .eq('role', role)
-    .select('id')
-    .maybeSingle()
+  profileUpdateQuery = target.status == null
+    ? profileUpdateQuery.is('status', null)
+    : profileUpdateQuery.eq('status', target.status)
+  const { data: updatedProfile, error: profileError } = await profileUpdateQuery.select('id').maybeSingle()
   if (profileError || !updatedProfile) {
+    const { data: latestProfile, error: latestProfileError } = await adminClient
+      .from('profiles')
+      .select('status')
+      .eq('id', userId)
+      .maybeSingle()
+    const statusToPreserve = latestProfileError ? target.status : latestProfile?.status ?? target.status
     const { error: rollbackError } = await adminClient.auth.admin.updateUserById(userId, {
-      ban_duration: String(target.status || 'active').toLowerCase() === 'inactive' ? '876000h' : 'none',
+      ban_duration: ['inactive', 'archived'].includes(String(statusToPreserve || '').toLowerCase()) ? '876000h' : 'none',
     })
-    if (rollbackError) {
-      console.error('Auth status rollback failed after profile update error:', rollbackError.message)
+    if (rollbackError || latestProfileError) {
+      console.error('Account status reconciliation failed after profile update error:', {
+        profile: profileError?.message,
+        latestProfile: latestProfileError?.message,
+        auth: rollbackError?.message,
+      })
       return jsonResponse(500, { error: `Profile status update failed and auth rollback failed: ${profileError?.message || 'Target role changed during update.'}` })
     }
     return jsonResponse(400, { error: profileError?.message || 'The account role changed before it could be updated.' })
@@ -103,16 +118,24 @@ serve(async req => {
     after_data: { id: target.id, name: target.name, role, status },
   })
   if (auditError) {
-    const { error: profileRollbackError } = await adminClient.from('profiles')
+    const { data: profileRollback, error: profileRollbackError } = await adminClient.from('profiles')
       .update({ status: target.status || 'active' })
       .eq('id', userId)
       .eq('role', role)
+      .eq('status', status)
+      .select('id')
+      .maybeSingle()
+    const { data: latestProfile, error: latestProfileError } = profileRollback
+      ? { data: { status: target.status || 'active' }, error: null }
+      : await adminClient.from('profiles').select('status').eq('id', userId).maybeSingle()
+    const statusToPreserve = latestProfileError ? status : latestProfile?.status ?? status
     const { error: authRollbackError } = await adminClient.auth.admin.updateUserById(userId, {
-      ban_duration: String(target.status || 'active').toLowerCase() === 'inactive' ? '876000h' : 'none',
+      ban_duration: ['inactive', 'archived'].includes(String(statusToPreserve || '').toLowerCase()) ? '876000h' : 'none',
     })
-    if (profileRollbackError || authRollbackError) {
+    if (profileRollbackError || !profileRollback || latestProfileError || authRollbackError) {
       console.error('Account status rollback failed after audit insertion error:', {
         profile: profileRollbackError?.message,
+        latestProfile: latestProfileError?.message,
         auth: authRollbackError?.message,
       })
       return jsonResponse(500, { error: 'Account status could not be audited or fully rolled back. Contact support.' })

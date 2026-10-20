@@ -18,6 +18,9 @@ const avColor   = n => { let s=0;for(const c of(n||''))s+=c.charCodeAt(0);return
 const val       = id => (document.getElementById(id)?.value||'').trim()
 const openM     = id => document.getElementById(id)?.classList.remove('hidden')
 const closeM    = id => document.getElementById(id)?.classList.add('hidden')
+const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+})[character])
 
 // Safely convert grade value: empty string → null, invalid → null
 // This prevents the check_grade_level constraint violation
@@ -35,6 +38,7 @@ export async function loadStudents() {
     .from('profiles')
     .select('id,name,email,contact,address,student_id,guardian_email,grade_level,status')
     .eq('role','STUDENT')
+    .or('status.is.null,status.neq.archived')
     .order('name',{ascending:true})
 
   if (error) { showToast('DB Error', error.message, 'error'); return }
@@ -48,6 +52,7 @@ export function applyFilters() {
   const gr = document.getElementById('gradeFilter')?.value || ''
   const st = document.getElementById('statusFilter')?.value || ''
   filtered = allStudents.filter(s =>
+    (s.status || '').toLowerCase() !== 'archived' &&
     (!q  || (s.name||'').toLowerCase().includes(q)||(s.student_id||'').toLowerCase().includes(q)||(s.email||'').toLowerCase().includes(q)) &&
     (!gr || s.grade_level===gr) &&
     (!st || (s.status||'active')===st)
@@ -92,7 +97,8 @@ function render() {
         <button class="act-btn" title="Edit"   onclick="openEditStudentModal('${s.id}')">✏️</button>
         ${document.body.dataset.role === 'SCHOOL_ADMIN'
           ? `<button class="btn btn-secondary btn-sm" onclick="setStudentStatus('${s.id}','${st === 'active' ? 'inactive' : 'active'}')">${st === 'active' ? 'Deactivate' : 'Reactivate'}</button>`
-          : `<button class="act-btn danger" title="Delete" onclick="confirmDeleteStudent('${s.id}','${(s.name||'').replace(/'/g,"\\'")}')">🗑</button>`}
+          : ''}
+        <button class="btn btn-secondary btn-sm" type="button" data-archive-account="${s.id}" data-account-role="STUDENT" data-account-name="${escapeHtml(s.name || 'Student')}">Archive</button>
       </div></td>
     </tr>`
   }).join('')
@@ -186,34 +192,6 @@ export async function submitEditStudent() {
   showToast('Saved',`${name} updated`,'success')
   closeM('editStudentModal')
   loadStudents()
-}
-
-// ── Delete Student ───────────────────────────────────────────
-window.confirmDeleteStudent = async function(id, name) {
-
-  if (!confirm(`Delete student "${name}"? This cannot be undone.`)) return
-
-  try {
-
-    const { error } = await supabase.functions.invoke('delete-user', {
-      body: {
-        userId: id
-      }
-    })
-
-    if (error) throw error
-
-    showToast('Deleted', `${name} removed`, 'success')
-
-    // Refresh UI
-    await loadStudents()
-
-  } catch (e) {
-
-    showToast('Error', e.message, 'error')
-
-  }
-
 }
 
 // ── Export ───────────────────────────────────────────────────

@@ -80,6 +80,7 @@ import {
 
 import { initSubjectsSection } from './modules/subjects.js'
 import { initSectionsSection } from './modules/sections.js'
+import { initArchiveSection, loadArchivedAccounts } from './modules/archive.js'
 import { initAdminSystem, loadPublicSystemSettings } from './modules/admin-system.js'
 
 import { renderPagination } from './ui/pagination.js';
@@ -115,7 +116,7 @@ async function authGuard() {
     .single()
 
   if (!profile || !['WEB_ADMIN', 'SCHOOL_ADMIN'].includes(profile.role) ||
-      String(profile.status || '').toLowerCase() === 'inactive') {
+      ['inactive', 'archived'].includes(String(profile.status || '').toLowerCase())) {
     await supabase.auth.signOut()
     window.location.href = 'index.html'
     return null
@@ -133,6 +134,7 @@ const SECTIONS = {
   subjects   : { id: 'subjectsSection',   title: 'Subject Management',    sub: 'Create, edit and manage school subjects' },
   sections   : { id: 'sectionsSection',   title: 'Section Management',    sub: 'Manage sections and student assignments' },
   parents    : { id: 'parentsSection',    title: 'Parents Management',    sub: 'Manage parent and guardian records' },
+  archiveAccounts: { id: 'archiveAccountsSection', title: 'Archived Accounts', sub: 'Review and restore archived student, teacher, and parent accounts' },
   schedules  : { id: 'schedulesSection',  title: 'Schedule Management',   sub: 'Create, review, and validate class schedules' },
   attendance : { id: 'attendanceSection', title: 'Attendance Logs',       sub: 'Real-time tracking with manual override' },
   grades     : { id: 'gradesSection',     title: 'Grade Records',         sub: 'Manage student academic performance' },
@@ -319,6 +321,7 @@ function setActiveSection(section) {
   if (!SECTIONS[section]) return
   if (section === activeSection) return
   activeSection = section
+  if (section === 'archiveAccounts') loadArchivedAccounts()
 
   // Show/hide sections
   Object.entries(SECTIONS).forEach(([key, cfg]) => {
@@ -348,7 +351,7 @@ function setActiveSection(section) {
   const submenuItems = document.querySelectorAll('.nav-submenu-item')
   
   // Check if the active section is a Users submenu item
-  const isUsersSection = ['students', 'teachers', 'parents'].includes(section)
+  const isUsersSection = ['students', 'teachers', 'parents', 'archiveAccounts'].includes(section)
   
   if (usersToggle && usersSubmenu) {
     // Expand dropdown if navigating to a Users section
@@ -637,6 +640,7 @@ function initRealtime() {
       if (activeSection === 'students') loadStudents()
       if (activeSection === 'teachers') loadTeachers()
       if (activeSection === 'userManagement') loadUserManagement()
+      if (activeSection === 'archiveAccounts') loadArchivedAccounts()
       updateOverviewStats()
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'grades' }, () => {
@@ -655,8 +659,7 @@ function initRealtime() {
 // ── Lightweight stat refresh (for nav changes) ────────────────
 async function updateOverviewStats() {
   if (activeSection !== 'overview') return
-  const monthVal = document.getElementById('chartMonth')?.value
-  loadDashboard(monthVal)
+  loadDashboard()
 }
 
 // ── Manual entry modal extra UI ───────────────────────────────
@@ -752,6 +755,7 @@ async function boot() {
   initStudentsSection()
   initTeachersSection()
   initParentsSection()
+  initArchiveSection()
   initSubjectsSection()
   initSectionsSection()
   initScheduleSection()
@@ -795,9 +799,9 @@ async function boot() {
       if (section === 'profile')  { window.openModal('profileModal');  return }
       setActiveSection(section)
     })
-    document.querySelectorAll('button[data-section]').forEach(button => {
-      button.addEventListener('click', () => setActiveSection(button.dataset.section))
-    })
+  })
+  document.querySelectorAll('button[data-section]').forEach(button => {
+    button.addEventListener('click', () => setActiveSection(button.dataset.section))
   })
 
   // Start with overview section visible

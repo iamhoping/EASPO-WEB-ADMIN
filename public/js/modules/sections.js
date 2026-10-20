@@ -149,7 +149,7 @@ async function loadSections() {
 
   const [sectionResult, studentResult] = await Promise.all([
     supabase.from('sections').select('id,name,grade_level').order('grade_level', { ascending: true }).order('name', { ascending: true }),
-    supabase.from('profiles').select('section_id').eq('role', 'STUDENT').not('section_id', 'is', null)
+    supabase.from('profiles').select('section_id').eq('role', 'STUDENT').or('status.is.null,status.neq.archived').not('section_id', 'is', null)
   ])
 
   if (sectionResult.error) {
@@ -236,6 +236,7 @@ async function saveSection(event) {
         .from('profiles')
         .select('grade_level')
         .eq('role', 'STUDENT')
+        .or('status.is.null,status.neq.archived')
         .eq('section_id', editingSectionId)
       if (error) throw error
       if ((students || []).some(student => gradeNumber(student.grade_level) !== gradeLevel)) {
@@ -322,6 +323,7 @@ async function loadAssignedStudents() {
     .from('profiles')
     .select('id,name,email,student_id,grade_level,role,section_id,status')
     .eq('role', 'STUDENT')
+    .or('status.is.null,status.neq.archived')
     .eq('section_id', selectedSection.id)
     .order('name', { ascending: true })
 
@@ -346,8 +348,9 @@ async function openEligibleStudents() {
 
   const { data, error } = await supabase
     .from('profiles')
-    .select('id,name,email,student_id,grade_level,section_id,role')
+    .select('id,name,email,student_id,grade_level,section_id,role,status')
     .eq('role', 'STUDENT')
+    .or('status.is.null,status.neq.archived')
     .is('section_id', null)
     .order('name', { ascending: true })
 
@@ -369,9 +372,10 @@ async function assignStudent(studentId) {
   try {
     const { data: student, error: studentError } = await supabase
       .from('profiles')
-      .select('id,role,grade_level,section_id')
+      .select('id,role,grade_level,section_id,status')
       .eq('id', studentId)
       .eq('role', 'STUDENT')
+      .or('status.is.null,status.neq.archived')
       .maybeSingle()
 
     if (studentError) throw studentError

@@ -16,6 +16,9 @@ const avColor   = n => { let s=0;for(const c of(n||''))s+=c.charCodeAt(0);return
 const val       = id => (document.getElementById(id)?.value||'').trim()
 const openM     = id => document.getElementById(id)?.classList.remove('hidden')
 const closeM    = id => document.getElementById(id)?.classList.add('hidden')
+const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+})[character])
 
 const RELATION_PILL = {
   'Father'      : 'pill-blue',
@@ -32,6 +35,7 @@ async function fetchParents() {
     .from('profiles')
     .select('id,name,student_id,grade_level')
     .eq('role','STUDENT')
+    .or('status.is.null,status.neq.archived')
     .order('name',{ascending:true})
   allStudents = data || []
 }
@@ -59,6 +63,7 @@ export async function loadParents() {
     .from('profiles')
     .select('*')
     .eq('role', 'PARENT') // This matches the role we set in submitAddParent
+    .or('status.is.null,status.neq.archived')
     .order('name', { ascending: true })
 
   if (error) {
@@ -76,6 +81,7 @@ export function applyFilters() {
   const q  = val('parentSearch').toLowerCase()
   const rl = document.getElementById('relationFilter')?.value || ''
   filtered = allParents.filter(p =>
+    (p.status || '').toLowerCase() !== 'archived' &&
     (!q  || (p.name||'').toLowerCase().includes(q)||(p.parent_id||'').toLowerCase().includes(q)||(p.email||'').toLowerCase().includes(q)) &&
     (!rl || p.relation===rl)
   )
@@ -125,7 +131,8 @@ function render() {
         <button class="act-btn" title="Edit"   onclick="openEditParentModal('${p.id}')">✏️</button>
         ${document.body.dataset.role === 'SCHOOL_ADMIN'
           ? `<button class="btn btn-secondary btn-sm" onclick="setParentStatus('${p.id}','${(p.status || 'active') === 'active' ? 'inactive' : 'active'}')">${(p.status || 'active') === 'active' ? 'Deactivate' : 'Reactivate'}</button>`
-          : `<button class="act-btn danger" title="Delete" onclick="confirmDeleteParent('${p.id}','${(p.name||'').replace(/'/g,"\\'")}')">🗑</button>`}
+          : ''}
+        <button class="btn btn-secondary btn-sm" type="button" data-archive-account="${p.id}" data-account-role="PARENT" data-account-name="${escapeHtml(p.name || 'Parent / Guardian')}">Archive</button>
       </div></td>
     </tr>`
   }).join('')
@@ -211,32 +218,6 @@ export async function submitEditParent() {
   showToast('Saved',`${name} updated`,'success')
   closeM('editParentModal')
   loadParents()
-}
-
-// ── Delete ────────────────────────────────────────────────────
-window.confirmDeleteParent = async function(id, name) {
-
-  if (!confirm(`Delete parent "${name}"? This cannot be undone.`)) return
-
-  try {
-
-    const { error } = await supabase.functions.invoke('delete-user', {
-      body: {
-        userId: id
-      }
-    })
-
-    if (error) throw error
-
-    showToast('Deleted', `${name} removed`, 'success')
-
-    await loadParents()
-
-  } catch (e) {
-
-    showToast('Error', e.message, 'error')
-
-  }
 }
 
 // ── Export ────────────────────────────────────────────────────

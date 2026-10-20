@@ -69,6 +69,9 @@
             </a>
           </div>
         </div>
+        <a class="nav-link" data-section="archiveAccounts" href="#">
+          <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11h14V8M10 12h4"/></svg></span> Archived Accounts
+        </a>
         <a class="nav-link" data-section="subjects" href="#">
           <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/><path d="M8 7h8M8 11h8"/></svg></span> Subjects
         </a>
@@ -137,94 +140,54 @@
       <!-- ══ OVERVIEW SECTION ══════════════════════════════ -->
       <section id="overviewSection">
         <div class="dashboard-intro">
-          <div class="dashboard-intro-mark" aria-hidden="true"><i data-lucide="panels-top-left"></i></div>
-          <div><h2>School overview</h2><p>A live snapshot of enrollment, staffing, attendance, and academic activity.</p></div>
+          <div><h2>School overview</h2><p>Enrollment, staffing, and attendance at a glance.</p></div>
         </div>
-        <div class="stats-grid">
+        <div class="stats-grid dashboard-stats-grid">
           <div class="stat-card c-green">
-            <div class="stat-row">
-              <div class="stat-icon"></div>
-              <span class="stat-change up" id="studentChange"></span>
-            </div>
             <div class="stat-value" id="totalStudents">—</div>
             <div class="stat-label">Total Students</div>
           </div>
           <div class="stat-card c-green">
-            <div class="stat-row">
-              <div class="stat-icon"></div>
-              <span class="stat-change up" id="teacherChange"></span>
-            </div>
             <div class="stat-value" id="totalTeachers">—</div>
             <div class="stat-label">Total Teachers</div>
           </div>
           <div class="stat-card c-green">
-            <div class="stat-row">
-              <div class="stat-icon"></div>
-              <span class="stat-change flat"></span>
-            </div>
-            <div class="stat-value" id="totalParents"></div>
+            <div class="stat-value" id="totalParents">—</div>
             <div class="stat-label">Registered Parents</div>
           </div>
           <div class="stat-card c-green">
-            <div class="stat-row">
-              <div class="stat-icon"></div>
-              <span class="stat-change flat"></span>
-            </div>
-            <div class="stat-value" id="totalGrades"></div>
-            <div class="stat-label">Grade Records</div>
-          </div>
-          <div class="stat-card c-green">
-            <div class="stat-row"><div class="stat-icon"></div></div>
             <div class="stat-value" id="totalSections">—</div>
             <div class="stat-label">Sections</div>
           </div>
-          <div class="stat-card c-green">
-            <div class="stat-row"><div class="stat-icon"></div></div>
-            <div class="stat-value" id="totalSubjects">—</div>
-            <div class="stat-label">Subjects</div>
-          </div>
         </div>
 
-        <div class="panel admin-recent-activity" id="recentActivityPanel" data-web-admin-only>
-          <div class="panel-header">
-            <div><div class="panel-title">Recent Administrative Activity</div><div class="panel-sub">Latest recorded system changes</div></div>
-            <button class="btn btn-secondary btn-sm" type="button" data-section="activityLogs">View Activity Logs</button>
-          </div>
-          <div class="table-wrap">
-            <table><thead><tr><th>When</th><th>User</th><th>Action</th><th>Record</th></tr></thead>
-              <tbody id="recentActivityBody"><tr><td colspan="4">Loading activity...</td></tr></tbody>
-            </table>
-          </div>
-        </div>
-
-        <div class="chart-row">
+        <div class="chart-row dashboard-chart-row">
           <div class="panel">
             <div class="panel-header">
               <div>
                 <div class="panel-title">Calendar</div>
-                <div class="panel-sub" id="calendarSubtitle">Attendance overview</div>
+                <div class="panel-sub" id="calendarSubtitle">DepEd School Year 2025–2026 ·</div>
               </div>
               <div class="panel-actions">
-                <button class="btn btn-sm btn-secondary" id="todayMonthBtn" type="button">Today</button>
-                <button class="icon-btn" id="refreshCalendarBtn" type="button" title="Refresh calendar" aria-label="Refresh calendar">↻</button>
-                <button class="icon-btn" id="prevMonthBtn" type="button" title="Previous month" aria-label="Previous month" onclick="window.prevMonth?.()">←</button>
-                <span id="calendarMonthYear" class="calendar-month-label"></span>
-                <button class="icon-btn" id="nextMonthBtn" type="button" title="Next month" aria-label="Next month" onclick="window.nextMonth?.()">→</button>
+                <select class="filter-select calendar-month-select" id="calendarMonthSelect" aria-label="Select calendar month"></select>
               </div>
             </div>
-            <div class="calendar-detail" id="calendarDetail" aria-live="polite">
-              <span class="calendar-detail-icon">i</span>
-              <div><strong>Select a day</strong><span>Choose a date to view its attendance summary.</span></div>
-            </div>
+            <div class="calendar-detail hidden" id="calendarDetail" aria-live="polite"></div>
             <div class="calendar-container" id="calendarContainer"></div>
             <div class="calendar-legend">
-              <span><i class="legend-dot legend-full"></i>Full</span>
-              <span><i class="legend-dot legend-good"></i>Good</span>
-              <span><i class="legend-dot legend-medium"></i>Needs attention</span>
-              <span><i class="legend-dot legend-low"></i>Low</span>
+              <span><i class="legend-dot legend-past"></i>Past</span>
             </div>
           </div>
+          <div class="dashboard-insights">
 
+            <div class="chart-card dashboard-chart-card">
+              <div class="chart-header"><h3>Students by Grade Level</h3></div>
+              <div class="chart-body">
+                <canvas id="dashboardGradeChart" aria-label="Student profile counts by grade level"></canvas>
+                <p class="dashboard-chart-empty hidden" id="dashboardGradeEmpty" role="status"></p>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -233,6 +196,7 @@
         <div class="page-header">
           <div class="page-header-actions">
             <button class="btn btn-secondary" id="exportStudentsBtn">⬇ Export</button>
+            <button class="btn btn-secondary" type="button" data-section="archiveAccounts">View Archived</button>
             <button class="btn btn-primary" id="addStudentBtn">+ Add Student</button>
           </div>
         </div>
@@ -303,6 +267,54 @@
           <div class="table-footer">
             <span class="table-count" id="studentsCount">Loading...</span>
             <div class="pagination" id="studentsPagination"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="archiveAccountsSection" class="hidden">
+        <div class="page-header">
+          <div class="page-header-actions">
+            <span class="page-header-subtitle">Archived accounts retain their academic and historical records.</span>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="toolbar">
+            <div class="toolbar-left">
+              <div class="search-box">
+                <input id="archiveSearch" type="search" placeholder="Search name, email, or ID..." />
+              </div>
+            </div>
+            <div class="toolbar-right">
+              <select class="filter-select" id="archiveRoleFilter" aria-label="Filter archived accounts by type">
+                <option value="">All Account Types</option>
+                <option value="STUDENT">Students</option>
+                <option value="TEACHER">Teachers</option>
+                <option value="PARENT">Parents / Guardians</option>
+              </select>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Account</th>
+                  <th>Type</th>
+                  <th>Account ID</th>
+                  <th>Grade / Department</th>
+                  <th>Section</th>
+                  <th>Archive Date</th>
+                  <th>Archived By</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="archiveAccountsTableBody">
+                <tr><td colspan="8"><div class="loader"><div class="spinner"></div></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="table-footer">
+            <span class="table-count" id="archiveAccountsCount">Loading...</span>
+            <div class="pagination" id="archiveAccountsPagination"></div>
           </div>
         </div>
       </section>
@@ -497,6 +509,7 @@
         <div class="page-header">
           <div class="page-header-actions">
             <button class="btn btn-secondary" id="exportTeachersBtn">⬇ Export</button>
+            <button class="btn btn-secondary" type="button" data-section="archiveAccounts">View Archived</button>
             <button class="btn btn-primary" id="addTeacherBtn">+ Add Teacher</button>
           </div>
         </div>
@@ -548,6 +561,7 @@
         <div class="page-header">
           <div class="page-header-actions">
             <button class="btn btn-secondary" id="exportParentsBtn">⬇ Export</button>
+            <button class="btn btn-secondary" type="button" data-section="archiveAccounts">View Archived</button>
             <button class="btn btn-primary" id="addParentBtn">+ Add Parent</button>
           </div>
         </div>
@@ -1940,5 +1954,23 @@
 </script>
 
 <script type="module" src="js/admin.js"></script>
+<div id="archiveAccountModal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2>Archive Account</h2>
+      <button class="modal-close" type="button" data-close-archive aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form id="archiveAccountForm" class="form-grid">
+        <p>Archive <strong id="archiveAccountName"></strong>?</p>
+        <p class="form-hint">The account will be archived without deleting its records. You can restore it later.</p>
+      </form>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" id="archiveAccountCancel" type="button">Cancel</button>
+      <button class="btn btn-primary" id="confirmArchiveAccount" type="submit" form="archiveAccountForm">Archive Account</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>

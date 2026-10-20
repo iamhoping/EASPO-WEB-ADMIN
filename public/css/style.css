@@ -3438,3 +3438,194 @@ tbody tr:hover {
   color: var(--text2);
 }
 .setting-row input[type="checkbox"] { accent-color: var(--primary); }
+
+#overviewSection .dashboard-intro {
+  margin-bottom: 14px;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+
+#overviewSection .dashboard-intro h2 {
+  font-size: 1.08rem;
+}
+
+#overviewSection .dashboard-intro p {
+  margin-top: 2px;
+}
+
+#overviewSection .dashboard-stats-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+#overviewSection .dashboard-stats-grid .stat-card {
+  min-height: 0;
+  padding: 15px 18px;
+  text-align: left;
+}
+
+#overviewSection .dashboard-stats-grid .stat-value {
+  font-size: 1.65rem;
+}
+
+#overviewSection .dashboard-chart-row {
+  grid-template-columns: minmax(0, 1.45fr) minmax(300px, .85fr);
+  align-items: start;
+  gap: 16px;
+}
+
+#overviewSection .dashboard-chart-row > .panel {
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+#overviewSection .calendar {
+  width: 100%;
+}
+
+#overviewSection .dashboard-insights {
+  display: grid;
+  min-width: 0;
+  gap: 16px;
+}
+
+#overviewSection .dashboard-chart-card {
+  min-width: 0;
+  margin-bottom: 0;
+  padding: 18px;
+}
+
+#overviewSection .dashboard-chart-card .chart-header {
+  margin-bottom: 8px;
+}
+
+#overviewSection .dashboard-chart-card .chart-body {
+  height: 190px;
+}
+
+.dashboard-chart-empty {
+  display: grid;
+  height: 100%;
+  margin: 0;
+  place-items: center;
+  color: var(--text3);
+  font-size: .82rem;
+  text-align: center;
+}
+
+.dashboard-chart-card canvas[hidden] {
+  display: none;
+}
+
+.calendar-month-select {
+  min-width: 158px;
+  max-width: 190px;
+}
+
+.calendar-source {
+  padding: 0 22px 16px;
+  color: var(--text3);
+  font-size: .68rem;
+  text-align: center;
+}
+
+.calendar-source a {
+  color: var(--primary);
+}
+
+.calendar-day.holiday,
+.calendar-day.break {
+  border-color: rgba(251, 191, 36, .68);
+  background: rgba(251, 191, 36, .12);
+}
+
+.calendar-day.past:not(.weekend) {
+  border-color: rgba(148, 163, 184, .35);
+  background: rgba(100, 116, 139, .14);
+  opacity: .62;
+}
+
+.calendar-day.outside-school-year {
+  background: rgba(100, 116, 139, .1);
+  opacity: .58;
+}
+
+.calendar-day.weekend {
+  border-color: rgba(148, 163, 184, .42);
+  background: #374151;
+  color: #cbd5e1;
+  opacity: .9;
+}
+
+.calendar-day.weekend.today,
+body.light-mode .calendar-day.weekend.today {
+  background: #374151 !important;
+}
+
+.calendar-day[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+.calendar-day[aria-disabled="true"]:hover {
+  border-color: var(--border);
+  transform: none;
+  box-shadow: none;
+}
+
+.legend-weekend { background: #64748b; }
+.legend-holiday { background: var(--yellow); }
+.legend-past { background: #94a3b8; }
+
+body.light-mode .calendar-day.holiday,
+body.light-mode .calendar-day.break {
+  background: #fff7df;
+}
+
+body.light-mode .calendar-day.past:not(.weekend) {
+  background: #e5e7eb;
+  opacity: .75;
+}
+
+body.light-mode .calendar-day.weekend,
+body.light-mode .calendar-day.weekend.today {
+  background: #d1d5db !important;
+  color: #374151;
+}
+
+@media (max-width: 1100px) {
+  #overviewSection .dashboard-chart-row {
+    grid-template-columns: 1fr;
+  }
+
+  #overviewSection .dashboard-insights {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  #overviewSection .dashboard-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  #overviewSection .dashboard-insights {
+    grid-template-columns: 1fr;
+  }
+
+  #overviewSection .dashboard-chart-card .chart-body {
+    height: 220px;
+  }
+
+  .calendar-month-select {
+    min-width: 135px;
+    max-width: none;
+  }
+
+  .calendar-source {
+    padding-right: 14px;
+    padding-left: 14px;
+  }
+}

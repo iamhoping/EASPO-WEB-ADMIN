@@ -42,6 +42,7 @@ async function fetchStudents() {
     .from('profiles')
     .select('id,name,student_id,grade_level')
     .eq('role','STUDENT')
+    .or('status.is.null,status.neq.archived')
     .order('name',{ascending:true})
   allStudents = data || []
   populateDropdowns()

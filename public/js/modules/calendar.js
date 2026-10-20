@@ -1,10 +1,23 @@
 // /js/modules/calendar.js
 import { supabase } from '../services/supabaseClient.js'
 import { showToast } from '../ui/toast.js'
+import {
+  getSchoolCalendarEvent,
+  isSchoolDay,
+  SCHOOL_YEAR_2025_2026
+} from './school-calendar-2025-2026.js'
 
-let currentDate = new Date()
+const SCHOOL_YEAR_MONTHS = []
+for (let date = new Date(`${SCHOOL_YEAR_2025_2026.startDate}T00:00:00`); date <= new Date(`${SCHOOL_YEAR_2025_2026.displayEndDate}T00:00:00`); date.setMonth(date.getMonth() + 1)) {
+  SCHOOL_YEAR_MONTHS.push(new Date(date.getFullYear(), date.getMonth(), 1))
+}
+
+let today = getManilaToday()
+let currentDate = getInitialCalendarMonth()
 let attendanceData = {}
-let selectedDate = formatLocalDate(currentDate)
+let selectedDate = isSchoolDay(today) && today >= formatLocalDate(new Date(`${SCHOOL_YEAR_2025_2026.startDate}T00:00:00`))
+  ? today
+  : ''
 
 function formatLocalDate(date) {
   const year = date.getFullYear()
@@ -13,7 +26,25 @@ function formatLocalDate(date) {
   return `${year}-${month}-${day}`
 }
 
-// Helper function to get the start and end of a month
+function getManilaToday() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Manila',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(new Date())
+  const part = type => parts.find(item => item.type === type)?.value
+  return `${part('year')}-${part('month')}-${part('day')}`
+}
+
+function getInitialCalendarMonth() {
+  const todayDate = new Date(`${today}T00:00:00`)
+  const months = SCHOOL_YEAR_MONTHS
+  if (todayDate < months[0]) return new Date(months[0])
+  if (todayDate > new Date(`${SCHOOL_YEAR_2025_2026.displayEndDate}T00:00:00`)) return new Date(months[months.length - 1])
+  return new Date(todayDate.getFullYear(), todayDate.getMonth(), 1)
+}
+
 function getMonthBounds(date) {
   const year = date.getFullYear()
   const month = date.getMonth()
@@ -22,87 +53,70 @@ function getMonthBounds(date) {
   return { start, end, year, month }
 }
 
-// Fetch attendance data for the current month
 async function fetchAttendanceData(date) {
   const bounds = getMonthBounds(date)
-  
-  try {
-    console.log(`Fetching attendance data from ${bounds.start} to ${bounds.end}`)
-    // Get total registered students (for absent calculation)
-    const { count: totalStudents, error: studentsError } = await supabase
-      .from('profiles')
+  const start = bounds.start < SCHOOL_YEAR_2025_2026.startDate ? SCHOOL_YEAR_2025_2026.startDate : bounds.start
+  const end = bounds.end > SCHOOL_YEAR_2025_2026.endDate ? SCHOOL_YEAR_2025_2026.endDate : bounds.end
+  if (start > end) return {}
+
+  const [
+    { count: totalStudents, error: studentsError },
+    { data, error }
+  ] = await Promise.all([
+    supabase.from('profiles')
       .select('id', { count: 'exact', head: true })
       .eq('role', 'STUDENT')
-
-    if (studentsError) {
-      console.error('Error fetching students count:', studentsError)
-    }
-
-    const { data, error } = await supabase
-      .from('attendance')
+      .or('status.is.null,status.neq.archived'),
+    supabase.from('attendance')
       .select('student_id, attendance_date, status')
-      .gte('attendance_date', bounds.start)
-      .lte('attendance_date', bounds.end)
+      .gte('attendance_date', start)
+      .lte('attendance_date', end)
       .order('attendance_date', { ascending: true })
-    
-    if (error) {
-      console.error('Supabase query error:', error)
-      showToast(`Error fetching attendance: ${error.message}`, 'error')
-      return {}
-    }
+  ])
 
-    if (!data) {
-      console.warn('No data returned from attendance table')
-      return {}
-    }
-    // Normalize rows to include `date` (legacy UI expects `date`)
-    const rows = (data || []).map(d => ({ ...d, date: d.attendance_date || d.date }))
-    console.log(`Fetched ${rows.length} attendance records`)
-
-    // Aggregate attendance by date using unique student IDs for present count
-    const summary = {}
-    for (const item of rows) {
-      if (!summary[item.date]) {
-        summary[item.date] = { total: totalStudents || 0, present: 0, absent: 0, presentSet: new Set() }
-      }
-      if (String(item.status || '').toLowerCase() === 'present') {
-        summary[item.date].presentSet.add(item.student_id)
-      }
-    }
-
-    // Finalize counts and remove helper sets
-    Object.keys(summary).forEach(d => {
-      const s = summary[d]
-      s.present = s.presentSet ? s.presentSet.size : 0
-      s.absent = Math.max(0, (s.total || 0) - s.present)
-      delete s.presentSet
-    })
-
-    console.log('Attendance data aggregated:', summary)
-    return summary
-  } catch (error) {
-    console.error('Exception in fetchAttendanceData:', error)
-    showToast(`Calendar Error: ${error.message}`, 'error')
+  if (studentsError) {
+    console.error('Error fetching students count:', studentsError)
+    showToast(`Error fetching student count: ${studentsError.message}`, 'error')
     return {}
   }
+  if (error) {
+    console.error('Supabase attendance query error:', error)
+    showToast(`Error fetching attendance: ${error.message}`, 'error')
+    return {}
+  }
+
+  const summary = {}
+  for (const item of data || []) {
+    const dateString = item.attendance_date
+    if (!dateString || !isSchoolDay(dateString)) continue
+    if (!summary[dateString]) {
+      summary[dateString] = { total: totalStudents || 0, present: 0, absent: 0, presentSet: new Set() }
+    }
+    if (String(item.status || '').toLowerCase() === 'present') {
+      summary[dateString].presentSet.add(item.student_id)
+    }
+  }
+
+  Object.keys(summary).forEach(dateString => {
+    const daySummary = summary[dateString]
+    daySummary.present = daySummary.presentSet.size
+    daySummary.absent = Math.max(0, daySummary.total - daySummary.present)
+    delete daySummary.presentSet
+  })
+  return summary
 }
 
-// Render the calendar
 async function renderCalendar(date) {
+  today = getManilaToday()
+  if (selectedDate && (selectedDate < today || !isSchoolDay(selectedDate))) selectedDate = ''
   const bounds = getMonthBounds(date)
   attendanceData = await fetchAttendanceData(date)
-  // expose for debugging in browser console
-  window.attendanceData = attendanceData
-  window.getAttendanceSummary = (d) => attendanceData[d] || null
 
   const container = document.getElementById('calendarContainer')
   if (!container) return
 
-  const monthYear = document.getElementById('calendarMonthYear')
-  if (monthYear) {
-    const options = { month: 'long', year: 'numeric' }
-    monthYear.textContent = date.toLocaleDateString('en-US', options)
-  }
+  const monthSelect = document.getElementById('calendarMonthSelect')
+  if (monthSelect) monthSelect.value = `${bounds.year}-${String(bounds.month + 1).padStart(2, '0')}`
 
   // Clear container
   container.innerHTML = ''
@@ -138,15 +152,22 @@ async function renderCalendar(date) {
   }
 
   // Days of month
-  const today = formatLocalDate(new Date())
   for (let day = 1; day <= daysInMonth; day++) {
     const dayDate = new Date(bounds.year, bounds.month, day)
     const dateStr = formatLocalDate(dayDate)
     const dayEl = document.createElement('div')
     dayEl.className = 'calendar-day'
+    const weekend = dayDate.getDay() === 0 || dayDate.getDay() === 6
+    const past = dateStr < today
+    const outsideSchoolYear = dateStr < SCHOOL_YEAR_2025_2026.startDate || dateStr > SCHOOL_YEAR_2025_2026.endDate
+    const event = getSchoolCalendarEvent(dateStr)
+    const selectable = !past && isSchoolDay(dateStr)
 
-    // Add status class based on attendance data
-    if (attendanceData[dateStr]) {
+    if (weekend) dayEl.classList.add('weekend')
+    if (past) dayEl.classList.add('past')
+    if (outsideSchoolYear) dayEl.classList.add('outside-school-year')
+    if (event) dayEl.classList.add(event.type)
+    if (attendanceData[dateStr] && isSchoolDay(dateStr)) {
       const att = attendanceData[dateStr]
       const percentage = att.total ? (att.present / att.total) * 100 : 0
 
@@ -165,24 +186,39 @@ async function renderCalendar(date) {
       }
     }
 
-    // Mark today
     if (dateStr === today) {
       dayEl.classList.add('today')
     }
     if (dateStr === selectedDate) dayEl.classList.add('selected')
     dayEl.setAttribute('role', 'button')
-    dayEl.setAttribute('tabindex', '0')
-    dayEl.setAttribute('aria-label', `${dateStr}: ${attendanceData[dateStr] ? `${attendanceData[dateStr].present} of ${attendanceData[dateStr].total} present` : 'No attendance recorded'}`)
-    const selectDay = () => {
-      selectedDate = dateStr
-      updateCalendarDetail(dateStr)
-      daysContainer.querySelectorAll('.calendar-day.selected').forEach(day => day.classList.remove('selected'))
-      dayEl.classList.add('selected')
+    dayEl.setAttribute('tabindex', selectable ? '0' : '-1')
+    dayEl.setAttribute('aria-disabled', String(!selectable))
+    const summary = attendanceData[dateStr]
+    const statusLabel = event?.label ||
+      (weekend ? 'Weekend — no school-day records'
+        : outsideSchoolYear ? 'Outside the school year'
+          : past ? 'Past date — selection disabled'
+            : summary ? `${summary.present} of ${summary.total} present`
+              : 'No attendance recorded')
+    dayEl.setAttribute('aria-label', `${dateStr}: ${statusLabel}${summary ? `; ${summary.present} of ${summary.total} present` : ''}`)
+    dayEl.title = statusLabel
+    if (selectable) {
+      const selectDay = () => {
+        if (dateStr < getManilaToday() || !isSchoolDay(dateStr)) {
+          selectedDate = ''
+          renderCalendar(new Date(currentDate))
+          return
+        }
+        selectedDate = dateStr
+        updateCalendarDetail(dateStr)
+        daysContainer.querySelectorAll('.calendar-day.selected').forEach(day => day.classList.remove('selected'))
+        dayEl.classList.add('selected')
+      }
+      dayEl.addEventListener('click', selectDay)
+      dayEl.addEventListener('keydown', event => {
+        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectDay() }
+      })
     }
-    dayEl.addEventListener('click', selectDay)
-    dayEl.addEventListener('keydown', event => {
-      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectDay() }
-    })
 
     const dayNumber = document.createElement('div')
     dayNumber.className = 'day-number'
@@ -191,10 +227,13 @@ async function renderCalendar(date) {
 
     const dayMeta = document.createElement('div')
     dayMeta.className = 'day-meta'
-    const daySummary = attendanceData[dateStr]
-    dayMeta.textContent = daySummary
-      ? `${daySummary.present}/${daySummary.total} · ${daySummary.total ? Math.round((daySummary.present / daySummary.total) * 100) : 0}%`
-      : 'No data'
+    dayMeta.textContent = event
+      ? event.type === 'break' ? 'School break' : 'Holiday'
+      : weekend ? 'Weekend'
+        : outsideSchoolYear ? ''
+          : summary
+          ? `${summary.present}/${summary.total} · ${summary.total ? Math.round((summary.present / summary.total) * 100) : 0}%`
+          : 'No data'
     dayEl.appendChild(dayMeta)
 
     daysContainer.appendChild(dayEl)
@@ -204,47 +243,65 @@ async function renderCalendar(date) {
   container.appendChild(calendarEl)
   if (selectedDate && selectedDate.slice(0, 7) === `${bounds.year}-${String(bounds.month + 1).padStart(2, '0')}`) {
     updateCalendarDetail(selectedDate)
+  } else {
+    const detail = document.getElementById('calendarDetail')
+    if (detail) {
+      detail.innerHTML = ''
+      detail.classList.add('hidden')
+    }
   }
 }
 
 function updateCalendarDetail(dateStr) {
   const detail = document.getElementById('calendarDetail')
   if (!detail) return
+  detail.classList.remove('hidden')
   const date = new Date(`${dateStr}T00:00:00`)
   const label = date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
   const summary = attendanceData[dateStr]
+  const calendarEvent = getSchoolCalendarEvent(dateStr)
   detail.innerHTML = summary
     ? `<span class="calendar-detail-icon">✓</span><div><strong>${label}</strong><span>${summary.present} present · ${summary.absent} absent · ${summary.total} students tracked</span></div>`
-    : `<span class="calendar-detail-icon muted">i</span><div><strong>${label}</strong><span>No attendance records were recorded for this date.</span></div>`
+    : `<span class="calendar-detail-icon muted">i</span><div><strong>${label}</strong><span>${calendarEvent?.label || 'No attendance records were recorded for this date.'}</span></div>`
 }
 
-// Navigation functions
 export function initCalendar() {
+  const monthSelect = document.getElementById('calendarMonthSelect')
+  if (monthSelect) {
+    monthSelect.innerHTML = SCHOOL_YEAR_MONTHS.map(month => {
+      const value = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}`
+      const label = month.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+      return `<option value="${value}">${label}</option>`
+    }).join('')
+    monthSelect.addEventListener('change', () => {
+      const selectedMonth = SCHOOL_YEAR_MONTHS.find(month => {
+        const value = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}`
+        return value === monthSelect.value
+      })
+      if (!selectedMonth) {
+        monthSelect.value = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`
+        return
+      }
+      currentDate = new Date(selectedMonth)
+      selectedDate = ''
+      renderCalendar(new Date(currentDate))
+    })
+  }
+
   renderCalendar(currentDate)
 
   document.getElementById('todayMonthBtn')?.addEventListener('click', () => {
-    currentDate = new Date()
-    selectedDate = formatLocalDate(currentDate)
+    today = getManilaToday()
+    currentDate = getInitialCalendarMonth()
+    selectedDate = isSchoolDay(today) ? today : ''
     renderCalendar(new Date(currentDate))
   })
   document.getElementById('refreshCalendarBtn')?.addEventListener('click', () => renderCalendar(new Date(currentDate)))
-
-  // Expose global functions for navigation
-  window.prevMonth = () => {
-    currentDate.setMonth(currentDate.getMonth() - 1)
-    renderCalendar(new Date(currentDate))
-  }
-
-  window.nextMonth = () => {
-    currentDate.setMonth(currentDate.getMonth() + 1)
-    renderCalendar(new Date(currentDate))
-  }
 
   window.refreshCalendar = () => {
     renderCalendar(new Date(currentDate))
   }
 
-  // Auto-refresh every 5 minutes
   setInterval(window.refreshCalendar, 5 * 60 * 1000)
 }
 

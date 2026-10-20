@@ -79,6 +79,7 @@ export async function loadUserManagement() {
   const result = await supabase
     .from('profiles')
     .select('id,name,email,role,status')
+    .or('status.is.null,status.neq.archived')
     .order('name', { ascending: true })
 
   if (result.error) {

@@ -303,7 +303,7 @@ export async function loadScheduleManagement() {
   if (tbody) tbody.innerHTML = `<tr><td colspan="8"><div class="loader"><div class="spinner"></div></div></td></tr>`
 
   const [teacherResult, sectionResult, subjectResult, scheduleResult] = await Promise.all([
-    supabase.from('profiles').select('id,name,teacher_id').eq('role', 'TEACHER').order('name', { ascending: true }),
+    supabase.from('profiles').select('id,name,teacher_id').eq('role', 'TEACHER').or('status.is.null,status.neq.archived').order('name', { ascending: true }),
     supabase.from('sections').select('id,name,grade_level').order('name', { ascending: true }),
     supabase.from('subjects').select('*').order('name', { ascending: true }),
     supabase.from('schedules').select('*').order('day', { ascending: true })
