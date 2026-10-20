@@ -1,6 +1,7 @@
 // /js/modules/attendance.js
 import { supabase } from '../services/supabaseClient.js'
 import { showToast } from '../ui/toast.js'
+import { formatUserName } from '../utils/name-format.js'
 
 let allRecords  = []
 let allStudents = []
@@ -13,6 +14,9 @@ let currentStats = { total: 0, present: 0, absent: 0 }
 const val   = id => (document.getElementById(id)?.value || '').trim()
 const openM = id => document.getElementById(id)?.classList.remove('hidden')
 const closeM= id => document.getElementById(id)?.classList.add('hidden')
+const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({
+	'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+}))
 
 const STATUS_PILL = {
 	present : 'pill-green',
@@ -51,7 +55,7 @@ function populateStudentDropdown() {
 	if (!el) return
 	el.innerHTML = `<option value="">Select student…</option>` +
 		allStudents.map(s =>
-			`<option value="${s.id}">${s.name} — ${s.grade_level || 'N/A'} (${s.student_id || '—'})</option>`
+			`<option value="${escapeHtml(s.id)}">${escapeHtml(formatUserName(s.name))} — ${escapeHtml(s.grade_level || 'N/A')} (${escapeHtml(s.student_id || '—')})</option>`
 		).join('')
 }
 
@@ -140,7 +144,7 @@ export async function loadAttendance() {
 				const student = allStudents.find(s => s.id === rec.student_id)
 				return {
 					...rec,
-					student_name: student?.name || 'Unknown',
+					student_name: formatUserName(student?.name) || 'Unknown',
 					student_id_code: student?.student_id || '—',
 					grade_level: student?.grade_level || '—',
 					section_id: student?.section_id || null,

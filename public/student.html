@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EASPO — Student Portal</title>
+  <link rel="icon" type="image/png" href="logo.png" data-school-logo>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-brand-title="Student Portal">
+  <main class="student-portal">
+    <header class="student-portal-header">
+      <div>
+        <div class="sb-brand-text" data-school-name>EASPO</div>
+        <h1 id="portalHeading">Student Portal</h1>
+        <p id="portalSubheading">Your personal, attendance, academic, and class information.</p>
+      </div>
+      <button class="btn btn-secondary" id="portalLogout" type="button">Sign Out</button>
+    </header>
+    <div id="portalStatus" class="student-portal-status" role="status" aria-live="polite">
+      <div class="loader"><div class="spinner"></div></div>
+    </div>
+    <div id="portalContent" class="student-portal-content hidden"></div>
+  </main>
+  <div id="toastContainer"></div>
+  <script type="module" src="js/student-portal.js"></script>
+</body>
+</html>

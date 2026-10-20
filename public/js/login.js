@@ -140,6 +140,8 @@ async function verifyAndRedirect(userId) {
     window.location.href = 'admin.html'
   } else if (data.role === 'TEACHER') {
     window.location.href = 'teacher.html'
+  } else if (['STUDENT', 'PARENT'].includes(data.role)) {
+    window.location.href = 'student.html'
   } else if (data.role === 'SCANNER') {
     window.location.href = 'scanner-attendance.html'
   } else {

@@ -28,7 +28,21 @@ export async function createAccount(role, profile) {
   const { data, error } = await supabase.functions.invoke('create-school-account', {
     body: { role, profile },
   })
-  if (error) throw error
+  if (error) {
+    const response = error.context
+    if (response && typeof response.clone === 'function') {
+      let body = null
+      try {
+        body = await response.clone().json()
+      } catch {
+        body = null
+      }
+      if (typeof body?.error === 'string' && body.error.trim()) {
+        throw new Error(body.error)
+      }
+    }
+    throw error
+  }
   if (!data?.userId) throw new Error('The account was created without a user ID.')
   return data.userId
 }

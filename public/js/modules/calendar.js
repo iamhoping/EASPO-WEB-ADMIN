@@ -196,10 +196,9 @@ async function renderCalendar(date) {
     const summary = attendanceData[dateStr]
     const statusLabel = event?.label ||
       (weekend ? 'Weekend — no school-day records'
-        : outsideSchoolYear ? 'Outside the school year'
-          : past ? 'Past date — selection disabled'
-            : summary ? `${summary.present} of ${summary.total} present`
-              : 'No attendance recorded')
+        : past ? 'Past date — selection disabled'
+          : summary ? `${summary.present} of ${summary.total} present`
+            : 'No attendance recorded')
     dayEl.setAttribute('aria-label', `${dateStr}: ${statusLabel}${summary ? `; ${summary.present} of ${summary.total} present` : ''}`)
     dayEl.title = statusLabel
     if (selectable) {

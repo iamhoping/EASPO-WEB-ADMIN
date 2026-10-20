@@ -3,6 +3,7 @@ import { supabase } from '../services/supabaseClient.js'
 import { showToast } from '../ui/toast.js'
 import { createAccount, setAccountStatus } from '../services/auth.js'
 import { renderPagination } from '../ui/pagination.js';
+import { formatUserName, initialsForUserName, isLastFirstName } from '../utils/name-format.js'
 
 let allTeachers = []
 let filtered    = []
@@ -11,7 +12,7 @@ let currentPage = 1
 const PER_PAGE  = 10
 
 const AV_COLORS = ['av-blue','av-green','av-yellow','av-purple','av-red','av-orange']
-const initials  = n => (n||'').split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase()||'??'
+const initials  = initialsForUserName
 const avColor   = n => { let s=0;for(const c of(n||''))s+=c.charCodeAt(0);return AV_COLORS[s%AV_COLORS.length] }
 const val       = id => (document.getElementById(id)?.value||'').trim()
 const openM     = id => document.getElementById(id)?.classList.remove('hidden')
@@ -122,7 +123,7 @@ function render() {
       <td class="cb-cell"><input type="checkbox"/></td>
       <td><div class="ent-row">
         <div class="av ${avColor(t.name)}">${initials(t.name)}</div>
-        <div><div class="ent-name">${t.name||'—'}</div><div class="ent-sub">${t.email||'—'}</div></div>
+        <div><div class="ent-name">${escapeHtml(formatUserName(t.name)||'—')}</div><div class="ent-sub">${escapeHtml(t.email||'—')}</div></div>
       </div></td>
       <td><code style="font-size:.78rem;color:var(--text3)">${t.teacher_id||'—'}</code></td>
       <td>${t.contact||'—'}</td>
@@ -132,7 +133,7 @@ function render() {
         ${document.body.dataset.role === 'SCHOOL_ADMIN'
           ? `<button class="btn btn-secondary btn-sm" onclick="setTeacherStatus('${t.id}','${(t.status || 'active') === 'active' ? 'inactive' : 'active'}')">${(t.status || 'active') === 'active' ? 'Deactivate' : 'Reactivate'}</button>`
           : ''}
-        <button class="btn btn-secondary btn-sm" type="button" data-archive-account="${t.id}" data-account-role="TEACHER" data-account-name="${escapeHtml(t.name || 'Teacher')}">Archive</button>
+        <button class="btn btn-secondary btn-sm" type="button" data-archive-account="${escapeHtml(t.id)}" data-account-role="TEACHER" data-account-name="${escapeHtml(formatUserName(t.name) || 'Teacher')}">Archive</button>
       </div></td>
     </tr>`
   }).join('')
@@ -158,17 +159,16 @@ export async function submitAddTeacher() {
 
   if (!name||!email||!password||!tid)
     return showToast('Missing fields','Fill all required fields','warning')
-  if (password.length<6)
-    return showToast('Weak password','Min 6 characters','warning')
-
+  if (!isLastFirstName(name))
+    return showToast('Name format required', 'Enter the teacher name as Last Name, First Name.', 'warning')
   try {
     await createAccount('TEACHER', {
-      name, email,
+      name: formatUserName(name), email, password,
       teacher_id : tid,
       department : dept||null,
       contact    : contact||null,
     })
-    showToast('Teacher Added',`${name} added successfully`,'success')
+    showToast('Teacher Added',`${formatUserName(name)} added successfully`,'success')
     closeM('addTeacherModal')
     document.getElementById('addTeacherForm').reset()
     loadTeachers()
@@ -190,7 +190,7 @@ export async function openEditTeacherModal(id) {
   const {data:t,error} = await supabase.from('profiles').select('*').eq('id',id).single()
   if(error) return showToast('Error','Could not load teacher','error')
   document.getElementById('editTeacherId').value      = t.id
-  document.getElementById('editTeacherName').value    = t.name||''
+  document.getElementById('editTeacherName').value = formatUserName(t.name)||''
   document.getElementById('editTeacherEmail').value   = t.email||''
   document.getElementById('editTeacherContact').value = t.contact||''
   document.getElementById('editTeacherDept').value    = t.department||''
@@ -206,9 +206,11 @@ export async function submitEditTeacher() {
   const name = val('editTeacherName')
   const email= val('editTeacherEmail')
   if(!name||!email) return showToast('Missing fields','Name and email required','warning')
+  if (!isLastFirstName(name))
+    return showToast('Name format required', 'Enter the teacher name as Last Name, First Name.', 'warning')
 
   const updates = {
-    name, email,
+    name: formatUserName(name), email,
     contact    : val('editTeacherContact')||null,
     department : val('editTeacherDept')||null,
     gender     : val('editTeacherGender')||null,
@@ -219,7 +221,7 @@ export async function submitEditTeacher() {
   const {error} = await supabase.from('profiles').update(updates).eq('id',id)
 
   if(error) return showToast('Error',error.message,'error')
-  showToast('Saved',`${name} updated`,'success')
+  showToast('Saved',`${formatUserName(name)} updated`,'success')
   closeM('editTeacherModal')
   loadTeachers()
 }
@@ -228,7 +230,7 @@ export async function submitEditTeacher() {
 function exportCSV() {
   if(!allTeachers.length) return showToast('Empty','Nothing to export','warning')
   const h = ['Name','Email','Teacher ID','Department','Contact']
-  const r = allTeachers.map(t=>[t.name,t.email,t.teacher_id,t.department,t.contact].map(x=>`"${x||''}"`).join(','))
+  const r = allTeachers.map(t=>[formatUserName(t.name),t.email,t.teacher_id,t.department,t.contact].map(x=>`"${String(x||'').replace(/"/g,'""')}"`).join(','))
   const a = Object.assign(document.createElement('a'),{
     href:URL.createObjectURL(new Blob([[h,...r].join('\n')],{type:'text/csv'})),download:'teachers.csv'
   }); a.click()

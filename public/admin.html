@@ -166,7 +166,6 @@
             <div class="panel-header">
               <div>
                 <div class="panel-title">Calendar</div>
-                <div class="panel-sub" id="calendarSubtitle">DepEd School Year 2025–2026 ·</div>
               </div>
               <div class="panel-actions">
                 <select class="filter-select calendar-month-select" id="calendarMonthSelect" aria-label="Select calendar month"></select>
@@ -206,19 +205,14 @@
             <div class="toolbar-left">
               <div class="search-box">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-                <input id="studentSearch" type="search" placeholder="Search by name or ID..." />
+                <input id="studentSearch" type="search" placeholder="Search by student name or LRN..." />
               </div>
             </div>
             <div class="toolbar-right">
               <select class="filter-select" id="gradeFilter">
                 <option value="">All Grades</option>
-                <option value="7">Grade 7</option>
-                <option value="8">Grade 8</option>
-                <option value="9">Grade 9</option>
-                <option value="10">Grade 10</option>
-                <option value="11">Grade 11</option>
-                <option value="12">Grade 12</option>
               </select>
+              <select class="filter-select" id="studentSectionFilter"><option value="">All Sections</option></select>
               <select class="filter-select" id="statusFilter">
                 <option value="">All Statuses</option>
                 <option value="active">Active</option>
@@ -248,18 +242,20 @@
             <table>
               <thead>
                 <tr>
-                  <th class="cb-cell"><input type="checkbox" id="selectAllStudents" /></th>
-                  <th>Student</th>
-                  <th>Student ID</th>
+                  <th>LRN Number</th>
+                  <th>Student Name</th>
                   <th>Grade Level</th>
-                  <th>Contact</th>
-                  <th>Guardian</th>
+                  <th>Section</th>
+                  <th>Gender</th>
+                  <th>Address</th>
+                  <th>Contact Number</th>
+                  <th>Guardian Email</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody id="studentsTableBody">
-                <tr><td colspan="8"><div class="loader"><div class="spinner"></div></div></td></tr>
+                <tr><td colspan="10"><div class="loader"><div class="spinner"></div></div></td></tr>
               </tbody>
             </table>
           </div>
@@ -433,7 +429,7 @@
           </div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>Student</th><th>Student ID</th><th>Email</th><th>Grade Level</th><th>Status</th><th>Actions</th></tr></thead>
+              <thead><tr><th>Student Name</th><th>LRN Number</th><th>Email</th><th>Grade Level</th><th>Status</th><th>Actions</th></tr></thead>
               <tbody id="sectionStudentsTableBody">
                 <tr><td colspan="5"><div class="loader"><div class="spinner"></div></div></td></tr>
               </tbody>
@@ -484,7 +480,7 @@
             <table class="user-management-table">
               <thead>
                 <tr>
-                  <th>Full Name</th>
+                  <th>Name (Last, First)</th>
                   <th>Username</th>
                   <th>Email</th>
                   <th>Role</th>
@@ -1066,6 +1062,11 @@
                 <input class="form-input" id="systemSchoolName" maxlength="160" placeholder="Enter your school name">
                 <span class="form-hint">This name appears on the login page and all role dashboards.</span>
               </div>
+              <div class="form-group">
+                <label class="form-label" for="systemSchoolAddress">School address</label>
+                <input class="form-input" id="systemSchoolAddress" maxlength="300" placeholder="Enter the official school address">
+                <span class="form-hint">This address appears on printed reports.</span>
+              </div>
               <div class="school-logo-control">
                 <div class="school-logo-preview-wrap">
                   <img id="systemSchoolLogoPreview" class="school-logo-preview" src="logo.png" alt="Current school logo preview">
@@ -1180,7 +1181,7 @@
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Student</th><th>Student ID</th><th>Email</th><th>Grade Level</th><th>Action</th></tr></thead>
+          <thead><tr><th>Student Name</th><th>LRN Number</th><th>Email</th><th>Grade Level</th><th>Action</th></tr></thead>
           <tbody id="eligibleStudentsTableBody">
             <tr><td colspan="4"><div class="loader"><div class="spinner"></div></div></td></tr>
           </tbody>
@@ -1245,8 +1246,8 @@
         <div class="form-divider">Account Credentials</div>
         <div class="form-2col">
           <div class="form-group">
-            <label class="form-label">Full Name <span class="req">*</span></label>
-            <input id="studentName" class="form-input" type="text" placeholder="Juan dela Cruz" required />
+            <label class="form-label">Student Name (Last Name, First Name) <span class="req">*</span></label>
+            <input id="studentName" class="form-input" type="text" placeholder="Dela Cruz, Juan" required />
           </div>
           <div class="form-group">
             <label class="form-label">Grade Level <span class="req">*</span></label>
@@ -1263,23 +1264,29 @@
         </div>
         <div class="form-group">
           <label class="form-label">Email Address <span class="req">*</span></label>
-          <input id="studentEmail" class="form-input" type="email" placeholder="student@school.edu" required />
+          <input id="studentEmail" class="form-input" type="text" placeholder="student@school.edu" required />
         </div>
         <div class="form-group">
           <label class="form-label">Password <span class="req">*</span></label>
-          <input id="studentPassword" class="form-input" type="password" placeholder="Min. 6 characters" required />
+          <input id="studentPassword" class="form-input" type="password" required />
           <span class="form-hint">Student will use this to log in to the portal</span>
         </div>
-        <div class="form-group">
-          <label class="form-label">Student ID <span class="req">*</span></label>
-          <div class="input-row">
-            <input id="studentId" class="form-input" type="text" placeholder="Auto-generated" readonly />
-            <button type="button" class="btn btn-secondary btn-sm" onclick="generateStudentId()">Generate</button>
-          </div>
-        </div>
-
         <div class="form-divider">Personal Information</div>
         <div class="form-2col">
+          <div class="form-group">
+            <label class="form-label">LRN Number <span class="req">*</span></label>
+            <input id="studentId" class="form-input" type="text" inputmode="numeric" maxlength="20" placeholder="Enter official LRN number" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Gender</label>
+            <select id="studentGender" class="form-select"><option value="">Not specified</option><option>Female</option><option>Male</option><option>Other</option></select>
+          </div>
+        </div>
+        <div class="form-2col">
+          <div class="form-group">
+            <label class="form-label">Date of Birth</label>
+            <input id="studentDateOfBirth" class="form-input" type="date" />
+          </div>
           <div class="form-group">
             <label class="form-label">Contact Number</label>
             <input id="studentContact" class="form-input" type="tel" placeholder="09XX XXX XXXX" />
@@ -1314,7 +1321,7 @@
         <input type="hidden" id="editStudentId" />
         <div class="form-2col">
           <div class="form-group">
-            <label class="form-label">Full Name <span class="req">*</span></label>
+            <label class="form-label">Student Name (Last, First) <span class="req">*</span></label>
             <input id="editStudentName" class="form-input" type="text" required />
           </div>
           <div class="form-group">
@@ -1344,9 +1351,19 @@
             </select>
           </div>
         </div>
+        <div class="form-2col">
+          <div class="form-group">
+            <label class="form-label">LRN Number <span class="req">*</span></label>
+            <input id="editStudentIdField" class="form-input" type="text" inputmode="numeric" maxlength="20" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Gender</label>
+            <select id="editStudentGender" class="form-select"><option value="">Not specified</option><option>Female</option><option>Male</option><option>Other</option></select>
+          </div>
+        </div>
         <div class="form-group">
-          <label class="form-label">Student ID</label>
-          <input id="editStudentIdField" class="form-input" type="text" readonly />
+          <label class="form-label">Date of Birth</label>
+          <input id="editStudentDateOfBirth" class="form-input" type="date" />
         </div>
         <div class="form-2col">
           <div class="form-group">
@@ -1371,6 +1388,16 @@
   </div>
 </div>
 
+<div id="studentProfileModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="studentProfileHeading">
+  <div class="modal-box x-wide">
+    <div class="modal-head">
+      <h2 id="studentProfileHeading">Student Profile</h2>
+      <button class="modal-close" type="button" aria-label="Close student profile" onclick="closeModal('studentProfileModal')">&times;</button>
+    </div>
+    <div class="modal-body student-profile-body" id="studentProfileBody" aria-live="polite"></div>
+  </div>
+</div>
+
 <!-- ── ADD TEACHER ──────────────────────────────────────── -->
 <div id="addTeacherModal" class="modal-overlay hidden">
   <div class="modal-box">
@@ -1382,28 +1409,17 @@
       <form id="addTeacherForm" class="form-grid">
         <div class="form-2col">
           <div class="form-group">
-            <label class="form-label">Full Name <span class="req">*</span></label>
-            <input id="teacherName" class="form-input" type="text" placeholder="Teacher's full name" required />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Department</label>
-            <select id="teacherDept" class="form-select">
-              <option value="">Select department...</option>
-              <option value="Science">Science</option>
-              <option value="Mathematics">Mathematics</option>
-              <option value="Arts & Humanities">Arts & Humanities</option>
-              <option value="Physical Education">Physical Education</option>
-              <option value="Technology">Technology</option>
-            </select>
+            <label class="form-label">Teacher Name (Last Name, First Name) <span class="req">*</span></label>
+            <input id="teacherName" class="form-input" type="text" placeholder="Dela Cruz, Juan" required />
           </div>
         </div>
         <div class="form-group">
           <label class="form-label">Email <span class="req">*</span></label>
-          <input id="teacherEmail" class="form-input" type="email" placeholder="teacher@school.edu" required />
+          <input id="teacherEmail" class="form-input" type="text" placeholder="teacher@school.edu" required />
         </div>
         <div class="form-group">
           <label class="form-label">Password <span class="req">*</span></label>
-          <input id="teacherPassword" class="form-input" type="password" placeholder="Min. 6 characters" required />
+          <input id="teacherPassword" class="form-input" type="password" required />
         </div>
         <div class="form-group">
           <label class="form-label">Teacher ID <span class="req">*</span></label>
@@ -1437,7 +1453,7 @@
         <input type="hidden" id="editTeacherId" />
         <div class="form-2col">
           <div class="form-group">
-            <label class="form-label">Full Name <span class="req">*</span></label>
+            <label class="form-label">Teacher Name (Last, First) <span class="req">*</span></label>
             <input id="editTeacherName" class="form-input" type="text" required />
           </div>
           <div class="form-group">
@@ -1500,8 +1516,8 @@
       <form id="addParentForm" class="form-grid">
         <div class="form-2col">
           <div class="form-group">
-            <label class="form-label">Full Name <span class="req">*</span></label>
-            <input id="parentName" class="form-input" type="text" placeholder="Parent's full name" required />
+            <label class="form-label">Parent/Guardian Name <span class="req">*</span></label>
+            <input id="parentName" class="form-input" type="text" placeholder="Dela Cruz, Maria" required />
           </div>
           <div class="form-group">
             <label class="form-label">Relation <span class="req">*</span></label>
@@ -1518,11 +1534,11 @@
         </div>
         <div class="form-group">
           <label class="form-label">Email Address <span class="req">*</span></label>
-          <input id="parentEmail" class="form-input" type="email" placeholder="parent@email.com" required />
+          <input id="parentEmail" class="form-input" type="text" placeholder="parent@email.com" required />
         </div>
         <div class="form-group">
           <label class="form-label">Password <span class="req">*</span></label>
-          <input id="parentPassword" class="form-input" type="password" placeholder="Min. 6 characters" required />
+          <input id="parentPassword" class="form-input" type="password" required />
         </div>
         <!--
         <div class="form-group">
@@ -1540,6 +1556,10 @@
         <div class="form-group">
           <label class="form-label">Address</label>
           <input id="parentAddress" class="form-input" type="text" placeholder="Home address" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Linked Student</label>
+          <select id="parentLinkedStudent" class="form-select"><option value="">None / Unlinked</option></select>
         </div>
       </form>
     </div>
@@ -1562,7 +1582,7 @@
         <input type="hidden" id="editParentId" />
         <div class="form-2col">
           <div class="form-group">
-            <label class="form-label">Full Name <span class="req">*</span></label>
+            <label class="form-label">Parent/Guardian Name (Last, First) <span class="req">*</span></label>
             <input id="editParentName" class="form-input" type="text" required />
           </div>
           <div class="form-group">
@@ -1588,6 +1608,10 @@
         <div class="form-group">
           <label class="form-label">Address</label>
           <input id="editParentAddress" class="form-input" type="text" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Linked Student</label>
+          <select id="editParentLinkedStudent" class="form-select"><option value="">None / Unlinked</option></select>
         </div>
       </form>
     </div>
@@ -1893,9 +1917,9 @@
           <div class="profile-section">
             <h4>Personal Information</h4>
             <div class="setting-row">
-              <label>Name</label>
+              <label>Name (Last, First)</label>
               <div class="inline-edit">
-                <input class="form-input" id="profileName" type="text" value="Web Admin" />
+                <input class="form-input" id="profileName" type="text" value="Web Admin" placeholder="Last Name, First Name" />
               </div>
             </div>
             <div class="setting-row">

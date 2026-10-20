@@ -15,6 +15,27 @@ function jsonResponse(status: number, body: Record<string, unknown>) {
   })
 }
 
+function titleCaseNamePart(value: string) {
+  return value
+    .split(/(\s+|[-'’])/)
+    .map(part => {
+      if (!part || /^\s+$/.test(part) || /^[-'’]$/.test(part)) return part
+      if (/^(?:[ivxlcdm]+)\.?$/i.test(part) && (part.length >= 3 || part === part.toLocaleUpperCase())) {
+        return part.toLocaleUpperCase()
+      }
+      const [first, ...rest] = part.toLocaleLowerCase()
+      return `${first.toLocaleUpperCase()}${rest.join('')}`
+    })
+    .join('')
+}
+
+function formatUserName(value: string) {
+  const normalized = value.trim().replace(/\s+/g, ' ')
+  const parts = normalized.split(',').map(part => part.trim()).filter(Boolean)
+  if (parts.length < 2) return titleCaseNamePart(normalized)
+  return `${titleCaseNamePart(parts[0])}, ${titleCaseNamePart(parts.slice(1).join(' '))}`
+}
+
 serve(async req => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 200, headers: corsHeaders })
@@ -61,19 +82,45 @@ serve(async req => {
   if (!['STUDENT', 'TEACHER', 'PARENT'].includes(role || '') || !profile || typeof profile !== 'object') {
     return jsonResponse(400, { error: 'Only student, teacher, and parent accounts can be created.' })
   }
-  if (typeof profile.name !== 'string' || !profile.name.trim() ||
-      typeof profile.email !== 'string' || !profile.email.trim() ||
-      typeof profile.password !== 'string' || profile.password.length < 6) {
-    return jsonResponse(400, { error: 'A name, valid email, and password of at least six characters are required.' })
+  const inputName = typeof profile.name === 'string' ? profile.name : ''
+  const name = formatUserName(inputName)
+  if (!name) return jsonResponse(400, { error: 'Name is required.' })
+  if (['STUDENT', 'TEACHER'].includes(role) &&
+      (!inputName.includes(',') || !inputName.split(',')[0].trim() || !inputName.split(',').slice(1).join(' ').trim())) {
+    return jsonResponse(400, { error: 'Enter the name as Last Name, First Name.' })
+  }
+  if (typeof profile.email !== 'string' || !profile.email.trim() ||
+      typeof profile.password !== 'string' || !profile.password.trim()) {
+    return jsonResponse(400, { error: 'Email and password are required to create an account.' })
+  }
+  if (role === 'STUDENT' &&
+      (typeof profile.student_id !== 'string' || !profile.student_id.trim() ||
+       profile.student_id.trim().length > 20 ||
+       typeof profile.grade_level !== 'string' || !profile.grade_level.trim())) {
+    return jsonResponse(400, { error: 'A valid LRN number (20 characters or fewer) and grade level are required.' })
+  }
+  if (role === 'PARENT' && profile.linked_student_id) {
+    if (typeof profile.linked_student_id !== 'string') {
+      return jsonResponse(400, { error: 'Select a valid linked student.' })
+    }
+    const { data: linkedStudent, error: linkedStudentError } = await adminClient
+      .from('profiles')
+      .select('id')
+      .eq('id', profile.linked_student_id)
+      .eq('role', 'STUDENT')
+      .maybeSingle()
+    if (linkedStudentError || !linkedStudent) {
+      return jsonResponse(400, { error: 'The selected linked student could not be verified.' })
+    }
   }
 
   const fieldsByRole: Record<string, string[]> = {
-    STUDENT: ['student_id', 'grade_level', 'contact', 'address', 'guardian_email'],
+    STUDENT: ['student_id', 'gender', 'date_of_birth', 'grade_level', 'contact', 'address', 'guardian_email'],
     TEACHER: ['teacher_id', 'department', 'contact'],
-    PARENT: ['relation', 'contact', 'address'],
+    PARENT: ['relation', 'contact', 'address', 'linked_student_id'],
   }
   const profileFields: Record<string, unknown> = {
-    name: profile.name.trim(),
+    name,
     email: profile.email.trim(),
     role,
     status: 'active',
@@ -86,7 +133,7 @@ serve(async req => {
     email: profile.email.trim(),
     password: profile.password,
     email_confirm: true,
-    user_metadata: { name: profile.name.trim() },
+    user_metadata: { name },
   })
   if (authError || !authData.user) {
     return jsonResponse(400, { error: authError?.message || 'Could not create the authentication account.' })
@@ -100,6 +147,10 @@ serve(async req => {
     if (rollbackError) {
       console.error('Account rollback failed after profile insertion error:', rollbackError.message)
       return jsonResponse(500, { error: `Profile creation failed and account cleanup failed: ${insertError.message}` })
+    }
+    if (role === 'STUDENT' && insertError.code === '23505' &&
+        insertError.message.includes('profiles_student_student_id_unique')) {
+      return jsonResponse(409, { error: 'That LRN number is already assigned to another student.' })
     }
     return jsonResponse(400, { error: insertError.message })
   }
@@ -118,7 +169,7 @@ serve(async req => {
       status: 'active',
       ...Object.fromEntries(
         Object.entries(profileFields).filter(([key]) =>
-          ['student_id', 'teacher_id', 'grade_level', 'section_id', 'department', 'relation'].includes(key)
+          ['student_id', 'gender', 'date_of_birth', 'teacher_id', 'grade_level', 'section_id', 'department', 'relation', 'linked_student_id'].includes(key)
         )
       ),
     },

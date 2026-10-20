@@ -3,6 +3,8 @@ import { logout } from './services/auth.js'
 import { renderPagination } from './ui/pagination.js'
 import { showToast } from './ui/toast.js'
 import { loadSchoolBranding } from './modules/school-branding.js'
+import { formatUserName } from './utils/name-format.js'
+import { openStudentProfile } from './modules/students.js'
 
 loadSchoolBranding()
 
@@ -27,6 +29,9 @@ const setText = (id, value) => {
   const el = document.getElementById(id)
   if (el) el.textContent = value
 }
+const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+}))
 const getSectionById = (sectionId) => state.sections.find(section => String(section.id) === String(sectionId)) || null
 const getSubjectById = (subjectId) => state.subjects.find(subject => String(subject.id) === String(subjectId)) || null
 
@@ -101,16 +106,16 @@ async function loadTeacherProfile() {
   }
 
   state.teacher = profile
-  setText('sidebarTeacherName', profile.name || 'Teacher')
-  setText('teacherHeaderName', profile.name || 'Teacher Dashboard')
-  setText('teacherNameValue', profile.name || 'Teacher')
-  const initialsValue = initials(profile.name || 'Teacher')
+  setText('sidebarTeacherName', formatUserName(profile.name) || 'Teacher')
+  setText('teacherHeaderName', formatUserName(profile.name) || 'Teacher Dashboard')
+  setText('teacherNameValue', formatUserName(profile.name) || 'Teacher')
+  const initialsValue = initials(formatUserName(profile.name) || 'Teacher')
   const initialsEl = document.getElementById('teacherInitials')
   if (initialsEl) initialsEl.textContent = initialsValue
 
   const profileName = document.getElementById('teacherProfileName')
   const profileEmail = document.getElementById('teacherProfileEmail')
-  if (profileName) profileName.value = profile.name || ''
+  if (profileName) profileName.value = formatUserName(profile.name) || ''
   if (profileEmail) profileEmail.value = profile.email || ''
 
   return profile
@@ -283,7 +288,7 @@ function renderOverview() {
   setText('teacherAssignedSections', sectionNames.length)
   setText('teacherStudentCount', state.students.length)
   setText('teacherTodaySchedules', todaysSchedules)
-  setText('teacherNameValue', state.teacher.name || 'Teacher')
+  setText('teacherNameValue', formatUserName(state.teacher.name) || 'Teacher')
   setText('teacherSubjectList', subjectNames.length ? subjectNames.join(', ') : 'No assigned subjects')
 
   const attendanceRows = state.attendance.filter(row => {
@@ -375,7 +380,7 @@ function renderTeacherAttendance() {
     const status = (row.status || 'present').toString().charAt(0).toUpperCase() + (row.status || 'present').toString().slice(1)
     return `
       <tr>
-        <td>${student?.name || 'Unknown Student'}</td>
+        <td>${student ? `<button class="student-name-link" type="button" data-view-student="${escapeHtml(student.id)}">${escapeHtml(formatUserName(student.name))}</button>` : 'Unknown Student'}</td>
         <td>${row.attendance_date || '—'}</td>
         <td>${row.time_in || '—'}</td>
         <td><span class="pill ${row.status === 'present' ? 'pill-green' : row.status === 'late' ? 'pill-yellow' : 'pill-red'}">${status}</span></td>
@@ -409,7 +414,7 @@ function populateGradeStudentList() {
     return sectionMatches && subjectMatches && eligibleSectionIds.includes(student.section_id)
   })
 
-  studentSelect.innerHTML = '<option value="">Select student</option>' + allowedStudents.map(student => `<option value="${student.id}">${student.name} (${student.student_id || 'No ID'})</option>`).join('')
+  studentSelect.innerHTML = '<option value="">Select student</option>' + allowedStudents.map(student => `<option value="${escapeHtml(student.id)}">${escapeHtml(formatUserName(student.name))} (${escapeHtml(student.student_id || 'No LRN')})</option>`).join('')
 }
 
 function renderTeacherGradesTable() {
@@ -442,7 +447,7 @@ function renderTeacherGradesTable() {
 
     return `
       <tr>
-        <td>${student?.name || 'Unknown Student'}</td>
+        <td>${student ? `<button class="student-name-link" type="button" data-view-student="${escapeHtml(student.id)}">${escapeHtml(formatUserName(student.name))}</button>` : 'Unknown Student'}</td>
         <td>${subjectName}</td>
         <td>${sectionName}</td>
         <td>${grade.quarter || '—'}</td>
@@ -481,6 +486,16 @@ function scheduleMatchKey(schedule) {
 async function initTeacherDashboard() {
   const profile = await loadTeacherProfile()
   if (!profile) return
+  document.addEventListener('click', event => {
+    const button = event.target.closest('[data-view-student]')
+    if (!button) return
+    const studentId = button.dataset.viewStudent
+    if (!state.students.some(student => String(student.id) === String(studentId))) {
+      showToast('Student unavailable', 'This student is not assigned to your classes.', 'error')
+      return
+    }
+    openStudentProfile(studentId)
+  })
 
   const schedules = await fetchTeacherSchedules()
   state.schedules = schedules

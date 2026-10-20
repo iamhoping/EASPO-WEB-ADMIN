@@ -8,6 +8,7 @@
 import { supabase }          from './services/supabaseClient.js'
 import { logout }            from './services/auth.js'
 import { showToast }         from './ui/toast.js'
+import { formatUserName, isLastFirstName } from './utils/name-format.js'
 
 // Modules
 import {
@@ -22,7 +23,6 @@ import { initCalendar } from './modules/calendar.js'
 import {
   initStudentsSection,
   loadStudents,
-  generateStudentId,
   submitAddStudent,
   openEditStudentModal,
   submitEditStudent,
@@ -158,7 +158,8 @@ async function saveAdminProfile() {
   const email = document.getElementById('profileEmail')?.value.trim() || ''
   const button = document.getElementById('updateProfileBtn')
 
-  if (!name || !email) return showToast('Profile not saved', 'Full name and email are required.', 'warning')
+  if (!name || !email) return showToast('Profile not saved', 'Name and email are required.', 'warning')
+  if (!isLastFirstName(name)) return showToast('Profile not saved', 'Enter your name as Last Name, First Name.', 'warning')
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return showToast('Profile not saved', 'Enter a valid email address.', 'warning')
   if (!settingsUser?.id) return showToast('Profile not saved', 'Could not identify the current admin account.', 'error')
 
@@ -171,7 +172,7 @@ async function saveAdminProfile() {
   try {
     const { error: profileError } = await supabase
       .from('profiles')
-      .update({ name, email })
+      .update({ name: formatUserName(name), email })
       .eq('id', settingsUser.id)
     if (profileError) throw profileError
 
@@ -180,7 +181,7 @@ async function saveAdminProfile() {
       if (authError) throw authError
     }
 
-    settingsUser = { ...settingsUser, email, name }
+    settingsUser = { ...settingsUser, email, name: formatUserName(name) }
     await loadAdminProfile(settingsUser.id)
     showToast('Profile updated', 'Your profile information was saved successfully.', 'success')
   } catch (error) {
@@ -398,7 +399,6 @@ document.addEventListener('click', e => {
 window.logout               = logout
 
 // Students
-window.generateStudentId    = generateStudentId
 window.submitAddStudent     = submitAddStudent
 window.openEditStudentModal = openEditStudentModal
 window.submitEditStudent    = submitEditStudent
@@ -819,7 +819,7 @@ async function boot() {
   })
 
   // Show welcome toast
-  const name = auth.profile?.name?.split(' ')[0] || 'Admin'
+  const name = formatUserName(auth.profile?.name) || 'Admin'
   showToast('Welcome back!', `Logged in as ${name}`, 'success', 3000)
 
   console.log('✅ SchoolSys Admin booted successfully')

@@ -3,6 +3,7 @@ import { supabase } from '../services/supabaseClient.js'
 import { showToast } from '../ui/toast.js'
 import { renderPagination } from '../ui/pagination.js';
 import { createAccount, setAccountStatus } from '../services/auth.js'
+import { formatUserName, initialsForUserName, isLastFirstName } from '../utils/name-format.js'
 
 let allParents  = []
 let allStudents = []   // for dropdowns
@@ -11,7 +12,7 @@ let currentPage = 1
 const PER_PAGE  = 10
 
 const AV_COLORS = ['av-blue','av-green','av-yellow','av-purple','av-red','av-orange']
-const initials  = n => (n||'').split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase()||'??'
+const initials  = initialsForUserName
 const avColor   = n => { let s=0;for(const c of(n||''))s+=c.charCodeAt(0);return AV_COLORS[s%AV_COLORS.length] }
 const val       = id => (document.getElementById(id)?.value||'').trim()
 const openM     = id => document.getElementById(id)?.classList.remove('hidden')
@@ -43,7 +44,7 @@ async function fetchParents() {
 // ── Populate student dropdowns ────────────────────────────────
 function populateStudentDropdowns() {
   const opts = `<option value="">None / Unlinked</option>` +
-    allStudents.map(s=>`<option value="${s.id}">${s.name} (${s.student_id||'—'})</option>`).join('')
+    allStudents.map(s=>`<option value="${escapeHtml(s.id)}">${escapeHtml(formatUserName(s.name))} (${escapeHtml(s.student_id||'—')})</option>`).join('')
   ;['parentLinkedStudent','editParentLinkedStudent','gradeStudent'].forEach(id=>{
     const el = document.getElementById(id)
     if(el) el.innerHTML = opts
@@ -112,7 +113,7 @@ function render() {
     const pillCls  = RELATION_PILL[rel] || 'pill-grey'
     const student  = allStudents.find(s=>s.id===p.linked_student_id)
     const studentDisplay = student
-      ? `<div class="ent-row"><div class="av av-blue" style="width:26px;height:26px;font-size:.65rem">${initials(student.name)}</div><div><div style="font-size:.82rem;font-weight:600;color:var(--text)">${student.name}</div><div style="font-size:.72rem;color:var(--text3)">${student.grade_level||''}</div></div></div>`
+      ? `<div class="ent-row"><div class="av av-blue" style="width:26px;height:26px;font-size:.65rem">${initials(formatUserName(student.name))}</div><div><div style="font-size:.82rem;font-weight:600;color:var(--text)">${escapeHtml(formatUserName(student.name))}</div><div style="font-size:.72rem;color:var(--text3)">${escapeHtml(student.grade_level||'')}</div></div></div>`
       : '<span style="color:var(--text3)">—</span>'
 
     return `
@@ -120,7 +121,7 @@ function render() {
       <td class="cb-cell"><input type="checkbox"/></td>
       <td><div class="ent-row">
         <div class="av ${avColor(p.name)}">${initials(p.name)}</div>
-        <div><div class="ent-name">${p.name||'—'}</div>
+        <div><div class="ent-name">${escapeHtml(formatUserName(p.name)||'—')}</div>
       </div></td>
       <td><code style="font-size:.78rem;color:var(--text3)">${p.address||'—'}</code></td>
       <td><span class="pill ${pillCls}">${rel}</span></td>
@@ -132,7 +133,7 @@ function render() {
         ${document.body.dataset.role === 'SCHOOL_ADMIN'
           ? `<button class="btn btn-secondary btn-sm" onclick="setParentStatus('${p.id}','${(p.status || 'active') === 'active' ? 'inactive' : 'active'}')">${(p.status || 'active') === 'active' ? 'Deactivate' : 'Reactivate'}</button>`
           : ''}
-        <button class="btn btn-secondary btn-sm" type="button" data-archive-account="${p.id}" data-account-role="PARENT" data-account-name="${escapeHtml(p.name || 'Parent / Guardian')}">Archive</button>
+        <button class="btn btn-secondary btn-sm" type="button" data-archive-account="${escapeHtml(p.id)}" data-account-role="PARENT" data-account-name="${escapeHtml(formatUserName(p.name) || 'Parent / Guardian')}">Archive</button>
       </div></td>
     </tr>`
   }).join('')
@@ -155,18 +156,24 @@ export async function submitAddParent() {
   const relation   = val('parentRelation')
   const contact    = val('parentContact')
   const address    = val('parentAddress')
+  const linked_student_id = val('parentLinkedStudent') || null
+  if (!name || !email || !password || !relation)
+    return showToast('Missing fields', 'Name, email, relation, and password are required.', 'warning')
+  if (linked_student_id && !allStudents.some(student => String(student.id) === linked_student_id))
+    return showToast('Invalid linked student', 'Select an active student from the list.', 'warning')
 
   try {
     await createAccount('PARENT', {
-      name, 
+      name: formatUserName(name),
       email, 
       password,
       relation,
       contact: contact || null,
       address: address || null,
+      linked_student_id,
     })
 
-    showToast('Parent Added', `${name} registered`, 'success')
+    showToast('Parent Added', `${formatUserName(name)} registered`, 'success')
     closeM('addParentModal')
     document.getElementById('addParentForm').reset()
     
@@ -193,11 +200,13 @@ export async function openEditParentModal(id) {
   const {data:p,error} = await supabase.from('profiles').select('*').eq('id',id).single()
   if(error) return showToast('Error','Could not load parent','error')
 
-  document.getElementById('editParentName').value            = p.name||''
+  document.getElementById('editParentId').value             = p.id
+  document.getElementById('editParentName').value            = formatUserName(p.name)||''
   document.getElementById('editParentEmail').value           = p.email||''
   document.getElementById('editParentRelation').value        = p.relation||''
   document.getElementById('editParentContact').value         = p.contact||''
   document.getElementById('editParentAddress').value         = p.address||''
+  document.getElementById('editParentLinkedStudent').value   = p.linked_student_id||''
   openM('editParentModal')
 }
 
@@ -206,16 +215,22 @@ export async function submitEditParent() {
   const name = val('editParentName')
   const email= val('editParentEmail')
   if(!name||!email) return showToast('Missing fields','Name and email required','warning')
+  if (!isLastFirstName(name))
+    return showToast('Name format required', 'Enter the parent/guardian name as Last Name, First Name.', 'warning')
+  const linkedStudentId = val('editParentLinkedStudent')
+  if (linkedStudentId && !allStudents.some(student => String(student.id) === linkedStudentId))
+    return showToast('Invalid linked student', 'Select an active student from the list.', 'warning')
 
   const {error} = await supabase.from('profiles').update({
-    name, email,
+    name: formatUserName(name), email,
     relation           : val('editParentRelation')||null,
     contact            : val('editParentContact')||null,
     address            : val('editParentAddress')||null,
+    linked_student_id  : linkedStudentId || null,
   }).eq('id',id)
 
   if(error) return showToast('Error',error.message,'error')
-  showToast('Saved',`${name} updated`,'success')
+  showToast('Saved',`${formatUserName(name)} updated`,'success')
   closeM('editParentModal')
   loadParents()
 }
@@ -224,7 +239,7 @@ export async function submitEditParent() {
 function exportCSV() {
   if(!allParents.length) return showToast('Empty','Nothing to export','warning')
   const h = ['Name','Email','Parent ID','Relation','Contact','Address']
-  const r = allParents.map(p=>[p.name,p.email,p.parent_id,p.relation,p.contact,p.address].map(x=>`"${x||''}"`).join(','))
+  const r = allParents.map(p=>[formatUserName(p.name),p.email,p.parent_id,p.relation,p.contact,p.address].map(x=>`"${String(x||'').replace(/"/g,'""')}"`).join(','))
   const a = Object.assign(document.createElement('a'),{
     href:URL.createObjectURL(new Blob([[h,...r].join('\n')],{type:'text/csv'})),download:'parents.csv'
   }); a.click()

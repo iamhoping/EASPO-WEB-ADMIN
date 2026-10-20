@@ -1,6 +1,7 @@
 import { supabase } from '../services/supabaseClient.js'
 import { showToast } from '../ui/toast.js'
 import { renderPagination } from '../ui/pagination.js'
+import { formatUserName } from '../utils/name-format.js'
 
 const PER_PAGE = 10
 const ROLE_LABELS = { STUDENT: 'Student', TEACHER: 'Teacher', PARENT: 'Parent / Guardian' }
@@ -109,14 +110,14 @@ function renderArchivedAccounts() {
     const academic = account.role === 'STUDENT' ? account.grade_level || '—' : account.department || '—'
     const archivedBy = account.archived_by_name || (account.archived_by ? account.archived_by.slice(0, 8) : '—')
     return `<tr>
-      <td data-label="Account"><div class="ent-name">${escapeHtml(account.name || 'Unnamed account')}</div><div class="ent-sub">${escapeHtml(account.email || '')}</div></td>
+      <td data-label="Account"><div class="ent-name">${escapeHtml(formatUserName(account.name) || 'Unnamed account')}</div><div class="ent-sub">${escapeHtml(account.email || '')}</div></td>
       <td data-label="Type"><span class="pill pill-grey">${ROLE_LABELS[account.role] || escapeHtml(account.role)}</span></td>
       <td data-label="Account ID"><code>${escapeHtml(accountId)}</code></td>
       <td data-label="Grade / Department">${escapeHtml(academic)}</td>
       <td data-label="Section">${escapeHtml(archivedSectionNames.get(String(account.archived_section_id)) || account.archived_section_id || '—')}</td>
       <td data-label="Archive Date">${escapeHtml(formatDate(account.archived_at))}</td>
       <td data-label="Archived By"><code>${escapeHtml(archivedBy)}</code></td>
-      <td data-label="Actions"><button class="btn btn-secondary btn-sm" type="button" data-restore-account="${escapeHtml(account.id)}" data-account-role="${escapeHtml(account.role)}" data-account-name="${escapeHtml(account.name || 'this account')}">Restore</button></td>
+      <td data-label="Actions"><button class="btn btn-secondary btn-sm" type="button" data-restore-account="${escapeHtml(account.id)}" data-account-role="${escapeHtml(account.role)}" data-account-name="${escapeHtml(formatUserName(account.name) || 'this account')}">Restore</button></td>
     </tr>`
   }).join('')
   count.textContent = `Showing ${start + 1}–${Math.min(start + PER_PAGE, total)} of ${total} archived accounts`
@@ -129,7 +130,7 @@ function renderArchivedAccounts() {
 function openArchiveModal(account) {
   pendingAccount = account
   const name = document.getElementById('archiveAccountName')
-  name.textContent = account.name
+  name.textContent = formatUserName(account.name)
   document.getElementById('archiveAccountModal').classList.remove('hidden')
 }
 
@@ -152,7 +153,7 @@ async function submitArchive(event) {
   }
   document.getElementById('archiveAccountModal').classList.add('hidden')
   pendingAccount = null
-  showToast('Account archived', `${account.name} was moved to Archived Accounts.`, 'success')
+  showToast('Account archived', `${formatUserName(account.name)} was moved to Archived Accounts.`, 'success')
   try {
     await Promise.all([loadArchivedAccounts(), refreshActiveAccountList(account.role)])
   } catch (error) {

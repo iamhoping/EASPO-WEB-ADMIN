@@ -1,6 +1,7 @@
 import { supabase } from '../services/supabaseClient.js'
 import { showToast } from '../ui/toast.js'
 import { renderPagination } from '../ui/pagination.js'
+import { formatUserName } from '../utils/name-format.js'
 
 const GRADE_LEVELS = [7, 8, 9, 10, 11, 12]
 const PER_PAGE = 10
@@ -106,13 +107,13 @@ function renderAssignedStudents() {
 
   tbody.innerHTML = assignedStudents.map(student => `
     <tr>
-      <td>${escapeHtml(student.name || '—')}</td>
+      <td>${escapeHtml(formatUserName(student.name) || '—')}</td>
       <td>${escapeHtml(student.student_id || '—')}</td>
       <td>${escapeHtml(student.email || '—')}</td>
       <td>${escapeHtml(gradeLabel(student.grade_level))}</td>
       <td><span class="pill ${String(student.status || 'active').toLowerCase() === 'active' ? 'pill-green' : 'pill-blue'}">${escapeHtml(student.status || 'active')}</span></td>
       <td>
-        <button class="act-btn danger" type="button" title="Remove from section" aria-label="Remove ${escapeHtml(student.name)} from section" data-section-action="remove-student" data-student-id="${escapeHtml(student.id)}">🗑</button>
+        <button class="act-btn danger" type="button" title="Remove from section" aria-label="Remove ${escapeHtml(formatUserName(student.name))} from section" data-section-action="remove-student" data-student-id="${escapeHtml(student.id)}">🗑</button>
       </td>
     </tr>
   `).join('')
@@ -134,7 +135,7 @@ function renderEligibleStudents() {
 
   tbody.innerHTML = filtered.map(student => `
     <tr>
-      <td>${escapeHtml(student.name || '—')}</td>
+      <td>${escapeHtml(formatUserName(student.name) || '—')}</td>
       <td>${escapeHtml(student.student_id || '—')}</td>
       <td>${escapeHtml(student.email || '—')}</td>
       <td>${escapeHtml(gradeLabel(student.grade_level))}</td>
@@ -420,7 +421,7 @@ async function assignStudent(studentId) {
 }
 
 async function removeStudent(student) {
-  if (!selectedSection || !window.confirm(`Remove ${student.name || 'this student'} from ${selectedSection.name}? Their profile will not be deleted.`)) return
+  if (!selectedSection || !window.confirm(`Remove ${formatUserName(student.name) || 'this student'} from ${selectedSection.name}? Their profile will not be deleted.`)) return
 
   try {
     const { data, error } = await supabase

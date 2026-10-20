@@ -1,5 +1,6 @@
 // /js/modules/scanner-attendance.js
 import { supabase } from '../services/supabaseClient.js'
+import { formatUserName } from '../utils/name-format.js'
 
 const SCAN_TIMEOUT = 700
 const SCANNER_IDLE_TIMEOUT = 15000
@@ -125,8 +126,8 @@ function showResult(student, sectionName, subjectName, scannedAt) {
   showScanResult()
   result.classList.remove('hidden', 'scanner-result-error', 'scanner-result-duplicate')
   setText('scannerResultTitle', 'Attendance Recorded Successfully')
-  setText('scannerStudentName', student.name)
-  setText('scannerStudentId', `Student ID: ${student.student_id}`)
+  setText('scannerStudentName', formatUserName(student.name))
+  setText('scannerStudentId', `LRN Number: ${student.student_id}`)
   setText('scannerStudentClass', `${student.grade_level || 'No grade'} - ${sectionName}`)
   setText('scannerSubject', `Subject: ${subjectName || '—'}`)
   setText('scannerResultStatus', 'Present')
@@ -155,7 +156,7 @@ function finishResult(state) {
 
 function showNoScheduleResult(student) {
   const result = getElement('scannerResult')
-  showErrorResult('No Schedule Today', `${student.name} does not have an attendance schedule today. Attendance was not recorded.`)
+  showErrorResult('No Schedule Today', `${formatUserName(student.name)} does not have an attendance schedule today. Attendance was not recorded.`)
   result?.classList.remove('scanner-result-error')
   result?.classList.add('scanner-result-info')
 }
@@ -317,7 +318,7 @@ async function recordScan(rawValue) {
       if (String(existing.status || '').toLowerCase() === 'present') {
         // Already scanned as present
         console.log('[ATTENDANCE] Already marked present', existing)
-        showErrorResult('Already Scanned', `${student.name} has already been marked present for this schedule. No duplicate was created.`, true)
+        showErrorResult('Already Scanned', `${formatUserName(student.name)} has already been marked present for this schedule. No duplicate was created.`, true)
         setText('scannerScannedAt', `Time In: ${existing.time_in || 'Recorded'}`)
         finishResult('DUPLICATE')
         processing = false
@@ -389,8 +390,8 @@ async function recordScan(rawValue) {
         showScanResult()
         resultDiv.classList.remove('hidden', 'scanner-result-error', 'scanner-result-duplicate', 'scanner-result-info')
         setText('scannerResultTitle', 'Late Arrival Recorded')
-        setText('scannerStudentName', student.name)
-        setText('scannerStudentId', `Student ID: ${student.student_id}`)
+        setText('scannerStudentName', formatUserName(student.name))
+        setText('scannerStudentId', `LRN Number: ${student.student_id}`)
         setText('scannerStudentClass', `${student.grade_level || 'No grade'} - ${sectionName}`)
         setText('scannerSubject', `Subject: ${subjectName || '—'}`)
         setText('scannerResultStatus', 'Late')

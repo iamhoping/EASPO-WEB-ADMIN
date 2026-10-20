@@ -3,6 +3,7 @@
 
 import { supabase } from '../services/supabaseClient.js'
 import { showToast } from '../ui/toast.js'
+import { formatUserName } from '../utils/name-format.js'
 
 let chartInstances = {}
 let activeReport = 'overview'
@@ -10,8 +11,11 @@ let reportData = emptyReportData()
 let hasRenderedShell = false
 let hasSubscribed = false
 let hasAttachedListeners = false
+let printBranding = null
+let reportSearchTimer = null
 
 const filters = {
+  query: '',
   gradeLevel: '',
   section: '',
   subject: '',
@@ -24,6 +28,7 @@ const REPORTS = [
   { id: 'overview', label: 'Dashboard Overview' },
   { id: 'attendance', label: 'Attendance Reports' },
   { id: 'academic', label: 'Academic Reports' },
+  { id: 'enrollment', label: 'Enrollment Reports' },
   { id: 'teacher', label: 'Teacher Reports' },
   { id: 'section', label: 'Section Reports' },
   { id: 'subject', label: 'Subject Reports' },
@@ -60,7 +65,7 @@ function renderReportsShell() {
     <div class="page-header">
       <div class="page-header-actions">
         <button class="btn btn-secondary" id="printReportBtn">Print</button>
-        <button class="btn btn-secondary" id="exportPdfBtn">PDF</button>
+        <button class="btn btn-secondary" id="exportPdfBtn">Export PDF</button>
         <button class="btn btn-secondary" id="exportExcelBtn">Excel</button>
         <button class="btn btn-primary" id="exportCsvBtn">CSV</button>
       </div>
@@ -79,6 +84,10 @@ function renderReportsShell() {
       <div class="reports-main">
         <div class="panel report-filters-panel">
           <div class="reports-filter-grid">
+            <label>
+              <span>Search</span>
+              <input id="reportSearch" type="search" class="filter-select" placeholder="Student, LRN, subject..." />
+            </label>
             <label>
               <span>Grade Level</span>
               <select id="reportGradeFilter" class="filter-select">
@@ -135,17 +144,21 @@ function attachReportListeners() {
     })
   })
 
+  document.getElementById('reportSearch')?.addEventListener('input', () => {
+    clearTimeout(reportSearchTimer)
+    reportSearchTimer = setTimeout(() => applyReportFilters(false), 200)
+  })
   ;['reportStartDate', 'reportEndDate', 'reportGradeFilter', 'reportSectionFilter', 'reportSubjectFilter', 'reportTeacherFilter']
     .forEach(id => document.getElementById(id)?.addEventListener('change', applyReportFilters))
 
   document.getElementById('reportRefreshBtn')?.addEventListener('click', reloadReports)
-  document.getElementById('printReportBtn')?.addEventListener('click', () => window.print())
+  document.getElementById('printReportBtn')?.addEventListener('click', printCurrentReport)
   document.getElementById('exportPdfBtn')?.addEventListener('click', exportReportAsPDF)
   document.getElementById('exportCsvBtn')?.addEventListener('click', exportReportAsCSV)
   document.getElementById('exportExcelBtn')?.addEventListener('click', exportReportAsExcel)
 
   window.applyReportFilters = applyReportFilters
-  window.printReport = () => window.print()
+  window.printReport = printCurrentReport
   window.exportReportPdf = exportReportAsPDF
   window.exportReportCsv = exportReportAsCSV
   window.exportReportAsPDF = exportReportAsPDF
@@ -178,14 +191,14 @@ async function loadReportData() {
     grades,
     schedules
   ] = await Promise.all([
-    safeSelect('profiles', 'id,name,email,student_id,grade_level,status,role', query => query.eq('role', 'STUDENT')),
+    safeSelect('profiles', 'id,name,email,student_id,grade_level,section_id,status,role', query => query.eq('role', 'STUDENT')),
     safeSelect('profiles', 'id,name,email,teacher_id,department,status,role', query => query.eq('role', 'TEACHER')),
     safeSelect('profiles', 'id,name,email,status,role', query => query.eq('role', 'PARENT')),
     safeSelect('sections', '*'),
     safeSelect('subjects', '*'),
     safeSelect('enrollments', '*'),
-    safeSelect('attendance', '*, profiles:student_id (name, student_id, grade_level)', query => query.order('attendance_date', { ascending: false })),
-    safeSelect('grades', '*, profiles:student_id (name, student_id, grade_level)', query => query.order('created_at', { ascending: false })),
+    safeSelect('attendance', '*, profiles:student_id (name, student_id, grade_level, section_id)', query => query.order('attendance_date', { ascending: false })),
+    safeSelect('grades', '*, profiles:student_id (name, student_id, grade_level, section_id)', query => query.order('created_at', { ascending: false })),
     safeSelect('schedules', '*')
   ])
 
@@ -210,7 +223,8 @@ async function safeSelect(table, columns = '*', applyQuery) {
   }
 }
 
-function applyReportFilters() {
+function applyReportFilters(notify = true) {
+  filters.query = valueOf('reportSearch').toLocaleLowerCase()
   filters.startDate = valueOf('reportStartDate')
   filters.endDate = valueOf('reportEndDate')
   filters.gradeLevel = valueOf('reportGradeFilter')
@@ -218,7 +232,7 @@ function applyReportFilters() {
   filters.subject = valueOf('reportSubjectFilter')
   filters.teacher = valueOf('reportTeacherFilter')
   renderActiveReport()
-  showToast('Filters Applied', 'Reports updated', 'success')
+  if (notify) showToast('Filters Applied', 'Reports updated', 'success')
 }
 
 function renderActiveReport() {
@@ -284,16 +298,20 @@ function renderOverviewReport() {
 function renderAttendanceReport() {
   const attendance = filteredAttendance()
   const absent = attendance.filter(row => normalize(row.status) !== 'present')
+  const present = attendance.length - absent.length
   const bySection = groupAttendanceBySection(attendance)
   const bySubject = countBy(attendance, row => row.subject || 'No subject')
-  const byStudent = countBy(attendance, row => row.profiles?.name || row.student_id || 'Unknown')
+  const byStudent = countBy(attendance, row => formatUserName(row.profiles?.name) || row.student_id || 'Unknown')
 
   return `
     ${sectionTitle('Attendance Reports', 'Daily, monthly, student, section, subject, and teacher attendance monitoring.')}
     ${summaryCards([
       ['Daily Attendance', countToday(attendance)],
       ['Monthly Attendance', countThisMonth(attendance, 'date')],
-      ['Absent Students', absent.length],
+      ['Present Records', present],
+      ['Absent Records', absent.length],
+      ['Attendance Rate', attendance.length ? `${Math.round((present / attendance.length) * 100)}%` : '-'],
+      ['Total Records', attendance.length],
       ['Attendance by Section', Object.keys(bySection).length],
       ['Attendance by Subject', Object.keys(bySubject).length],
       ['Attendance by Student', Object.keys(byStudent).length],
@@ -302,10 +320,11 @@ function renderAttendanceReport() {
       ['Present vs Absent', 'attendancePresentAbsentChart'],
       ['Attendance Trend', 'attendanceTrendReportChart'],
     ])}
-    ${dataTable('Absent Students', ['Date', 'Student', 'Grade', 'Subject'], absent.slice(0, 10).map(row => [
+    ${dataTable('Attendance Records', ['Date', 'Student', 'Grade', 'Status', 'Subject'], attendance.map(row => [
       formatDate(row.date),
-      row.profiles?.name || row.student_id || 'Unknown',
+      formatUserName(row.profiles?.name) || row.student_id || 'Unknown',
       row.profiles?.grade_level || '-',
+      row.status || '-',
       row.subject || '-'
     ]))}
   `
@@ -335,13 +354,13 @@ function renderAcademicReport() {
       ['Grade Distribution', 'academicDistributionChart']
     ])}
     ${dataTable('Top Performing Students', ['Student', 'Subject', 'Score', 'Remarks'], topRows.map(row => [
-      row.profiles?.name || row.student_id || 'Unknown',
+      formatUserName(row.profiles?.name) || row.student_id || 'Unknown',
       row.subject || '-',
       row.score || '-',
       Number(row.score || 0) >= 75 ? 'Passed' : 'Failed'
     ]))}
     ${dataTable('Failed Students', ['Student', 'Subject', 'Score'], failedRows.slice(0, 10).map(row => [
-      row.profiles?.name || row.student_id || 'Unknown',
+      formatUserName(row.profiles?.name) || row.student_id || 'Unknown',
       row.subject || '-',
       row.score || '-'
     ]))}
@@ -366,6 +385,13 @@ function renderEnrollmentReport() {
       ['Students per Section', 'enrollmentSectionChart'],
       ['Students per Grade Level', 'enrollmentGradeChart']
     ])}
+    ${dataTable('Student Records', ['Student', 'LRN Number', 'Grade Level', 'Section', 'Status'], filteredStudents().map(row => [
+      formatUserName(row.name) || row.name || '-',
+      row.student_id || '-',
+      row.grade_level || '-',
+      reportData.sections.find(section => String(section.id) === String(row.section_id))?.name || '-',
+      row.status || 'active',
+    ]))}
     ${dataTable('Enrollment by Grade Level', ['Grade Level', 'Students'], objectRows(byGrade))}
   `
 }
@@ -485,7 +511,7 @@ function renderChartsForActiveReport() {
       barChart('subjectAverageChart', 'Average Score', subjectAverages())
     },
     export: () => {
-      document.getElementById('printReportBtnMirror')?.addEventListener('click', () => window.print())
+      document.getElementById('printReportBtnMirror')?.addEventListener('click', printCurrentReport)
       document.getElementById('exportPdfBtnMirror')?.addEventListener('click', exportReportAsPDF)
       document.getElementById('exportExcelBtnMirror')?.addEventListener('click', exportReportAsExcel)
       document.getElementById('exportCsvBtnMirror')?.addEventListener('click', exportReportAsCSV)
@@ -619,20 +645,29 @@ function exportAction(label, id, text) {
 }
 
 function filteredStudents() {
-  return reportData.students.filter(row => !filters.gradeLevel || row.grade_level === filters.gradeLevel)
+  return reportData.students.filter(row =>
+    (!filters.gradeLevel || normalizeGradeLevel(row.grade_level) === normalizeGradeLevel(filters.gradeLevel)) &&
+    (!filters.section || String(row.section_id || '') === String(filters.section)) &&
+    matchesSearch([row.name, row.email, row.student_id, row.grade_level])
+  )
 }
 
 function filteredTeachers() {
-  return reportData.teachers.filter(row => !filters.teacher || row.id === filters.teacher || row.name === filters.teacher)
+  return reportData.teachers.filter(row =>
+    (!filters.teacher || row.id === filters.teacher || row.name === filters.teacher) &&
+    matchesSearch([row.name, row.email, row.teacher_id, row.department])
+  )
 }
 
 function filteredAttendance() {
   return reportData.attendance.filter(row => {
     const grade = row.profiles?.grade_level || row.grade_level || ''
     return inDateRange(row.date) &&
-      (!filters.gradeLevel || grade === filters.gradeLevel) &&
-      (!filters.subject || row.subject === filters.subject || row.subject_id === filters.subject) &&
-      (!filters.teacher || row.teacher_id === filters.teacher || row.teacher === filters.teacher)
+      (!filters.gradeLevel || normalizeGradeLevel(grade) === normalizeGradeLevel(filters.gradeLevel)) &&
+      (!filters.section || String(row.profiles?.section_id || row.section_id || '') === String(filters.section)) &&
+      (!filters.subject || row.subject === filters.subject || String(row.subject_id || '') === String(filters.subject)) &&
+      (!filters.teacher || String(row.teacher_id || '') === String(filters.teacher) || row.teacher === filters.teacher) &&
+      matchesSearch([row.profiles?.name, row.profiles?.student_id, row.subject, row.status])
   })
 }
 
@@ -640,32 +675,44 @@ function filteredGrades() {
   return reportData.grades.filter(row => {
     const grade = row.profiles?.grade_level || row.grade_level || ''
     return inDateRange(row.created_at || row.date) &&
-      (!filters.gradeLevel || grade === filters.gradeLevel) &&
-      (!filters.subject || row.subject === filters.subject || row.subject_id === filters.subject) &&
-      (!filters.teacher || row.teacher_id === filters.teacher || row.teacher === filters.teacher)
+      (!filters.gradeLevel || normalizeGradeLevel(grade) === normalizeGradeLevel(filters.gradeLevel)) &&
+      (!filters.section || String(row.profiles?.section_id || row.section_id || '') === String(filters.section)) &&
+      (!filters.subject || row.subject === filters.subject || String(row.subject_id || '') === String(filters.subject)) &&
+      (!filters.teacher || String(row.teacher_id || '') === String(filters.teacher) || row.teacher === filters.teacher) &&
+      matchesSearch([row.profiles?.name, row.profiles?.student_id, row.subject, row.remarks, row.score])
   })
 }
 
 function filteredEnrollments() {
   return reportData.enrollments.filter(row => {
     return inDateRange(row.created_at || row.date) &&
-      (!filters.gradeLevel || row.grade_level === filters.gradeLevel) &&
-      (!filters.section || row.section_id === filters.section || row.section === filters.section || row.section_name === filters.section)
+      (!filters.gradeLevel || normalizeGradeLevel(row.grade_level || row.profiles?.grade_level) === normalizeGradeLevel(filters.gradeLevel)) &&
+      (!filters.section || String(row.section_id || '') === String(filters.section) || row.section === filters.section || row.section_name === filters.section) &&
+      matchesSearch([row.student_name, row.name, row.email, row.student_id, row.section, row.section_name])
   })
 }
 
 function filteredSchedules() {
   return reportData.schedules.filter(row => {
-    return (!filters.section || row.section_id === filters.section || row.section === filters.section || row.section_name === filters.section) &&
-      (!filters.subject || row.subject_id === filters.subject || row.subject === filters.subject || row.subject_name === filters.subject) &&
-      (!filters.teacher || row.teacher_id === filters.teacher || row.teacher === filters.teacher || row.teacher_name === filters.teacher)
+    return (!filters.section || String(row.section_id || '') === String(filters.section) || row.section === filters.section || row.section_name === filters.section) &&
+      (!filters.subject || String(row.subject_id || '') === String(filters.subject) || row.subject === filters.subject || row.subject_name === filters.subject) &&
+      (!filters.teacher || String(row.teacher_id || '') === String(filters.teacher) || row.teacher === filters.teacher || row.teacher_name === filters.teacher) &&
+      matchesSearch([row.subject, row.subject_name, row.teacher_name, row.section_name, row.room, row.day])
   })
+}
+
+function normalizeGradeLevel(value) {
+  return String(value || '').trim().toLocaleLowerCase().replace(/^grade\s*/, '')
+}
+
+function matchesSearch(values) {
+  return !filters.query || values.some(value => String(value || '').toLocaleLowerCase().includes(filters.query))
 }
 
 function populateFilterOptions() {
   setOptions('reportSectionFilter', 'All Sections', reportData.sections.map(row => [row.id || row.name, row.name || row.section_name || row.id]))
   setOptions('reportSubjectFilter', 'All Subjects', subjectOptions())
-  setOptions('reportTeacherFilter', 'All Teachers', reportData.teachers.map(row => [row.id, row.name || row.email || row.id]))
+  setOptions('reportTeacherFilter', 'All Teachers', reportData.teachers.map(row => [row.id, formatUserName(row.name) || row.email || row.id]))
 }
 
 function subjectOptions() {
@@ -796,7 +843,7 @@ function objectRows(obj) {
 
 function teacherName(value) {
   const teacher = reportData.teachers.find(row => row.id === value || row.teacher_id === value || row.name === value)
-  return teacher?.name || value || 'Unassigned'
+  return formatUserName(teacher?.name) || value || 'Unassigned'
 }
 
 function inDateRange(value) {
@@ -853,9 +900,88 @@ async function exportReportAsExcel() {
   showToast('Success', 'Report exported as Excel', 'success')
 }
 
-function exportReportAsPDF() {
-  showToast('Info', 'Opening print dialog. Choose Save as PDF.', 'info')
-  window.print()
+async function loadPrintBranding() {
+  const { data, error } = await supabase.rpc('get_public_school_branding')
+  if (error) throw error
+  const settings = Object.fromEntries((data || []).map(row => [row.key, row.value]))
+  const logo = document.querySelector('[data-school-logo]:not(link), .sidebar-logo')
+  printBranding = {
+    name: String(settings.school_name || 'Eastern Porac National High School').trim(),
+    address: String(settings.school_address || '').trim(),
+    logo: String(settings.school_logo_url || logo?.src || 'logo.png').trim(),
+  }
+}
+
+function getReportPeriodLabel() {
+  const period = filters.startDate || filters.endDate
+    ? `${filters.startDate || 'Start date not set'} to ${filters.endDate || 'End date not set'}`
+    : `Generated ${new Date().toLocaleDateString()}`
+  const appliedFilters = [
+    filters.gradeLevel ? `Grade: ${filters.gradeLevel}` : '',
+    filters.section ? `Section: ${reportData.sections.find(section => String(section.id) === String(filters.section))?.name || filters.section}` : '',
+    filters.subject ? `Subject: ${document.querySelector('#reportSubjectFilter option:checked')?.textContent || filters.subject}` : '',
+    filters.teacher ? `Teacher: ${document.querySelector('#reportTeacherFilter option:checked')?.textContent || filters.teacher}` : '',
+    filters.query ? `Search: ${filters.query}` : '',
+  ].filter(Boolean)
+  return [period, ...appliedFilters].join(' · ')
+}
+
+async function preparePrintableReport() {
+  await loadPrintBranding()
+  const content = document.getElementById('reportContent')
+  if (!content) throw new Error('The current report is not available.')
+
+  const printable = content.cloneNode(true)
+  printable.querySelectorAll('.report-chart-grid, .chart-card, .report-export-grid, button').forEach(element => element.remove())
+  const description = printable.querySelector('.report-section-title p')?.textContent.trim() || ''
+  printable.querySelector('.report-section-title')?.remove()
+  printable.querySelectorAll('.report-table-panel').forEach(panel => {
+    panel.classList.remove('panel')
+    panel.querySelector('.table-wrap')?.classList.remove('table-wrap')
+  })
+
+  let printRoot = document.getElementById('reportPrintRoot')
+  if (!printRoot) {
+    printRoot = document.createElement('main')
+    printRoot.id = 'reportPrintRoot'
+    printRoot.className = 'report-print-root'
+    document.body.appendChild(printRoot)
+  }
+
+  const reportTitle = REPORTS.find(report => report.id === activeReport)?.label || 'Reports'
+  printRoot.classList.toggle('report-print-landscape', ['attendance', 'academic', 'enrollment', 'teacher'].includes(activeReport))
+  printRoot.innerHTML = `
+    <header class="report-print-header">
+      <img src="${escapeAttr(printBranding.logo)}" alt="School logo" class="report-print-logo">
+      <div class="report-print-school">
+        <h1>${escapeHtml(printBranding.name)}</h1>
+        <p>${escapeHtml(printBranding.address || 'School address not configured')}</p>
+      </div>
+    </header>
+    <div class="report-print-heading">
+      <h2>${escapeHtml(reportTitle)}</h2>
+      <p>${escapeHtml(getReportPeriodLabel())}</p>
+      ${description ? `<p class="report-print-description">${escapeHtml(description)}</p>` : ''}
+    </div>
+    <div class="report-print-content">${printable.innerHTML}</div>
+    <footer class="report-print-footer">
+      <span>${escapeHtml(printBranding.name)} · Official Report</span>
+      <span>Page <span class="report-print-page-number"></span></span>
+    </footer>`
+}
+
+async function printCurrentReport() {
+  try {
+    await preparePrintableReport()
+    window.print()
+  } catch (error) {
+    console.error('Report print preparation failed:', error)
+    showToast('Report not ready', error.message || 'The printable report could not be prepared.', 'error')
+  }
+}
+
+async function exportReportAsPDF() {
+  await printCurrentReport()
 }
 
 function buildExportRows() {
@@ -879,10 +1005,10 @@ function buildExportRows() {
     ['Grade Records', grades.length],
     [],
     ['Attendance', 'Date', 'Student', 'Status', 'Subject'],
-    ...attendance.slice(0, 200).map(row => ['', formatDate(row.date), row.profiles?.name || row.student_id || '', row.status || '', row.subject || '']),
+    ...attendance.slice(0, 200).map(row => ['', formatDate(row.date), formatUserName(row.profiles?.name) || row.student_id || '', row.status || '', row.subject || '']),
     [],
     ['Grades', 'Student', 'Subject', 'Score', 'Date'],
-    ...grades.slice(0, 200).map(row => ['', row.profiles?.name || row.student_id || '', row.subject || '', row.score || '', formatDate(row.created_at)])
+    ...grades.slice(0, 200).map(row => ['', formatUserName(row.profiles?.name) || row.student_id || '', row.subject || '', row.score || '', formatDate(row.created_at)])
   ]
 }
 
@@ -927,6 +1053,9 @@ function injectReportStyles() {
     .report-chart-grid{margin-bottom:20px}
     .report-table-panel{margin-top:20px}
     .report-table-panel h3{margin:0 0 12px;font-size:1rem}
+    .report-table-panel .table-wrap{overflow-x:auto}
+    .report-table-panel table{width:100%;border-collapse:collapse}
+    .report-table-panel th,.report-table-panel td{padding:9px 11px;text-align:left;vertical-align:top}
     .report-export-grid{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:14px;margin-bottom:20px}
     .report-export-action{display:flex;flex-direction:column;gap:6px;text-align:left;cursor:pointer;color:var(--text)}
     .report-export-action span{color:var(--text2);font-size:.82rem}
@@ -934,7 +1063,37 @@ function injectReportStyles() {
     .filter-select{padding:6px 8px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text);font-size:14px}
     @media (max-width:1100px){.reports-layout{grid-template-columns:1fr}.reports-nav{position:static;display:grid;grid-template-columns:repeat(2,1fr)}.reports-nav-title{grid-column:1/-1}.reports-filter-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
     @media (max-width:640px){.reports-nav,.reports-filter-grid,.report-export-grid{grid-template-columns:1fr}.reports-layout{gap:14px}}
-    @media print{.reports-nav,.report-filters-panel,.page-header-actions{display:none!important}.reports-layout{display:block}.chart-card,.report-table-panel,.stat-card{break-inside:avoid}}
+    .report-print-root{display:none}
+    @media print{
+      @page{size:auto;margin:16mm 12mm 20mm}
+      @page reportLandscape{size:landscape;margin:12mm 12mm 18mm}
+      body *{visibility:hidden!important}
+      #reportPrintRoot,#reportPrintRoot *{visibility:visible!important}
+      body>:not(#reportPrintRoot){display:none!important}
+      #reportPrintRoot{display:block!important;position:relative;width:100%;padding-bottom:10mm;background:#fff;color:#111827;font:10pt/1.4 Arial,sans-serif}
+      #reportPrintRoot.report-print-landscape{page:reportLandscape}
+      .report-print-header{display:flex;align-items:center;gap:18px;border-bottom:2px solid #1e3a5f;padding:0 0 12px;margin-bottom:18px}
+      .report-print-logo{width:72px;height:72px;object-fit:contain}
+      .report-print-school h1{font-size:17pt;margin:0 0 4px;color:#17365d}
+      .report-print-school p,.report-print-heading p{font-size:9pt;margin:0;color:#4b5563}
+      .report-print-heading{text-align:center;margin:16px 0 20px}
+      .report-print-heading h2{font-size:14pt;margin:0 0 4px}
+      .report-print-description{margin-top:6px!important}
+      .report-print-content .stats-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:0 0 16px}
+      .report-print-content .stat-card{min-height:0;padding:8px;border:1px solid #cbd5e1;background:#fff;box-shadow:none;break-inside:avoid}
+      .report-print-content .stat-value{font-size:14pt;color:#111827}
+      .report-print-content .stat-label{font-size:8pt;color:#374151}
+      .report-print-content .report-table-panel{margin:0 0 16px;break-inside:auto}
+      .report-print-content .report-table-panel h3{font-size:11pt;margin:0 0 7px}
+      .report-print-content table{width:100%;border-collapse:collapse;table-layout:auto;font-size:8.5pt}
+      .report-print-content thead{display:table-header-group}
+      .report-print-content th,.report-print-content td{border:1px solid #9ca3af;padding:5px 7px;text-align:left;vertical-align:top;overflow-wrap:anywhere}
+      .report-print-content th{background:#e8eef5!important;color:#111827;font-weight:700;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+      .report-print-content tr{break-inside:avoid}
+      .report-print-content .report-section-title,.report-print-content .report-chart-grid,.report-print-content .report-export-grid{display:none!important}
+      .report-print-footer{position:fixed;left:0;right:0;bottom:-14mm;border-top:1px solid #9ca3af;padding-top:4px;display:flex;justify-content:space-between;font-size:8pt;color:#4b5563}
+      .report-print-page-number:after{content:counter(page)}
+    }
   `
   document.head.appendChild(style)
 }

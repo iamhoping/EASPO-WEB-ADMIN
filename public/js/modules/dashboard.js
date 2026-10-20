@@ -1,6 +1,7 @@
 import { supabase } from '../services/supabaseClient.js'
 import { showToast } from '../ui/toast.js'
 import { isSchoolDay, SCHOOL_YEAR_2025_2026 } from './school-calendar-2025-2026.js'
+import { formatUserName } from '../utils/name-format.js'
 
 const dashboardCharts = {}
 const DATA_PAGE_SIZE = 1000
@@ -190,7 +191,7 @@ export async function loadAdminProfile(userId) {
     .eq('id', userId)
     .single()
 
-  const name = data?.name || 'Admin'
+  const name = formatUserName(data?.name) || 'Admin'
   const ini = name.split(' ').map(word => word[0] || '').join('').slice(0, 2).toUpperCase()
 
   setText('sidebarName', name)

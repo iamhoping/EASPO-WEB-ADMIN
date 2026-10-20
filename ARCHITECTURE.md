@@ -504,6 +504,26 @@ archives receive `Inactive`. Reasons are retained in account metadata but are
 not displayed in the Archived Accounts list. Restored students return without a
 section assignment and must be assigned again.
 
+The `20261020000001_student_profile_details.sql` migration enforces uniqueness
+for the existing student `student_id` field, which stores and is displayed as
+the student's LRN, adds optional gender and date-of-birth fields, and adds
+row-scoped student/parent reads for their own or explicitly linked records.
+The Student Portal shows permitted personal, attendance, grade, and class data;
+parents must be linked to a student to see that child's records. Teacher
+student-profile actions continue to use
+teacher-scoped profile, attendance, grade, and schedule policies. Apply this
+migration before deploying the student/parent portal frontend.
+
+The `20261020000002_school_address_reporting.sql` migration adds a configurable
+school address to public branding data for official report headers. Web Admins
+can configure it in System Settings; report Print and PDF use the active report's
+filtered tables and summaries in a dedicated print layout.
+
+New and edited account names use `Last Name, First Name`. Existing names without
+a comma are displayed unchanged because the single stored name field does not
+reliably distinguish multi-word surnames, middle names, or suffixes. Convert
+those legacy records only after verifying the intended name parts.
+
 Deploy the migrations and Edge Functions:
 
 ```bash

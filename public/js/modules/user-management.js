@@ -1,6 +1,7 @@
 // /js/modules/user-management.js
 import { supabase } from '../services/supabaseClient.js'
 import { showToast } from '../ui/toast.js'
+import { formatUserName, initialsForUserName } from '../utils/name-format.js'
 
 let allUsers = []
 let filteredUsers = []
@@ -13,12 +14,7 @@ const setText = (id, value) => {
   const el = document.getElementById(id)
   if (el) el.textContent = value
 }
-const initials = name => (name || '')
-  .split(' ')
-  .map(part => part[0] || '')
-  .join('')
-  .slice(0, 2)
-  .toUpperCase() || 'U'
+const initials = initialsForUserName
 const avColor = name => {
   let sum = 0
   for (const char of (name || '')) sum += char.charCodeAt(0)
@@ -106,7 +102,7 @@ export function applyUserManagementFilters() {
     .filter(user => {
       const userStatus = normalizeStatus(user.status)
       const haystack = [
-        user.name,
+        formatUserName(user.name),
         user.email,
         usernameFor(user),
         roleLabel(user.role),
@@ -118,7 +114,7 @@ export function applyUserManagementFilters() {
         (!status || userStatus === status)
     })
     .sort((a, b) => {
-      const left = (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })
+      const left = formatUserName(a.name).localeCompare(formatUserName(b.name), undefined, { sensitivity: 'base' })
       return direction === 'desc' ? -left : left
     })
 
@@ -151,7 +147,7 @@ function renderUsers() {
   tbody.innerHTML = slice.map(user => {
     const status = normalizeStatus(user.status)
     const statusLabel = status.charAt(0).toUpperCase() + status.slice(1)
-    const name = user.name || 'Unnamed User'
+    const name = formatUserName(user.name) || 'Unnamed User'
     const username = usernameFor(user)
 
     return `
@@ -224,7 +220,7 @@ export function openChangeUserPasswordModal(userId) {
   const user = allUsers.find(item => item.id === userId)
   if (!user) return showToast('User not found', 'Refresh the user list and try again.', 'warning')
 
-  const name = user.name || 'Unnamed User'
+  const name = formatUserName(user.name) || 'Unnamed User'
   document.getElementById('changePasswordUserId').value = user.id
   setText('changePasswordName', name)
   setText('changePasswordEmail', user.email || usernameFor(user))
@@ -269,7 +265,7 @@ export async function submitChangeUserPassword() {
     return showToast('Invalid password', 'Use 8 characters, one uppercase letter, one number, and matching confirmation.', 'warning')
   }
 
-  if (!window.confirm(`Change password for ${user.name || user.email || 'this user'}?`)) return
+  if (!window.confirm(`Change password for ${formatUserName(user.name) || user.email || 'this user'}?`)) return
 
   const saveBtn = document.getElementById('saveUserPasswordBtn')
   const originalText = saveBtn?.textContent || 'Save Password'
@@ -285,7 +281,7 @@ export async function submitChangeUserPassword() {
 
     if (error) throw error
 
-    showToast('Password updated', `${user.name || user.email}'s password was changed successfully.`, 'success')
+    showToast('Password updated', `${formatUserName(user.name) || user.email}'s password was changed successfully.`, 'success')
     document.getElementById('changeUserPasswordModal')?.classList.add('hidden')
     document.getElementById('changeUserPasswordForm')?.reset()
   } catch (error) {

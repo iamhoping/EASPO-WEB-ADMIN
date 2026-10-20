@@ -1,6 +1,7 @@
 // /js/modules/grades.js
 import { supabase } from '../services/supabaseClient.js'
 import { showToast } from '../ui/toast.js'
+import { formatUserName } from '../utils/name-format.js'
 
 let allGrades   = []
 let allStudents = []
@@ -12,6 +13,9 @@ const PER_PAGE  = 15
 const val   = id => (document.getElementById(id)?.value || '').trim()
 const openM = id => document.getElementById(id)?.classList.remove('hidden')
 const closeM= id => document.getElementById(id)?.classList.add('hidden')
+const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+}))
 
 // Score → letter grade
 function letterGrade(score) {
@@ -51,7 +55,7 @@ async function fetchStudents() {
 function populateDropdowns() {
   const opts = `<option value="">Select student…</option>` +
     allStudents.map(s =>
-      `<option value="${s.id}">${s.name} (${s.grade_level||'—'})</option>`
+      `<option value="${escapeHtml(s.id)}">${escapeHtml(formatUserName(s.name))} (${escapeHtml(s.grade_level||'—')})</option>`
     ).join('')
 
   ;['gradeStudent','editGradeStudent'].forEach(id => {
@@ -139,7 +143,7 @@ export function applyFilters() {
   const qt = document.getElementById('quarterFilter')?.value      || ''
 
   filtered = allGrades.filter(g => {
-    const name  = g.profiles?.name        || ''
+    const name  = formatUserName(g.profiles?.name) || ''
     const grade = g.profiles?.grade_level || ''
     return (
       (!q  || name.toLowerCase().includes(q) || (g.subject||'').toLowerCase().includes(q)) &&
@@ -180,7 +184,7 @@ function render() {
   const pages = Math.ceil(total / PER_PAGE)
 
   tbody.innerHTML = slice.map(g => {
-    const name    = g.profiles?.name        || 'Unknown'
+    const name    = formatUserName(g.profiles?.name) || 'Unknown'
     const glevel  = g.profiles?.grade_level || '—'
     const score   = Number(g.score || 0)
     const letter  = letterGrade(score)
@@ -193,7 +197,7 @@ function render() {
       <td>
         <div class="ent-row">
           <div>
-            <div class="ent-name">${name}</div>
+            <div class="ent-name">${escapeHtml(name)}</div>
             <div class="ent-sub">${g.academic_year || '—'}</div>
           </div>
         </div>

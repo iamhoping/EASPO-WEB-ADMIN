@@ -1,5 +1,6 @@
 import { supabase } from '../services/supabaseClient.js'
 import { showToast } from '../ui/toast.js'
+import { formatUserName } from '../utils/name-format.js'
 import { renderPagination } from '../ui/pagination.js'
 import { loadSchoolBranding } from './school-branding.js'
 
@@ -69,7 +70,7 @@ async function actorNames(ids) {
   if (failedResult?.error) throw failedResult.error
   return Object.fromEntries(results.flatMap(result => result.data || []).map(profile => [
     profile.id,
-    profile.name || profile.email || profile.id,
+    formatUserName(profile.name) || profile.email || profile.id,
   ]))
 }
 
@@ -330,6 +331,7 @@ async function loadBackupHistory() {
 
 const SETTING_FIELDS = [
   ['school_name', 'systemSchoolName', 'text'],
+  ['school_address', 'systemSchoolAddress', 'text'],
   ['school_year', 'systemSchoolYear', 'text'],
   ['academic_period', 'systemAcademicPeriod', 'text'],
   ['auto_absent_grace_minutes', 'systemAbsenceGrace', 'number'],
@@ -411,6 +413,7 @@ async function saveSystemSettings(event) {
 
   const values = {
     school_name: document.getElementById('systemSchoolName')?.value.trim() || '',
+    school_address: document.getElementById('systemSchoolAddress')?.value.trim() || '',
     school_logo_url: currentSchoolLogoUrl,
     school_year: document.getElementById('systemSchoolYear')?.value.trim() || '',
     academic_period: document.getElementById('systemAcademicPeriod')?.value.trim() || '',

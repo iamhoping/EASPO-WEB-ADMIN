@@ -1,5 +1,6 @@
 import { supabase } from '../services/supabaseClient.js'
 import { showToast } from '../ui/toast.js'
+import { formatUserName } from '../utils/name-format.js'
 
 let allSchedules = []
 let allTeachers = []
@@ -43,7 +44,7 @@ function overlaps(startA, endA, startB, endB) {
 
 function getTeacherName(teacherId) {
   const teacher = allTeachers.find(row => String(row.id) === String(teacherId))
-  return teacher?.name || 'Unassigned'
+  return formatUserName(teacher?.name) || 'Unassigned'
 }
 
 function getSectionName(sectionId) {
@@ -113,7 +114,7 @@ function getRoomOptions() {
 
 function populateScheduleSelects() {
   const teacherOptions = ['<option value="">Select teacher…</option>']
-    .concat(allTeachers.map(teacher => `<option value="${teacher.id}">${teacher.name} ${teacher.teacher_id ? `(${teacher.teacher_id})` : ''}</option>`))
+    .concat(allTeachers.map(teacher => `<option value="${teacher.id}">${formatUserName(teacher.name)} ${teacher.teacher_id ? `(${teacher.teacher_id})` : ''}</option>`))
     .join('')
 
   const sectionOptions = ['<option value="">Select section…</option>']
