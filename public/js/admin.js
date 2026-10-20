@@ -143,7 +143,7 @@ const SECTIONS = {
   activityLogs: { id: 'activityLogsSection', title: 'Activity Logs', sub: 'Review recorded account and academic data changes' },
   systemMonitoring: { id: 'systemMonitoringSection', title: 'System Monitoring', sub: 'Monitor live service checks and operational telemetry' },
   security: { id: 'securitySection', title: 'Security', sub: 'Review security events and protected account workflows' },
-  backupRecovery: { id: 'backupRecoverySection', title: 'Backup & Recovery', sub: 'Review verified backup history and recovery guidance' },
+  backupRecovery: { id: 'backupRecoverySection', title: 'Backup & Restore', sub: 'Create, download, and safely restore encrypted data backups' },
   systemSettings: { id: 'systemSettingsSection', title: 'System Settings', sub: 'Configure non-secret school and academic settings' },
 }
 

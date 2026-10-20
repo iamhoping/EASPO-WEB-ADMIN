@@ -98,6 +98,7 @@
         <a class="nav-link" data-section="systemMonitoring" data-web-admin-only href="#"><span class="nav-icon">◉</span> System Monitoring</a>
         <a class="nav-link" data-section="security" data-web-admin-only href="#"><span class="nav-icon">⌑</span> Security</a>
         <a class="nav-link" data-section="systemSettings" data-web-admin-only href="#"><span class="nav-icon">⚙</span> System Settings</a>
+        <a class="nav-link" data-section="backupRecovery" data-web-admin-only href="#"><span class="nav-icon">▣</span> Backup &amp; Restore</a>
         <a class="nav-link" data-section="profile" href="#">
           <span class="nav-icon">👤</span> My Profile
         </a>
@@ -1028,18 +1029,58 @@
       </section>
 
       <section id="backupRecoverySection" class="hidden" data-web-admin-only>
-        <div class="panel" id="backupSetupNotice">
-          <div class="panel-title">Off-site backup job status</div>
-          <p id="backupSetupMessage">No successful encrypted backup upload has been recorded. Configure the daily GitHub Actions workflow and required repository secrets described in ARCHITECTURE.md.</p>
-          <p>A “Verified” run means the PostgreSQL archive passed pg_restore listing, was age-encrypted, uploaded, downloaded again, and matched its SHA-256 checksum. This does not mean a database restore has been tested.</p>
+        <div class="page-header admin-tool-heading">
+          <div>
+            <h2>Backup and Restore</h2>
+            <p>Last selective backup: <strong id="backupLastRun">Loading…</strong></p>
+          </div>
+          <button class="btn btn-secondary" id="refreshBackupsBtn" type="button">Refresh history</button>
         </div>
-        <div class="panel"><div class="panel-header"><div><div class="panel-title">Backup history</div><div class="panel-sub" id="backupHistorySummary">Checking for verified records...</div></div><button class="btn btn-secondary" id="refreshBackupsBtn" type="button">Refresh</button></div>
-          <div class="table-wrap"><table><thead><tr><th>Started</th><th>Completed</th><th>Verified</th><th>Status</th><th>Size</th><th>SHA-256</th><th>Artifact key</th><th>Result</th></tr></thead><tbody id="backupHistoryBody"><tr><td colspan="8">Loading backup history...</td></tr></tbody></table></div>
+
+        <div class="panel panel-padded">
+          <div class="panel-title">Create a backup</div>
+          <p class="panel-sub">Choose a date range, or leave both dates blank for all available dates. Date filters use attendance, creation, or update dates where available. Selected student, teacher, and parent profiles are included in full because they have no date columns.</p>
+          <div class="system-backup-date-grid">
+            <div class="form-group"><label class="form-label" for="backupDateFrom">From date</label><input class="form-input" id="backupDateFrom" type="date"></div>
+            <div class="form-group"><label class="form-label" for="backupDateTo">Through date</label><input class="form-input" id="backupDateTo" type="date"></div>
+          </div>
+          <label class="system-backup-option"><input id="backupAllDatasets" type="checkbox" checked><span><strong>Back up all supported data</strong></span></label>
+          <div class="system-backup-datasets">
+            <label class="system-backup-option"><input type="checkbox" data-backup-dataset value="students" checked><span>Students</span></label>
+            <label class="system-backup-option"><input type="checkbox" data-backup-dataset value="teachers" checked><span>Teachers</span></label>
+            <label class="system-backup-option"><input type="checkbox" data-backup-dataset value="parents" checked><span>Parents</span></label>
+            <label class="system-backup-option"><input type="checkbox" data-backup-dataset value="sections" checked><span>Sections</span></label>
+            <label class="system-backup-option"><input type="checkbox" data-backup-dataset value="subjects" checked><span>Subjects</span></label>
+            <label class="system-backup-option"><input type="checkbox" data-backup-dataset value="schedules" checked><span>Schedules</span></label>
+            <label class="system-backup-option"><input type="checkbox" data-backup-dataset value="grades" checked><span>Grades</span></label>
+            <label class="system-backup-option"><input type="checkbox" data-backup-dataset value="attendance" checked><span>Attendance</span></label>
+            <label class="system-backup-option"><input type="checkbox" data-backup-dataset value="system_settings" checked><span>System settings</span></label>
+          </div>
+          <button class="btn btn-primary" id="backupNowBtn" type="button">Backup Now</button>
+          <p class="system-backup-status" id="backupActionMessage" role="status" aria-live="polite"></p>
         </div>
-        <div class="panel">
-          <div class="panel-title">Recovery guidance</div>
-          <p>Restore only into a separate, isolated Supabase project. Download the encrypted object from the configured S3-compatible bucket, decrypt it with the offline age private key, inspect the archive with <code>pg_restore --list</code>, then restore and validate data in staging. Never test by restoring over production.</p>
-          <p>The dashboard does not expose download links, decryption keys, or restore controls. A successful upload/checksum is not a substitute for a periodic restore drill.</p>
+
+        <div class="panel panel-padded">
+          <div class="panel-title">Restore a backup</div>
+          <p class="panel-sub">Upload an EASPO <code>.easpobackup</code> file (maximum 10 MiB). It is validated before restore and held in private temporary storage. Existing rows are never updated; duplicate rows are skipped.</p>
+          <div class="system-backup-restore-controls">
+            <input id="restoreBackupFile" type="file" accept=".easpobackup,application/octet-stream">
+            <button class="btn btn-secondary" id="previewBackupBtn" type="button">Validate and Preview</button>
+          </div>
+          <pre class="system-backup-preview hidden" id="restorePreview" aria-live="polite"></pre>
+          <div class="system-backup-restore-actions">
+            <button class="btn btn-primary" id="restoreBackupBtn" type="button" disabled>Restore Backup</button>
+            <button class="btn btn-secondary hidden" id="discardRestoreFileBtn" type="button">Remove uploaded file</button>
+          </div>
+          <p class="system-backup-status" id="restoreActionMessage" role="status" aria-live="polite"></p>
+          <pre class="system-backup-preview hidden" id="restoreResults" aria-live="polite"></pre>
+        </div>
+
+        <div class="panel panel-padded">
+          <div class="panel-header system-backup-history-header">
+            <div><div class="panel-title">Backup history</div><div class="panel-sub" id="backupHistorySummary">Loading backup history…</div></div>
+          </div>
+          <div class="table-wrap"><table><thead><tr><th>Backup date</th><th>Date range</th><th>Included data</th><th>File size</th><th>Status</th><th>File</th></tr></thead><tbody id="backupHistoryBody"><tr><td colspan="6">Loading backup history…</td></tr></tbody></table></div>
         </div>
       </section>
 

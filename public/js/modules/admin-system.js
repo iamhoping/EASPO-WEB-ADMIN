@@ -3,6 +3,7 @@ import { showToast } from '../ui/toast.js'
 import { formatUserName } from '../utils/name-format.js'
 import { renderPagination } from '../ui/pagination.js'
 import { loadSchoolBranding } from './school-branding.js'
+import { initBackupRecovery, loadBackupHistory } from './backup-recovery.js'
 
 const PAGE_SIZE = 20
 const escapeHtml = value => String(value ?? '')
@@ -293,42 +294,6 @@ async function loadAuthLoginHistory() {
   }
 }
 
-async function loadBackupHistory() {
-  const body = document.getElementById('backupHistoryBody')
-  if (!body) return
-  body.innerHTML = '<tr><td colspan="8">Loading backup history...</td></tr>'
-  try {
-    const { data, error } = await supabase.from('system_backup_runs')
-      .select('started_at,completed_at,verified_at,status,result,object_key,sha256,size_bytes')
-      .order('started_at', { ascending: false })
-      .limit(100)
-    if (error) throw error
-    const runs = data || []
-    const verified = runs.find(run => run.status === 'verified' && run.verified_at)
-    setText('backupHistorySummary', verified
-      ? `Most recent verified backup: ${formatDate(verified.verified_at)}`
-      : 'No verified backup has been reported.')
-    const setupMessage = document.getElementById('backupSetupMessage')
-    if (setupMessage) {
-      setupMessage.textContent = verified
-        ? 'A successful off-site backup upload has been recorded. Review the latest run and continue performing isolated restore drills.'
-        : 'No successful encrypted backup upload has been recorded. Configure the daily GitHub Actions workflow and required repository secrets described in ARCHITECTURE.md.'
-    }
-    const notice = document.getElementById('backupSetupNotice')
-    notice?.classList.remove('hidden')
-    body.innerHTML = runs.length ? runs.map(run => `<tr>
-      <td>${escapeHtml(formatDate(run.started_at))}</td><td>${escapeHtml(formatDate(run.completed_at))}</td>
-      <td>${escapeHtml(formatDate(run.verified_at))}</td><td><span class="health-pill" data-status="${escapeHtml(run.status)}">${escapeHtml(run.status)}</span></td>
-      <td>${run.size_bytes ? `${escapeHtml((Number(run.size_bytes) / (1024 * 1024)).toFixed(2))} MiB` : '—'}</td>
-      <td><code>${escapeHtml(run.sha256 || '—')}</code></td>
-      <td><code>${escapeHtml(run.object_key || '—')}</code></td><td>${escapeHtml(run.result)}</td>
-    </tr>`).join('') : '<tr><td colspan="8">No backup history has been reported.</td></tr>'
-  } catch (error) {
-    setText('backupHistorySummary', 'Backup history is unavailable.')
-    body.innerHTML = `<tr><td colspan="8">${escapeHtml(error.message || 'Backup history could not be loaded.')}</td></tr>`
-  }
-}
-
 const SETTING_FIELDS = [
   ['school_name', 'systemSchoolName', 'text'],
   ['school_address', 'systemSchoolAddress', 'text'],
@@ -486,7 +451,7 @@ export function initAdminSystem() {
     }
     document.getElementById('activityRefreshBtn')?.addEventListener('click', () => loadActivityLogs(1))
     document.getElementById('refreshHealthBtn')?.addEventListener('click', loadSystemHealth)
-    document.getElementById('refreshBackupsBtn')?.addEventListener('click', loadBackupHistory)
+    initBackupRecovery()
     document.getElementById('refreshAuthLoginHistoryBtn')?.addEventListener('click', loadAuthLoginHistory)
     document.getElementById('systemSettingsForm')?.addEventListener('submit', saveSystemSettings)
     document.getElementById('systemSchoolLogoFile')?.addEventListener('change', event => {

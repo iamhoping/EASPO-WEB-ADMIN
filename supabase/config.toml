@@ -3,3 +3,6 @@ verify_jwt = false
 
 [functions.record-backup-run]
 verify_jwt = false
+
+[functions.selective-backup]
+verify_jwt = false
