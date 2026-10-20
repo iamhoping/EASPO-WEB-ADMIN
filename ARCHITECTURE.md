@@ -519,6 +519,12 @@ school address to public branding data for official report headers. Web Admins
 can configure it in System Settings; report Print and PDF use the active report's
 filtered tables and summaries in a dedicated print layout.
 
+Subject student lists derive assignments from schedules: each subject's
+scheduled sections determine the active students shown, deduplicated by profile.
+The Web Admin/School Admin Subjects view and each teacher's own schedule expose
+the filtered, printable roster while retaining the existing RLS-scoped profile
+and schedule reads.
+
 New and edited account names use `Last Name, First Name`. Existing names without
 a comma are displayed unchanged because the single stored name field does not
 reliably distinguish multi-word surnames, middle names, or suffixes. Convert
@@ -530,6 +536,7 @@ Deploy the migrations and Edge Functions:
 supabase db push
 supabase functions deploy create-school-account
 supabase functions deploy set-school-account-status
+supabase functions deploy delete-school-account
 supabase functions deploy manage-archived-account
 supabase functions deploy change-user-role
 supabase functions deploy system-health
@@ -543,11 +550,13 @@ Account archiving also requires deploying `manage-archived-account`; deploying
 Run `supabase db push` first so the archive metadata columns and RLS policies
 exist before invoking that function.
 
-Role assignment is available to Web Admins in User Management; the server
-rejects self-role changes and School Admin promotion to Web Admin. Account
-creation, status changes, password resets, role changes, and health checks
-must use their authenticated Edge Functions. Keep the Supabase service-role
-key and notification credentials in server-side environment variables only.
+Role assignment and permanent account deletion are available to Web Admins in
+User Management; the server rejects self-role changes, self-deletion, School
+Admin promotion to Web Admin, and deletion of the last active Web Admin.
+Account creation, status changes, password resets, role changes, deletion, and
+health checks must use their authenticated Edge Functions. Keep the Supabase
+service-role key and notification credentials in server-side environment
+variables only.
 
 System Monitoring checks the dashboard API/database live and shows only
 telemetry emitted by instrumented background processes. Authentication login

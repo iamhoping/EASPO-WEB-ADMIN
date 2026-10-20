@@ -1,6 +1,7 @@
 import { supabase } from '../services/supabaseClient.js'
 import { showToast } from '../ui/toast.js'
 import { renderPagination } from '../ui/pagination.js'
+import { openSubjectStudentList } from './subject-students.js'
 
 const GRADE_LEVELS = [7, 8, 9, 10, 11, 12]
 const PER_PAGE = 10
@@ -58,7 +59,7 @@ function renderSubjects() {
   tbody.innerHTML = pageSubjects.map(subject => `
     <tr>
       <td><code>${escapeHtml(subject.code || '—')}</code></td>
-      <td>${escapeHtml(subject.name || '—')}</td>
+      <td><button class="subject-detail-link" type="button" data-open-subject-students="${escapeHtml(subject.id)}">${escapeHtml(subject.name || '—')}</button></td>
       <td>${escapeHtml(formatGradeLevel(subject.grade_level))}</td>
       <td>${escapeHtml(subject.units ?? '—')}</td>
       <td>
@@ -236,6 +237,13 @@ export function initSubjectsSection() {
     button.addEventListener('click', closeModal)
   })
   byId('subjectsTableBody')?.addEventListener('click', event => {
+    const detailsButton = event.target.closest('[data-open-subject-students]')
+    if (detailsButton) {
+      const subject = subjects.find(item => String(item.id) === detailsButton.dataset.openSubjectStudents)
+      if (subject) openSubjectStudentList(subject)
+      return
+    }
+
     const button = event.target.closest('[data-subject-action]')
     if (!button) return
 

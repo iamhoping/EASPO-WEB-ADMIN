@@ -53,7 +53,6 @@ function getSectionName(sectionId) {
 }
 
 function getSubjectName(schedule) {
-  if (schedule?.subject_name) return schedule.subject_name
   if (schedule?.subject) return schedule.subject
   if (schedule?.subject_id) {
     const subject = allSubjects.find(row => String(row.id) === String(schedule.subject_id))
@@ -334,12 +333,12 @@ export async function loadScheduleManagement() {
 }
 
 function validateScheduleRecord(record, existingRows = allSchedules, ignoreId = '') {
-  if (!record.day || !record.start_time || !record.end_time || !record.room || !record.teacher_id || !record.section_id || (!record.subject_id && !record.subject_name)) {
+  if (!record.day || !record.start_time || !record.end_time || !record.room || !record.teacher_id || !record.section_id || (!record.subject_id && !record.subject)) {
     return { valid: false, message: 'All required fields must be completed.' }
   }
 
   const sectionGrade = getSectionGradeLevel(record.section_id)
-  const selectedSubject = allSubjects.find(subject => String(subject.id) === String(record.subject_id || '')) || allSubjects.find(subject => String(subject.name || subject.subject_name || subject.code) === String(record.subject_name || ''))
+  const selectedSubject = allSubjects.find(subject => String(subject.id) === String(record.subject_id || '')) || allSubjects.find(subject => String(subject.name || subject.code) === String(record.subject || ''))
   const subjectGrade = selectedSubject ? Number(selectedSubject.grade_level ?? selectedSubject.gradeLevel ?? selectedSubject.level ?? -1) : null
 
   if (sectionGrade !== null && subjectGrade !== null && Number(subjectGrade) !== Number(sectionGrade)) {
@@ -365,7 +364,7 @@ function validateScheduleRecord(record, existingRows = allSchedules, ignoreId = 
     const sameRoom = String(row.room || '').trim().toLowerCase() === String(record.room).trim().toLowerCase()
     const sameTeacher = String(row.teacher_id || '') === String(record.teacher_id)
     const sameSection = String(row.section_id || '') === String(record.section_id)
-    const sameSubject = String(row.subject_id || row.subject_name || row.subject || '') === String(record.subject_id || record.subject_name || record.subject || '')
+    const sameSubject = String(row.subject_id || row.subject || '') === String(record.subject_id || record.subject || '')
     return sameDay && sameStart && sameEnd && sameRoom && sameTeacher && sameSection && sameSubject
   })
 
@@ -497,8 +496,8 @@ export async function openEditScheduleModal(id) {
   document.getElementById('editScheduleSection').value = data.section_id || ''
 
   const subjectValue = data.subject_id
-    || allSubjects.find(subject => String(subject.name || subject.subject_name || subject.code) === String(data.subject_name || ''))?.id
-    || data.subject_name
+    || allSubjects.find(subject => String(subject.name || subject.code) === String(data.subject || ''))?.id
+    || data.subject
     || ''
 
   const subjectInput = document.getElementById('editScheduleSubject')

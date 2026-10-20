@@ -1069,7 +1069,7 @@ function injectReportStyles() {
       @page reportLandscape{size:landscape;margin:12mm 12mm 18mm}
       body *{visibility:hidden!important}
       #reportPrintRoot,#reportPrintRoot *{visibility:visible!important}
-      body>:not(#reportPrintRoot){display:none!important}
+      body>:not(#reportPrintRoot):not(#subjectStudentsPrintRoot){display:none!important}
       #reportPrintRoot{display:block!important;position:relative;width:100%;padding-bottom:10mm;background:#fff;color:#111827;font:10pt/1.4 Arial,sans-serif}
       #reportPrintRoot.report-print-landscape{page:reportLandscape}
       .report-print-header{display:flex;align-items:center;gap:18px;border-bottom:2px solid #1e3a5f;padding:0 0 12px;margin-bottom:18px}

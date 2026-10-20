@@ -5,6 +5,7 @@ import { showToast } from './ui/toast.js'
 import { loadSchoolBranding } from './modules/school-branding.js'
 import { formatUserName } from './utils/name-format.js'
 import { openStudentProfile } from './modules/students.js'
+import { openSubjectStudentList } from './modules/subject-students.js'
 
 loadSchoolBranding()
 
@@ -324,12 +325,13 @@ function renderTeacherSchedule() {
 
   tbody.innerHTML = pageItems.map(schedule => {
     const sectionName = schedule.sections?.name || '—'
-    const subjectName = schedule.subject || schedule.subjects?.name || '—'
+    const linkedSubject = getSubjectById(schedule.subject_id) || schedule.subjects || null
+    const subjectName = linkedSubject?.name || schedule.subject || '—'
     const studentCount = state.students.filter(student => String(student.section_id) === String(schedule.section_id)).length
 
     return `
       <tr>
-        <td>${subjectName}</td>
+        <td><button class="subject-detail-link" type="button" data-teacher-subject-roster="${escapeHtml(schedule.id)}">${escapeHtml(subjectName)}</button></td>
         <td>${sectionName}</td>
         <td>${schedule.day || '—'}</td>
         <td>${schedule.start_time || '—'} - ${schedule.end_time || '—'}</td>
@@ -487,6 +489,21 @@ async function initTeacherDashboard() {
   const profile = await loadTeacherProfile()
   if (!profile) return
   document.addEventListener('click', event => {
+    const subjectButton = event.target.closest('[data-teacher-subject-roster]')
+    if (subjectButton) {
+      const schedule = byId(state.schedules, subjectButton.dataset.teacherSubjectRoster)
+      if (!schedule) {
+        showToast('Subject unavailable', 'This schedule is no longer available.', 'error')
+        return
+      }
+      const subject = getSubjectById(schedule.subject_id) || schedule.subjects || {
+        id: schedule.subject_id || '',
+        name: schedule.subject || 'Subject',
+      }
+      openSubjectStudentList(subject, { sectionId: schedule.section_id })
+      return
+    }
+
     const button = event.target.closest('[data-view-student]')
     if (!button) return
     const studentId = button.dataset.viewStudent
@@ -513,7 +530,7 @@ async function initTeacherDashboard() {
 
   const subjectIds = [...new Set(schedules.map(schedule => schedule.subject_id).filter(Boolean))]
   if (subjectIds.length) {
-    const { data: subjects } = await supabase.from('subjects').select('id,name,grade_level').in('id', subjectIds)
+    const { data: subjects } = await supabase.from('subjects').select('id,name,code,grade_level,units').in('id', subjectIds)
     state.subjects = subjects || []
   } else {
     state.subjects = []

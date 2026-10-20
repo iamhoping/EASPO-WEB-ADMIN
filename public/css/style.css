@@ -262,6 +262,12 @@ input, select, textarea { font-family: var(--font-body); }
   
 }
 
+body.login-page.light-mode {
+  background: var(--bg) !important;
+  color: var(--text);
+  color-scheme: light;
+}
+
 .login-page::before {
   content: '';
   position: absolute;

@@ -172,6 +172,7 @@ function renderUsers() {
             </select>
             <button class="btn btn-secondary btn-sm" type="button" data-user-action="change-role" data-user-id="${escapeHtml(user.id)}" data-user-name="${escapeHtml(name)}" ${user.id === window.currentUserId ? 'disabled' : ''}>Save Role</button>
             <button class="btn btn-secondary btn-sm" type="button" onclick="openChangeUserPasswordModal('${escapeHtml(user.id)}')">Reset Password</button>
+            <button class="btn btn-danger btn-sm" type="button" data-user-action="delete" data-user-id="${escapeHtml(user.id)}" data-user-name="${escapeHtml(name)}" ${user.id === window.currentUserId ? 'disabled' : ''}>Delete</button>
           ` : ''}
           ${document.body.dataset.role === 'WEB_ADMIN' && user.id === window.currentUserId
             ? '<span class="ent-sub">Your role cannot be changed here.</span>'
@@ -213,6 +214,32 @@ async function changeUserRole(userId, name) {
     await loadUserManagement()
   } catch (error) {
     showToast('Role not changed', await functionErrorMessage(error), 'error')
+  }
+}
+
+async function deleteUserAccount(userId, name, button) {
+  if (document.body.dataset.role !== 'WEB_ADMIN') {
+    return showToast('Not authorized', 'Only a Web Admin can delete accounts.', 'error')
+  }
+  if (userId === window.currentUserId) {
+    return showToast('Account not deleted', 'You cannot delete your own account.', 'warning')
+  }
+  const user = allUsers.find(item => item.id === userId)
+  if (!user) return showToast('User not found', 'Refresh the user list and try again.', 'warning')
+  if (!window.confirm(`Permanently delete ${name}'s account? This cannot be undone. The action may be blocked if other records still depend on this account.`)) return
+
+  button.disabled = true
+  try {
+    const { error } = await supabase.functions.invoke('delete-school-account', {
+      body: { userId },
+    })
+    if (error) throw error
+    showToast('Account deleted', `${name}'s account was permanently deleted.`, 'success')
+    await loadUserManagement()
+  } catch (error) {
+    showToast('Account not deleted', await functionErrorMessage(error), 'error')
+  } finally {
+    button.disabled = false
   }
 }
 
@@ -315,8 +342,13 @@ export function initUserManagementSection() {
   document.getElementById('changePasswordNew')?.addEventListener('input', updatePasswordRules)
   document.getElementById('changePasswordConfirm')?.addEventListener('input', updatePasswordRules)
   document.getElementById('userManagementTableBody')?.addEventListener('click', event => {
-    const button = event.target.closest('[data-user-action="change-role"]')
-    if (button) changeUserRole(button.dataset.userId, button.dataset.userName)
+    const button = event.target.closest('[data-user-action]')
+    if (!button) return
+    if (button.dataset.userAction === 'change-role') {
+      changeUserRole(button.dataset.userId, button.dataset.userName)
+    } else if (button.dataset.userAction === 'delete') {
+      deleteUserAccount(button.dataset.userId, button.dataset.userName, button)
+    }
   })
   loadUserManagement()
 }
