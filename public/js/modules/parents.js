@@ -221,15 +221,18 @@ export async function submitEditParent() {
   if (linkedStudentId && !allStudents.some(student => String(student.id) === linkedStudentId))
     return showToast('Invalid linked student', 'Select an active student from the list.', 'warning')
 
-  const {error} = await supabase.from('profiles').update({
-    name: formatUserName(name), email,
-    relation           : val('editParentRelation')||null,
-    contact            : val('editParentContact')||null,
-    address            : val('editParentAddress')||null,
-    linked_student_id  : linkedStudentId || null,
-  }).eq('id',id)
+  const {count, error} = await supabase.from('profiles')
+    .update({
+      name: formatUserName(name), email,
+      relation           : val('editParentRelation')||null,
+      contact            : val('editParentContact')||null,
+      address            : val('editParentAddress')||null,
+      linked_student_id  : linkedStudentId || null,
+    }, { count: 'exact' })
+    .eq('id', id)
 
   if(error) return showToast('Error',error.message,'error')
+  if (count === 0) return showToast('Error', 'Parent profile was not updated. Check your access and try again.', 'error')
   showToast('Saved',`${formatUserName(name)} updated`,'success')
   closeM('editParentModal')
   loadParents()

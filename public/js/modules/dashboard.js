@@ -115,23 +115,42 @@ function renderGradeDistribution(rows) {
     counts.set(grade, (counts.get(grade) || 0) + 1)
   }
   const grades = [...counts.entries()].sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
+  const tableBody = document.getElementById('dashboardGradeTableBody')
+  const tableWrap = document.getElementById('dashboardGradeTableWrap')
+  const emptyState = document.getElementById('dashboardGradeEmpty')
+  if (!tableBody || !tableWrap || !emptyState) return
+
+  tableBody.replaceChildren()
   if (!grades.length) {
-    showChartMessage('dashboardGradeChart', 'No student profile records are available.')
+    tableWrap.classList.add('hidden')
+    emptyState.textContent = 'No student profile records are available.'
+    emptyState.classList.remove('hidden')
     return
   }
 
-  renderDashboardChart('dashboardGradeChart', 'bar', {
-    labels: grades.map(([grade]) => grade),
-    datasets: [{
-      label: 'Students',
-      data: grades.map(([, count]) => count),
-      backgroundColor: '#0ea5e9',
-      borderRadius: 5
-    }]
-  }, {
-    indexAxis: 'y',
-    scales: { x: { beginAtZero: true, ticks: { precision: 0 } } }
-  })
+  tableWrap.classList.remove('hidden')
+  emptyState.classList.add('hidden')
+  for (const [grade, count] of grades) {
+    const row = document.createElement('tr')
+    const gradeCell = document.createElement('td')
+    const countCell = document.createElement('td')
+    gradeCell.textContent = grade
+    countCell.textContent = String(count)
+    row.append(gradeCell, countCell)
+    tableBody.append(row)
+  }
+}
+
+function showGradeMessage(message) {
+  const tableBody = document.getElementById('dashboardGradeTableBody')
+  const tableWrap = document.getElementById('dashboardGradeTableWrap')
+  const emptyState = document.getElementById('dashboardGradeEmpty')
+  if (tableBody) tableBody.replaceChildren()
+  tableWrap?.classList.add('hidden')
+  if (emptyState) {
+    emptyState.textContent = message
+    emptyState.classList.remove('hidden')
+  }
 }
 
 export async function loadDashboard() {
@@ -177,7 +196,7 @@ export async function loadDashboard() {
     showToast(`Some dashboard data could not be loaded: ${failedQueries.join('; ')}`, 'error')
   }
 
-  if (studentsResult.error) showChartMessage('dashboardGradeChart', 'Student data could not be loaded.')
+  if (studentsResult.error) showGradeMessage('Student data could not be loaded.')
   else renderGradeDistribution(studentsResult.data)
   if (attendanceResult.error) showChartMessage('dashboardAttendanceChart', 'Attendance data could not be loaded.')
   else renderAttendanceTrend(attendanceResult.data)

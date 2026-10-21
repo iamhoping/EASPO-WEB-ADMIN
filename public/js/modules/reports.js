@@ -28,7 +28,6 @@ const REPORTS = [
   { id: 'overview', label: 'Dashboard Overview' },
   { id: 'attendance', label: 'Attendance Reports' },
   { id: 'academic', label: 'Academic Reports' },
-  { id: 'enrollment', label: 'Enrollment Reports' },
   { id: 'teacher', label: 'Teacher Reports' },
   { id: 'section', label: 'Section Reports' },
   { id: 'subject', label: 'Subject Reports' },
@@ -281,7 +280,6 @@ function renderOverviewReport() {
       ['Students per Grade Level', 'overviewStudentsGradeChart'],
       ['Attendance Percentage', 'overviewAttendancePercentChart'],
       ['Average Grades', 'overviewAverageGradesChart'],
-      ['Enrollment Trends', 'overviewEnrollmentTrendChart'],
       ['Subject Distribution', 'overviewSubjectDistributionChart']
     ])}
     ${dataTable('Tables Used', ['Table', 'Records'], [
@@ -378,10 +376,8 @@ function renderEnrollmentReport() {
       ['Total Enrolled Students', enrollments.length],
       ['Enrollment by Section', Object.keys(bySection).length],
       ['Enrollment by Grade Level', Object.keys(byGrade).length],
-      ['Enrollment Growth Trends', countThisMonth(enrollments, 'created_at')]
     ])}
     ${chartGrid([
-      ['Enrollment Growth', 'enrollmentGrowthChart'],
       ['Students per Section', 'enrollmentSectionChart'],
       ['Students per Grade Level', 'enrollmentGradeChart']
     ])}

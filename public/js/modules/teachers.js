@@ -218,9 +218,12 @@ export async function submitEditTeacher() {
   if (document.body.dataset.role !== 'SCHOOL_ADMIN') {
     updates.status = val('editTeacherStatus') || null
   }
-  const {error} = await supabase.from('profiles').update(updates).eq('id',id)
+  const {count, error} = await supabase.from('profiles')
+    .update(updates, { count: 'exact' })
+    .eq('id', id)
 
   if(error) return showToast('Error',error.message,'error')
+  if (count === 0) return showToast('Error', 'Teacher profile was not updated. Check your access and try again.', 'error')
   showToast('Saved',`${formatUserName(name)} updated`,'success')
   closeM('editTeacherModal')
   loadTeachers()

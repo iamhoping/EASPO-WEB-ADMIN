@@ -590,6 +590,23 @@ body.login-page.light-mode {
   filter: drop-shadow(0 0 8px rgba(16,185,129,0.28));
 }
 
+.nav-link-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.nav-link-copy small {
+  color: var(--text3);
+  font-size: .65rem;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.nav-link.active .nav-link-copy small {
+  color: var(--primary);
+}
+
 /* ─── Dropdown Menu Styles ─────────────────────────────────── */
 .nav-dropdown {
   position: relative;
@@ -898,6 +915,34 @@ body.login-page.light-mode {
 }
 .page-header p { font-size: .78rem; color: var(--text3); margin-top: 2px; }
 .page-header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.subjects-page-header {
+  align-items: center;
+  padding: 4px 0 2px;
+}
+
+.subjects-page-intro {
+  display: grid;
+  gap: 4px;
+}
+
+.subjects-page-kicker {
+  color: var(--primary);
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.subjects-page-intro h2 {
+  font-size: 1.25rem;
+}
+
+.subjects-page-intro p {
+  margin: 0;
+  color: var(--text3);
+  font-size: .82rem;
+}
 
 /* ═══════════════════════════════════════════════════════════
    STAT CARDS
@@ -3642,13 +3687,22 @@ tbody tr:hover {
 }
 
 #overviewSection .dashboard-chart-card .chart-body {
-  height: 190px;
+  height: auto;
+}
+
+#overviewSection .dashboard-grade-table {
+  min-width: 0;
+}
+
+#overviewSection .dashboard-grade-table th:last-child,
+#overviewSection .dashboard-grade-table td:last-child {
+  text-align: right;
 }
 
 .dashboard-chart-empty {
   display: grid;
-  height: 100%;
   margin: 0;
+  padding: 16px 0;
   place-items: center;
   color: var(--text3);
   font-size: .82rem;
@@ -3752,10 +3806,6 @@ body.light-mode .calendar-day.weekend.today {
 
   #overviewSection .dashboard-insights {
     grid-template-columns: 1fr;
-  }
-
-  #overviewSection .dashboard-chart-card .chart-body {
-    height: 220px;
   }
 
   .calendar-month-select {

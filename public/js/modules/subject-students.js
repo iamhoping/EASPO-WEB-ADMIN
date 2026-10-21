@@ -54,6 +54,7 @@ function ensureModal() {
             <span>Section</span>
             <select id="subjectStudentsSection" class="filter-select"><option value="">All Sections</option></select>
           </label>
+          <button class="btn btn-secondary" type="button" id="exportSubjectStudents">Export CSV</button>
           <button class="btn btn-secondary" type="button" id="printSubjectStudents">Print Student List</button>
         </div>
         <p class="subject-students-count" id="subjectStudentsCount" aria-live="polite"></p>
@@ -81,6 +82,7 @@ function ensureModal() {
   byId('subjectStudentsSearch').addEventListener('input', renderStudents)
   byId('subjectStudentsGrade').addEventListener('change', renderStudents)
   byId('subjectStudentsSection').addEventListener('change', renderStudents)
+  byId('exportSubjectStudents').addEventListener('click', exportSubjectStudents)
   byId('printSubjectStudents').addEventListener('click', printSubjectStudents)
 }
 
@@ -95,7 +97,7 @@ function injectStyles() {
     .subject-students-info > div{padding:10px 12px;border:1px solid var(--border);border-radius:9px}
     .subject-students-info span,.subject-students-toolbar label span{display:block;color:var(--text3);font-size:.72rem}
     .subject-students-info strong{display:block;color:var(--text);font-size:.88rem;overflow-wrap:anywhere}
-    .subject-students-toolbar{display:grid;grid-template-columns:minmax(180px,2fr) repeat(2,minmax(130px,1fr)) auto;gap:10px;align-items:end}
+    .subject-students-toolbar{display:grid;grid-template-columns:minmax(180px,2fr) repeat(2,minmax(130px,1fr)) auto auto;gap:10px;align-items:end}
     .subject-students-toolbar label{display:block;color:var(--text2);font-size:.76rem;font-weight:700}
     .subject-students-toolbar .filter-select{width:100%;margin-top:5px}
     .subject-students-count{margin:14px 0 8px;color:var(--text2);font-weight:700}
@@ -108,7 +110,7 @@ function injectStyles() {
       .subject-students-info{grid-template-columns:repeat(2,minmax(0,1fr))}
       .subject-students-toolbar{grid-template-columns:1fr 1fr}
       .subject-students-toolbar label:first-child{grid-column:1/-1}
-      .subject-students-toolbar button{grid-column:1/-1}
+      .subject-students-toolbar button{grid-column:span 1}
       .subject-students-table-wrap{max-height:50vh}
     }
     @media print{
@@ -300,6 +302,38 @@ function startRealtimeRefresh() {
 function scheduleRealtimeRefresh() {
   clearTimeout(refreshTimer)
   refreshTimer = setTimeout(loadAssignedStudents, 250)
+}
+
+function exportSubjectStudents() {
+  const filtered = getFilteredStudents()
+  if (!filtered.length) {
+    showToast('Nothing to export', 'No students match the selected filters.', 'warning')
+    return
+  }
+
+  const escapeCsv = value => `"${String(value ?? '').replace(/"/g, '""')}"`
+  const rows = [
+    ['LRN Number', 'Student Name', 'Grade Level', 'Section', 'Gender'],
+    ...filtered.map(student => [
+      student.student_id || '',
+      formatUserName(student.name) || 'Unnamed Student',
+      gradeLabel(student.grade_level),
+      sectionNames.get(String(student.section_id)) || '',
+      student.gender || ''
+    ])
+  ]
+  const csv = `\uFEFF${rows.map(row => row.map(escapeCsv).join(',')).join('\r\n')}`
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+  const link = document.createElement('a')
+  const subjectName = String(activeSubject?.code || activeSubject?.name || 'subject')
+    .replace(/[^a-z0-9_-]+/gi, '-')
+    .replace(/^-|-$/g, '')
+  link.href = url
+  link.download = `${subjectName || 'subject'}-students.csv`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
 async function loadBranding() {

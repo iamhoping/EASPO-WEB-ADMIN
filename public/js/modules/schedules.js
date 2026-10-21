@@ -30,6 +30,20 @@ function normalizeTime(value) {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
 }
 
+function formatDisplayTime(value) {
+  const normalized = normalizeTime(value)
+  const match = normalized.match(/^(\d{2}):(\d{2})$/)
+  if (!match) return normalized || '—'
+
+  const hours = Number(match[1])
+  const minutes = Number(match[2])
+  if (hours > 23 || minutes > 59) return normalized
+
+  const period = hours < 12 ? 'am' : 'pm'
+  const displayHours = hours % 12 || 12
+  return `${displayHours}:${String(minutes).padStart(2, '0')}${period}`
+}
+
 function timeToMinutes(value) {
   const normalized = normalizeTime(value)
   if (!normalized) return null
@@ -262,7 +276,7 @@ function renderScheduleRows(list) {
     return `
       <tr>
         <td>${schedule.day || '—'}</td>
-        <td>${schedule.start_time ? normalizeTime(schedule.start_time) : '—'} – ${schedule.end_time ? normalizeTime(schedule.end_time) : '—'}</td>
+        <td>${formatDisplayTime(schedule.start_time)} to ${formatDisplayTime(schedule.end_time)}</td>
         <td>${schedule.room || '—'}</td>
         <td>${teacherName}</td>
         <td>${sectionName}</td>

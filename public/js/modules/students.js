@@ -252,11 +252,14 @@ export async function submitEditStudent() {
   if (document.body.dataset.role !== 'SCHOOL_ADMIN') {
     updates.status = val('editStudentStatus') || null
   }
-  const {error} = await supabase.from('profiles').update(updates).eq('id',id)
+  const {count, error} = await supabase.from('profiles')
+    .update(updates, { count: 'exact' })
+    .eq('id', id)
 
   if(error) return showToast('Error',error.message.includes('profiles_student_student_id_unique')
     ? 'That LRN number is already assigned to another student.'
     : error.message,'error')
+  if (count === 0) return showToast('Error', 'Student profile was not updated. Check your access and try again.', 'error')
   showToast('Saved',`${formatUserName(name)} updated`,'success')
   closeM('editStudentModal')
   loadStudents()
