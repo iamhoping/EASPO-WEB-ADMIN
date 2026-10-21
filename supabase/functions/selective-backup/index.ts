@@ -99,38 +99,64 @@ function validateBackup(value: unknown): BackupPackage {
     throw new Error('The backup file has an invalid structure.')
   }
   const candidate = value as Partial<BackupPackage>
-  if (candidate.format !== FORMAT || candidate.version !== 1 ||
-      typeof candidate.createdAt !== 'string' || !Number.isFinite(Date.parse(candidate.createdAt)) ||
-      !Array.isArray(candidate.tables) || !candidate.tables.length ||
-      !candidate.records || typeof candidate.records !== 'object' || Array.isArray(candidate.records)) {
-    throw new Error('The backup format or required metadata is invalid.')
+  if (candidate.format !== FORMAT) {
+    throw new Error(`Unsupported backup format; expected "${FORMAT}".`)
   }
-  if (!candidate.tables.every(isDataset) || new Set(candidate.tables).size !== candidate.tables.length) {
-    throw new Error('The backup contains unsupported or duplicate table names.')
+  if (candidate.version !== 1) {
+    throw new Error(`Unsupported backup version "${String(candidate.version)}"; expected version 1.`)
+  }
+  if (typeof candidate.createdAt !== 'string' || !Number.isFinite(Date.parse(candidate.createdAt))) {
+    throw new Error('The backup metadata field "createdAt" must be a valid date and time.')
+  }
+  if (!Array.isArray(candidate.tables) || !candidate.tables.length) {
+    throw new Error('The backup metadata field "tables" must list at least one dataset.')
+  }
+  if (!candidate.records || typeof candidate.records !== 'object' || Array.isArray(candidate.records)) {
+    throw new Error('The backup field "records" must be an object keyed by dataset name.')
+  }
+  const unsupportedTable = candidate.tables.find(table => !isDataset(table))
+  if (unsupportedTable !== undefined) {
+    throw new Error(`The backup manifest contains unsupported dataset "${String(unsupportedTable)}".`)
+  }
+  const duplicateTable = candidate.tables.find((table, index) => candidate.tables!.indexOf(table) !== index)
+  if (duplicateTable !== undefined) {
+    throw new Error(`The backup manifest lists dataset "${duplicateTable}" more than once.`)
   }
   const records = candidate.records as Record<string, unknown>
   const recordKeys = Object.keys(records)
-  if (recordKeys.length !== candidate.tables.length ||
-      recordKeys.some(key => !candidate.tables!.includes(key as DatasetName))) {
-    throw new Error('The backup data does not match its table manifest.')
+  const missingDataset = candidate.tables.find(table => !Object.hasOwn(records, table))
+  if (missingDataset !== undefined) {
+    throw new Error(`The backup manifest lists "${missingDataset}", but its records are missing.`)
+  }
+  const unlistedDataset = recordKeys.find(key => !candidate.tables!.includes(key as DatasetName))
+  if (unlistedDataset !== undefined) {
+    throw new Error(`The records contain "${unlistedDataset}", which is not listed in the table manifest.`)
   }
   let recordCount = 0
   for (const table of candidate.tables) {
     const rows = records[table]
-    if (!Array.isArray(rows) || rows.some(row => !row || typeof row !== 'object' || Array.isArray(row))) {
-      throw new Error(`The ${table} dataset is not a list of records.`)
+    if (!Array.isArray(rows)) {
+      throw new Error(`The "${table}" dataset must be an array of records.`)
+    }
+    const invalidRecordIndex = rows.findIndex(row => !row || typeof row !== 'object' || Array.isArray(row))
+    if (invalidRecordIndex >= 0) {
+      throw new Error(`The "${table}" dataset record ${invalidRecordIndex + 1} must be an object.`)
     }
     recordCount += rows.length
   }
   if (recordCount > MAX_RECORDS) throw new Error(`The backup exceeds the ${MAX_RECORDS.toLocaleString()} record safety limit.`)
-  if (!candidate.filters || typeof candidate.filters !== 'object' ||
-      !(candidate.filters.dateFrom === null || isDate(candidate.filters.dateFrom)) ||
-      !(candidate.filters.dateTo === null || isDate(candidate.filters.dateTo))) {
-    throw new Error('The backup date range is invalid.')
+  if (!candidate.filters || typeof candidate.filters !== 'object' || Array.isArray(candidate.filters)) {
+    throw new Error('The backup metadata field "filters" must be an object.')
+  }
+  if (!(candidate.filters.dateFrom === null || isDate(candidate.filters.dateFrom))) {
+    throw new Error('The backup filter "dateFrom" must be null or a valid YYYY-MM-DD date.')
+  }
+  if (!(candidate.filters.dateTo === null || isDate(candidate.filters.dateTo))) {
+    throw new Error('The backup filter "dateTo" must be null or a valid YYYY-MM-DD date.')
   }
   if (candidate.filters.dateFrom && candidate.filters.dateTo &&
       candidate.filters.dateFrom > candidate.filters.dateTo) {
-    throw new Error('The backup date range is reversed.')
+    throw new Error('The backup date range is reversed: "dateFrom" is later than "dateTo".')
   }
   return candidate as BackupPackage
 }
@@ -381,8 +407,14 @@ serve(async req => {
           p_rows: backup.records,
         })
         if (validationError || !validatedCounts || typeof validatedCounts !== 'object') {
-          if (validationError) console.error('Backup preview validation failed.', { code: validationError.code || 'unknown' })
-          return response(400, { error: 'Backup contents failed schema or required-field validation. No restore was attempted.' })
+          if (validationError) {
+            console.error('Backup preview validation failed.', { code: validationError.code || 'unknown' })
+            const detail = String(validationError.message || 'Database schema validation failed.')
+              .replace(/\s+/g, ' ')
+              .slice(0, 500)
+            return response(400, { error: `Backup validation failed: ${detail} No restore was attempted.` })
+          }
+          return response(400, { error: 'Backup validation returned no dataset counts. No restore was attempted.' })
         }
         return response(200, preview(backup, validatedCounts as Record<string, number>))
       }
