@@ -15,6 +15,7 @@ for (let date = new Date(`${SCHOOL_YEAR_2025_2026.startDate}T00:00:00`); date <=
 let today = getManilaToday()
 let currentDate = getInitialCalendarMonth()
 let attendanceData = {}
+let calendarStudentIds = null
 let selectedDate = isSchoolDay(today) && today >= formatLocalDate(new Date(`${SCHOOL_YEAR_2025_2026.startDate}T00:00:00`))
   ? today
   : ''
@@ -58,20 +59,26 @@ async function fetchAttendanceData(date) {
   const start = bounds.start < SCHOOL_YEAR_2025_2026.startDate ? SCHOOL_YEAR_2025_2026.startDate : bounds.start
   const end = bounds.end > SCHOOL_YEAR_2025_2026.endDate ? SCHOOL_YEAR_2025_2026.endDate : bounds.end
   if (start > end) return {}
+  if (calendarStudentIds && !calendarStudentIds.length) return {}
+
+  let attendanceQuery = supabase.from('attendance')
+    .select('student_id, attendance_date, status')
+    .gte('attendance_date', start)
+    .lte('attendance_date', end)
+    .order('attendance_date', { ascending: true })
+  if (calendarStudentIds) attendanceQuery = attendanceQuery.in('student_id', calendarStudentIds)
 
   const [
     { count: totalStudents, error: studentsError },
     { data, error }
   ] = await Promise.all([
-    supabase.from('profiles')
-      .select('id', { count: 'exact', head: true })
-      .eq('role', 'STUDENT')
-      .or('status.is.null,status.neq.archived'),
-    supabase.from('attendance')
-      .select('student_id, attendance_date, status')
-      .gte('attendance_date', start)
-      .lte('attendance_date', end)
-      .order('attendance_date', { ascending: true })
+    calendarStudentIds
+      ? Promise.resolve({ count: calendarStudentIds.length, error: null })
+      : supabase.from('profiles')
+        .select('id', { count: 'exact', head: true })
+        .eq('role', 'STUDENT')
+        .or('status.is.null,status.neq.archived'),
+    attendanceQuery
   ])
 
   if (studentsError) {
@@ -264,7 +271,11 @@ function updateCalendarDetail(dateStr) {
     : `<span class="calendar-detail-icon muted">i</span><div><strong>${label}</strong><span>${calendarEvent?.label || 'No attendance records were recorded for this date.'}</span></div>`
 }
 
-export function initCalendar() {
+export function initCalendar(options = {}) {
+  calendarStudentIds = Array.isArray(options.studentIds)
+    ? [...new Set(options.studentIds.filter(Boolean))]
+    : null
+
   const monthSelect = document.getElementById('calendarMonthSelect')
   if (monthSelect) {
     monthSelect.innerHTML = SCHOOL_YEAR_MONTHS.map(month => {

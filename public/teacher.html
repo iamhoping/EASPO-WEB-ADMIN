@@ -127,8 +127,25 @@
             </div>
           </div>
 
-          <div class="chart-row">
-            <div class="panel">
+          <div class="chart-row teacher-dashboard-overview-row">
+            <div class="panel teacher-calendar-panel">
+              <div class="panel-header">
+                <div>
+                  <div class="panel-title">Calendar</div>
+                  <div class="panel-sub">Attendance for students in your assigned classes.</div>
+                </div>
+                <div class="panel-actions">
+                  <select class="filter-select calendar-month-select" id="calendarMonthSelect" aria-label="Select calendar month"></select>
+                </div>
+              </div>
+              <div class="calendar-detail hidden" id="calendarDetail" aria-live="polite"></div>
+              <div class="calendar-container" id="calendarContainer"></div>
+              <div class="calendar-legend">
+                <span><i class="legend-dot legend-past"></i>Past</span>
+              </div>
+            </div>
+
+            <div class="panel teacher-summary-panel">
               <div class="panel-header">
                 <div>
                   <div class="panel-title">Teacher Overview</div>

@@ -3818,3 +3818,175 @@ body.light-mode .calendar-day.weekend.today {
     padding-left: 14px;
   }
 }
+
+#overviewSection .teacher-calendar-panel {
+  overflow: hidden;
+}
+
+#overviewSection .teacher-calendar-panel .calendar-container {
+  padding: 14px 18px 12px;
+}
+
+#overviewSection .teacher-calendar-panel .calendar {
+  width: min(100%, 700px);
+}
+
+#overviewSection .teacher-calendar-panel .calendar-weekdays,
+#overviewSection .teacher-calendar-panel .calendar-days {
+  gap: 8px;
+}
+
+#overviewSection .teacher-calendar-panel .calendar-weekdays {
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+}
+
+#overviewSection .teacher-calendar-panel .calendar-day {
+  aspect-ratio: auto;
+  min-height: 72px;
+  padding: 8px 4px;
+  border-radius: 12px;
+}
+
+#overviewSection .teacher-calendar-panel .day-number {
+  margin-bottom: 4px;
+  font-size: .95rem;
+}
+
+#overviewSection .teacher-calendar-panel .day-meta {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: .6rem;
+  text-overflow: ellipsis;
+}
+
+#overviewSection .teacher-calendar-panel .calendar-detail {
+  margin-bottom: 14px;
+}
+
+@media (max-width: 640px) {
+  #overviewSection .teacher-calendar-panel .calendar-container {
+    padding: 12px 10px 8px;
+  }
+
+  #overviewSection .teacher-calendar-panel .calendar-weekdays,
+  #overviewSection .teacher-calendar-panel .calendar-days {
+    gap: 5px;
+  }
+
+  #overviewSection .teacher-calendar-panel .calendar-weekdays {
+    margin-bottom: 6px;
+    padding-bottom: 6px;
+  }
+
+  #overviewSection .teacher-calendar-panel .calendar-day {
+    min-height: 56px;
+    padding: 6px 1px;
+    border-radius: 9px;
+  }
+
+  #overviewSection .teacher-calendar-panel .day-number {
+    margin-bottom: 3px;
+    font-size: .84rem;
+  }
+
+  #overviewSection .teacher-calendar-panel .day-meta {
+    font-size: .48rem;
+  }
+}
+
+body[data-brand-title="Teacher Dashboard"] #overviewSection > .stats-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+body[data-brand-title="Teacher Dashboard"] #overviewSection > .stats-grid .stat-card {
+  min-height: 0;
+  padding: 14px 16px;
+  border-radius: 13px;
+  box-shadow: 0 5px 16px rgba(0, 0, 0, .07);
+}
+
+body[data-brand-title="Teacher Dashboard"] #overviewSection > .stats-grid .stat-row {
+  min-height: 0;
+  margin-bottom: 10px;
+}
+
+body[data-brand-title="Teacher Dashboard"] #overviewSection > .stats-grid .stat-value {
+  margin-bottom: 5px;
+  font-size: 1.65rem;
+}
+
+body[data-brand-title="Teacher Dashboard"] #overviewSection > .stats-grid .stat-label {
+  font-size: .72rem;
+}
+
+body[data-brand-title="Teacher Dashboard"] #overviewSection > .stats-grid .stat-change {
+  padding: 3px 8px;
+}
+
+body[data-brand-title="Teacher Dashboard"] #overviewSection .teacher-dashboard-overview-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(280px, .8fr);
+  align-items: start;
+  gap: 16px;
+}
+
+body[data-brand-title="Teacher Dashboard"] #overviewSection .teacher-dashboard-overview-row > .panel {
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+body[data-brand-title="Teacher Dashboard"] #overviewSection .teacher-summary-panel .panel-body {
+  padding: 18px;
+}
+
+body[data-brand-title="Teacher Dashboard"] #overviewSection .teacher-summary-panel .info-grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+body[data-brand-title="Teacher Dashboard"] #overviewSection .teacher-summary-panel .info-box {
+  padding: 15px 16px;
+  border-radius: 12px;
+}
+
+body[data-brand-title="Teacher Dashboard"] #overviewSection .teacher-summary-panel .info-label {
+  margin-bottom: 6px;
+}
+
+body[data-brand-title="Teacher Dashboard"] #overviewSection .teacher-summary-panel .info-value {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 860px) {
+  body[data-brand-title="Teacher Dashboard"] #overviewSection > .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+}
+
+@media (max-width: 1100px) {
+  body[data-brand-title="Teacher Dashboard"] #overviewSection .teacher-dashboard-overview-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 420px) {
+  body[data-brand-title="Teacher Dashboard"] #overviewSection > .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  body[data-brand-title="Teacher Dashboard"] #overviewSection > .stats-grid .stat-card {
+    padding: 12px 10px;
+  }
+
+  body[data-brand-title="Teacher Dashboard"] #overviewSection > .stats-grid .stat-value {
+    font-size: 1.5rem;
+  }
+
+  body[data-brand-title="Teacher Dashboard"] #overviewSection > .stats-grid .stat-label {
+    font-size: .66rem;
+  }
+}

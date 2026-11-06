@@ -6,6 +6,7 @@ import { loadSchoolBranding } from './modules/school-branding.js'
 import { formatUserName } from './utils/name-format.js'
 import { openStudentProfile } from './modules/students.js'
 import { openSubjectStudentList } from './modules/subject-students.js'
+import { initCalendar } from './modules/calendar.js'
 
 loadSchoolBranding()
 
@@ -537,6 +538,7 @@ async function initTeacherDashboard() {
   }
 
   state.students = await fetchTeacherStudents(sectionIds)
+  initCalendar({ studentIds: state.students.map(student => student.id) })
   const studentIds = state.students.map(student => student.id)
   state.attendance = await fetchTeacherAttendance(studentIds)
   state.grades = await fetchTeacherGrades(studentIds)
