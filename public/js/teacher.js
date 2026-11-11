@@ -4,6 +4,7 @@ import { renderPagination } from './ui/pagination.js'
 import { showToast } from './ui/toast.js'
 import { loadSchoolBranding } from './modules/school-branding.js'
 import { formatUserName } from './utils/name-format.js'
+import { formatTime12Hour } from './utils/time-format.js'
 import { openStudentProfile } from './modules/students.js'
 import { openSubjectStudentList } from './modules/subject-students.js'
 import { initCalendar } from './modules/calendar.js'
@@ -385,7 +386,7 @@ function renderTeacherAttendance() {
       <tr>
         <td>${student ? `<button class="student-name-link" type="button" data-view-student="${escapeHtml(student.id)}">${escapeHtml(formatUserName(student.name))}</button>` : 'Unknown Student'}</td>
         <td>${row.attendance_date || '—'}</td>
-        <td>${row.time_in || '—'}</td>
+        <td>${escapeHtml(formatTime12Hour(row.time_in))}</td>
         <td><span class="pill ${row.status === 'present' ? 'pill-green' : row.status === 'late' ? 'pill-yellow' : 'pill-red'}">${status}</span></td>
       </tr>
     `

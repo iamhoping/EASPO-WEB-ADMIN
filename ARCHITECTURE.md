@@ -84,6 +84,12 @@ Check Existing Attendance
 - `showResult()` - Success UI
 - `showErrorResult()` - Error UI
 
+**Dynamic QR attendance**:
+- Students receive a six-character QR session from `generate_student_qr_session`; sessions expire after 30 seconds and are refreshed automatically in the student portal.
+- The scanner reads the `EASPO-QR:` payload and sends only the session code to `process_dynamic_qr_attendance`.
+- The database RPC authorizes the scanner, validates the session and student, selects today's section schedule, applies the existing late-grace setting, and records attendance before consuming the session in the same transaction.
+- Direct browser access to `student_qr_sessions` is revoked. Apply the database migration with `supabase db push`.
+
 ### 2. Backend Scheduler
 **File**: `server.js`
 
@@ -246,7 +252,7 @@ Student Scans QR
      └─► UI: "Success"
 
 [Database]
-attendance: { student_id, status: 'present', time_in: HH:MM:SS, is_late: false, ... }
+attendance: { student_id, status: 'present', time_in: 'h:mm AM/PM', is_late: false, ... }
 ```
 
 ### Flow 2: Late Scan After Auto-Absent
@@ -271,11 +277,11 @@ Student Scans QR @ 10:30 AM
      ├─► Check Schedule (Today)
      ├─► Check Existing Attendance
      │   └─► Found: status = 'absent'
-     ├─► UPDATE attendance { status: 'present', time_in: 10:30, is_late: true }
+     ├─► UPDATE attendance { status: 'present', time_in: '10:30 AM', is_late: true }
      └─► UI: "Late Arrival"
 
 [Database]
-attendance: { student_id, status: 'present', time_in: 10:30, is_late: true, ... }
+attendance: { student_id, status: 'present', time_in: '10:30 AM', is_late: true, ... }
 ```
 
 ### Flow 3: Guardian Email Notification

@@ -2,6 +2,7 @@
 import { supabase } from '../services/supabaseClient.js'
 import { showToast } from '../ui/toast.js'
 import { formatUserName } from '../utils/name-format.js'
+import { formatTime12Hour } from '../utils/time-format.js'
 
 let allRecords  = []
 let allStudents = []
@@ -257,7 +258,7 @@ function render() {
 		const dt = new Date(r.date)
 		const dateStr = isNaN(dt) ? (r.date || '—') : dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 		const rawTime = r.time || ''
-		const timeStr = rawTime ? `<span class="time ${st==='present'?'text-green':'text-red'}">${rawTime}</span>` : '—'
+		const timeStr = rawTime ? `<span class="time ${st==='present'?'text-green':'text-red'}">${escapeHtml(formatTime12Hour(rawTime))}</span>` : '—'
 
 		const safeName = String(name).replace(/'/g, "\\'")
 		const studentId = r.student_id || ''

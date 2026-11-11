@@ -4,6 +4,7 @@ import { showToast } from '../ui/toast.js'
 import { renderPagination } from '../ui/pagination.js';
 import { createAccount, setAccountStatus } from '../services/auth.js'
 import { formatUserName, isLastFirstName } from '../utils/name-format.js'
+import { formatTime12Hour } from '../utils/time-format.js'
 
 let allStudents = []
 let filtered    = []
@@ -456,7 +457,7 @@ export async function openStudentProfile(studentId) {
     const subject = schedule?.subject || subjectNames.get(String(schedule?.subject_id)) || '—'
     const time = schedule ? `${schedule.start_time || '—'}–${schedule.end_time || '—'}` : '—'
     const status = row.is_late && String(row.status).toLowerCase() === 'present' ? 'Late' : row.status || '—'
-    return `<tr><td>${escapeHtml(row.attendance_date || '—')}</td><td>${escapeHtml(subject)}</td><td>${escapeHtml(schedule?.day || '—')}</td><td>${escapeHtml(time)}</td><td>${escapeHtml(schedule?.room || '—')}</td><td>${escapeHtml(row.time_in || '—')}</td><td>${escapeHtml(row.time_out || '—')}</td><td>${escapeHtml(status)}</td></tr>`
+    return `<tr><td>${escapeHtml(row.attendance_date || '—')}</td><td>${escapeHtml(subject)}</td><td>${escapeHtml(schedule?.day || '—')}</td><td>${escapeHtml(time)}</td><td>${escapeHtml(schedule?.room || '—')}</td><td>${escapeHtml(formatTime12Hour(row.time_in))}</td><td>${escapeHtml(formatTime12Hour(row.time_out))}</td><td>${escapeHtml(status)}</td></tr>`
   }).join('')
   const attendanceContent = `${attendanceSummary}<div class="table-wrap"><table><thead><tr><th>Date</th><th>Subject</th><th>Day</th><th>Schedule</th><th>Room</th><th>Time In</th><th>Time Out</th><th>Status</th></tr></thead><tbody>${attendanceHistory || '<tr><td colspan="8">No attendance records.</td></tr>'}</tbody></table></div>`
 

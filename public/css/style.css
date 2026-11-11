@@ -1759,6 +1759,11 @@ tbody tr:last-child td { border-bottom: none; }
 .student-portal-error { color: var(--red); }
 .student-portal-content { display: grid; gap: 18px; }
 .student-portal-content > .student-profile-section { padding: 18px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.student-qr { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+.student-qr-image { display: grid; min-width: 240px; min-height: 240px; place-items: center; padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: #fff; }
+.student-qr-image img, .student-qr-image canvas { display: block; max-width: 100%; }
+.student-qr-code { font-size: 1.2rem; font-weight: 700; letter-spacing: .12em; }
+.student-qr-expiry { color: var(--text2); }
 
 @keyframes mIn {
   from { opacity: 0; transform: scale(.93) translateY(12px); }

@@ -2,6 +2,7 @@ import { supabase } from './services/supabaseClient.js'
 import { logout } from './services/auth.js'
 import { loadSchoolBranding } from './modules/school-branding.js'
 import { formatUserName } from './utils/name-format.js'
+import { formatTime12Hour } from './utils/time-format.js'
 
 loadSchoolBranding()
 
@@ -12,6 +13,8 @@ const gradeKey = value => String(value || '').replace(/^grade\s*/i, '').trim()
 const gradeLabel = value => value ? `Grade ${gradeKey(value)}` : '—'
 const portalStatus = document.getElementById('portalStatus')
 const portalContent = document.getElementById('portalContent')
+let qrCountdownTimer = null
+let qrGeneration = 0
 
 function showStatus(message, error = false) {
   portalStatus.classList.remove('hidden')
@@ -25,6 +28,93 @@ function field(label, value) {
 
 function section(title, content, emptyMessage = 'No records available.') {
   return `<section class="student-profile-section"><h2>${escapeHtml(title)}</h2>${content || `<p class="student-profile-empty">${escapeHtml(emptyMessage)}</p>`}</section>`
+}
+
+function startStudentQr() {
+  const status = document.getElementById('studentQrStatus')
+  const codeLabel = document.getElementById('studentQrCode')
+  const expiryLabel = document.getElementById('studentQrExpiry')
+  const qrTarget = document.getElementById('studentQrImage')
+  if (!status || !codeLabel || !expiryLabel || !qrTarget) return
+
+  if (typeof window.QRCode !== 'function') {
+    status.textContent = 'QR display is unavailable. Refresh the page or contact the school administrator.'
+    status.classList.add('student-portal-error')
+    return
+  }
+
+  const refresh = async () => {
+    const requestId = ++qrGeneration
+    const requestStartedAt = performance.now()
+    status.textContent = 'Generating a secure attendance QR code...'
+    codeLabel.textContent = ''
+    expiryLabel.textContent = ''
+    qrTarget.replaceChildren()
+
+    const { data, error } = await supabase.rpc('generate_student_qr_session')
+    if (requestId !== qrGeneration) return
+    if (error) {
+      status.textContent = 'Unable to generate your QR code. Please refresh the page or contact the school administrator.'
+      status.classList.add('student-portal-error')
+      console.error('Student QR generation failed:', error)
+      return
+    }
+
+    const code = String(data?.session_code || '')
+    const createdAt = new Date(data?.created_at || '')
+    const expiresAt = new Date(data?.expires_at || '')
+    if (!/^[A-Z0-9]{6}$/.test(code) ||
+        Number.isNaN(createdAt.getTime()) || Number.isNaN(expiresAt.getTime())) {
+      status.textContent = 'The server returned an invalid QR session. Please refresh the page.'
+      status.classList.add('student-portal-error')
+      console.error('Student QR generation returned an invalid session.')
+      return
+    }
+    const expiresAtLocal = Date.now() + Math.max(
+      0,
+      expiresAt.getTime() - createdAt.getTime() - (performance.now() - requestStartedAt),
+    )
+
+    try {
+      new window.QRCode(qrTarget, {
+        text: `EASPO-QR:${code}`,
+        width: 240,
+        height: 240,
+        correctLevel: window.QRCode.CorrectLevel.M,
+      })
+    } catch (renderError) {
+      status.textContent = 'Unable to display your QR code. Please refresh the page.'
+      status.classList.add('student-portal-error')
+      console.error('Student QR rendering failed:', renderError)
+      return
+    }
+
+    status.classList.remove('student-portal-error')
+    status.textContent = 'Show this QR code to the attendance scanner.'
+    codeLabel.textContent = `Code: ${code}`
+    const updateCountdown = () => {
+      const remainingSeconds = Math.max(0, Math.ceil((expiresAtLocal - Date.now()) / 1000))
+      expiryLabel.textContent = `Refreshes in ${remainingSeconds} seconds`
+      if (remainingSeconds === 0) {
+        clearInterval(qrCountdownTimer)
+        refresh().catch(refreshError => {
+          console.error('Student QR refresh failed:', refreshError)
+          status.textContent = 'Unable to refresh your QR code. Please refresh the page.'
+          status.classList.add('student-portal-error')
+        })
+      }
+      return remainingSeconds
+    }
+
+    clearInterval(qrCountdownTimer)
+    if (updateCountdown() > 0) qrCountdownTimer = setInterval(updateCountdown, 1000)
+  }
+
+  refresh().catch(error => {
+    console.error('Student QR generation failed:', error)
+    status.textContent = 'Unable to generate your QR code. Please refresh the page or contact the school administrator.'
+    status.classList.add('student-portal-error')
+  })
 }
 
 async function fetchAllRows(buildQuery) {
@@ -180,7 +270,7 @@ async function loadStudentPortal() {
     const schedule = scheduleById.get(String(record.schedule_id))
     const subjectName = schedule?.subject || subjectNames.get(String(schedule?.subject_id)) || '—'
     const status = record.is_late && String(record.status).toLowerCase() === 'present' ? 'Late' : record.status || '—'
-    return `<tr><td>${escapeHtml(formatDate(record.attendance_date))}</td><td>${escapeHtml(subjectName)}</td><td>${escapeHtml(schedule?.day || '—')}</td><td>${escapeHtml(schedule ? `${schedule.start_time || '—'}–${schedule.end_time || '—'}` : '—')}</td><td>${escapeHtml(schedule?.room || '—')}</td><td>${escapeHtml(record.time_in || '—')}</td><td>${escapeHtml(record.time_out || '—')}</td><td>${escapeHtml(status)}</td></tr>`
+    return `<tr><td>${escapeHtml(formatDate(record.attendance_date))}</td><td>${escapeHtml(subjectName)}</td><td>${escapeHtml(schedule?.day || '—')}</td><td>${escapeHtml(schedule ? `${schedule.start_time || '—'}–${schedule.end_time || '—'}` : '—')}</td><td>${escapeHtml(schedule?.room || '—')}</td><td>${escapeHtml(formatTime12Hour(record.time_in))}</td><td>${escapeHtml(formatTime12Hour(record.time_out))}</td><td>${escapeHtml(status)}</td></tr>`
   }).join('')
   const attendanceContent = `${attendanceSummary}<div class="table-wrap"><table><thead><tr><th>Date</th><th>Subject</th><th>Day</th><th>Schedule</th><th>Room</th><th>Time In</th><th>Time Out</th><th>Status</th></tr></thead><tbody>${attendanceRows || '<tr><td colspan="8">No attendance records.</td></tr>'}</tbody></table></div>`
 
@@ -204,7 +294,14 @@ async function loadStudentPortal() {
     ${section('Attendance Summary and History', attendanceResult.error ? '' : attendanceContent, attendanceResult.error?.message || 'No attendance records are recorded.')}
     ${section('Academic Performance', gradesResult.error ? '' : academicContent, gradesResult.error?.message || 'No grade records are recorded.')}
     ${section('Enrollment and Class Information', schedulesResult.error ? '' : scheduleContent, schedulesResult.error?.message || 'No class schedules are assigned.')}
-    ${section('Parent/Guardian Information', parentContent, parentResult.error?.message || 'No guardian details are recorded.')}`
+    ${section('Parent/Guardian Information', parentContent, parentResult.error?.message || 'No guardian details are recorded.')}
+    ${account.role === 'STUDENT' && !['inactive', 'archived'].includes(String(student.status || '').toLowerCase())
+      ? section('Dynamic Attendance QR Code', '<div class="student-qr"><div id="studentQrImage" class="student-qr-image" aria-label="Your current attendance QR code"></div><div><p id="studentQrStatus" role="status" aria-live="polite">Preparing your secure QR code...</p><p id="studentQrCode" class="student-qr-code"></p><p id="studentQrExpiry" class="student-qr-expiry">Codes refresh automatically and expire after 30 seconds.</p></div></div>')
+      : ''}`
+
+  if (account.role === 'STUDENT' && !['inactive', 'archived'].includes(String(student.status || '').toLowerCase())) {
+    startStudentQr()
+  }
 }
 
 document.getElementById('portalLogout')?.addEventListener('click', logout)

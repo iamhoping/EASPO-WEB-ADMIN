@@ -1,9 +1,11 @@
 // /js/modules/scanner-attendance.js
 import { supabase } from '../services/supabaseClient.js'
 import { formatUserName } from '../utils/name-format.js'
+import { formatTime12Hour } from '../utils/time-format.js'
 
 const SCAN_TIMEOUT = 700
 const SCANNER_IDLE_TIMEOUT = 15000
+const DYNAMIC_QR_PREFIX = 'EASPO-QR:'
 
 let scanBuffer = ''
 let scanTimer = null
@@ -68,7 +70,7 @@ function armScannerIdleTimer() {
 }
 
 function formatScanTime(date) {
-  return date.toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour: 'numeric', minute: '2-digit', second: '2-digit' })
+  return date.toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour: 'numeric', minute: '2-digit' })
 }
 
 function schoolDateParts(date) {
@@ -161,6 +163,70 @@ function showNoScheduleResult(student) {
   result?.classList.add('scanner-result-info')
 }
 
+function getDynamicQrCode(value) {
+  if (!value.toUpperCase().startsWith(DYNAMIC_QR_PREFIX)) return null
+  const code = value.slice(DYNAMIC_QR_PREFIX.length).toUpperCase()
+  return /^[A-Z0-9]{6}$/.test(code) ? code : ''
+}
+
+function getBareDynamicQrCode(value) {
+  return /^[A-Z0-9]{6}$/i.test(value) ? value.toUpperCase() : null
+}
+
+async function processDynamicQrScan(code) {
+  if (!code) {
+    showErrorResult('Invalid QR Code', 'QR code not recognized.')
+    setScannerState('Invalid QR Code', 'error')
+    return
+  }
+
+  const { data, error } = await supabase.rpc('process_dynamic_qr_attendance', {
+    p_session_code: code,
+  })
+  if (error) throw error
+
+  switch (data?.status) {
+    case 'ATTENDANCE_RECORDED': {
+      const student = data.student || {}
+      const scannedAt = new Date()
+      showResult(student, student.section_name || '—', data.subject_name, scannedAt)
+      const attendanceStatus = String(data.attendance_status || 'present').toLowerCase()
+      setText('scannerResultTitle', 'Valid QR Code - Attendance Recorded')
+      setText('scannerResultStatus', attendanceStatus === 'late' ? 'Late' : 'Present')
+      setText('scannerScannedAt', `Time In: ${formatTime12Hour(data.time_in || formatAttendanceTime(scannedAt))}`)
+      setScannerState(attendanceStatus === 'late' ? 'Late Arrival' : 'Attendance Recorded', 'success')
+      document.dispatchEvent(new CustomEvent('scanner-attendance-recorded'))
+      return
+    }
+    case 'EXPIRED_QR':
+      showErrorResult('Expired QR Code', 'Ask the student to refresh their QR code.')
+      setScannerState('Expired QR Code', 'error')
+      return
+    case 'ALREADY_USED':
+      showErrorResult('Already Used', 'This QR code has already been used.', true)
+      setScannerState('Already Used', 'duplicate')
+      return
+    case 'DUPLICATE_ATTENDANCE':
+      showErrorResult('Duplicate Attendance', 'Attendance has already been recorded for this schedule and date.', true)
+      setScannerState('Duplicate Attendance', 'duplicate')
+      return
+    case 'NO_ACTIVE_SCHEDULE':
+      showErrorResult('No Active Schedule', 'No applicable schedule was found for this student today.')
+      setScannerState('No Active Schedule', 'error')
+      return
+    case 'STUDENT_NOT_ELIGIBLE':
+      showErrorResult('Student Not Eligible', 'Student account is not eligible for attendance.')
+      setScannerState('Student Not Eligible', 'error')
+      return
+    case 'INVALID_QR':
+      showErrorResult('Invalid QR Code', 'QR code not recognized.')
+      setScannerState('Invalid QR Code', 'error')
+      return
+    default:
+      throw new Error('The scanner returned an unrecognized QR validation result.')
+  }
+}
+
 function scheduleValue(schedule, keys) {
   for (const key of keys) {
     if (schedule?.[key] !== undefined && schedule[key] !== null && schedule[key] !== '') return schedule[key]
@@ -227,10 +293,16 @@ async function recordScan(rawValue) {
 
   processing = true
   scannerState = 'PROCESSING'
-  setScannerState('Looking up student...', 'busy')
+  const dynamicQrCode = getDynamicQrCode(scannedValue)
+  setScannerState(dynamicQrCode !== null ? 'Validating QR code...' : 'Looking up student...', 'busy')
   armScannerIdleTimer()
 
   try {
+    if (dynamicQrCode !== null) {
+      await processDynamicQrScan(dynamicQrCode)
+      return
+    }
+
     const exactLookup = await supabase
       .from('profiles')
       .select('id, student_id, name, grade_level, section_id, status')
@@ -262,6 +334,13 @@ async function recordScan(rawValue) {
     }
 
     if (!student) {
+      const bareDynamicQrCode = getBareDynamicQrCode(scannedValue)
+      if (bareDynamicQrCode) {
+        setScannerState('Validating QR code...', 'busy')
+        await processDynamicQrScan(bareDynamicQrCode)
+        return
+      }
+
       console.error('[STUDENT] Student not found', { scannedValue })
       showErrorResult('Student Not Found', 'The scanned student ID is not registered. Attendance was not recorded.')
       finishResult('NOT_FOUND')
@@ -282,7 +361,7 @@ async function recordScan(rawValue) {
 
     const scannedAt = new Date()
     const attendanceDate = formatLocalDate(scannedAt)
-    const timeIn = formatAttendanceTime(scannedAt)
+    const timeIn = formatTime12Hour(formatAttendanceTime(scannedAt))
     const todaySchedule = await findTodaySchedule(student, attendanceDate, schoolDateParts(scannedAt).weekday)
     if (!todaySchedule) {
       showNoScheduleResult(student)
@@ -319,7 +398,7 @@ async function recordScan(rawValue) {
         // Already scanned as present
         console.log('[ATTENDANCE] Already marked present', existing)
         showErrorResult('Already Scanned', `${formatUserName(student.name)} has already been marked present for this schedule. No duplicate was created.`, true)
-        setText('scannerScannedAt', `Time In: ${existing.time_in || 'Recorded'}`)
+        setText('scannerScannedAt', `Time In: ${formatTime12Hour(existing.time_in)}`)
         finishResult('DUPLICATE')
         processing = false
         armScannerIdleTimer()
