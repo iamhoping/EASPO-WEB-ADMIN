@@ -88,15 +88,22 @@
 .scanner-scan-area span { color: var(--scanner-muted); font-size: .84rem; }
 
 .scanner-result { width: min(100%, 600px); margin: 0; padding: 0; border: 0; background: transparent; display: flex; flex-direction: column; align-items: center; text-align: center; animation: scanner-arrive .3s ease both; }
-.scanner-result-title { display: inline-flex; align-items: center; min-height: 30px; padding: 5px 10px; border-radius: 4px; background: var(--scanner-accent-soft); color: var(--scanner-accent); font-size: .68rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.scanner-result-title { display: inline-flex; align-items: center; gap: 7px; min-height: 30px; padding: 5px 10px; border-radius: 4px; background: var(--scanner-accent-soft); color: var(--scanner-accent); font-size: .76rem; font-weight: 800; }
+.scanner-result-title::before { display: inline-grid; width: 18px; height: 18px; place-items: center; border-radius: 50%; font-size: .76rem; font-weight: 900; }
+.scanner-result-success .scanner-result-title::before { content: '✓'; background: #d3ecdf; }
+.scanner-result-error .scanner-result-title::before { content: '!'; background: #f7d8d7; }
+.scanner-result-duplicate .scanner-result-title::before { content: '!'; background: #f5e4b7; }
+.scanner-result-info .scanner-result-title::before { content: 'i'; background: #d9eaf1; }
 .scanner-student-name { max-width: 100%; margin-top: 12px; overflow-wrap: anywhere; font-family: var(--font-head, sans-serif); font-size: 2rem; font-weight: 800; line-height: 1.2; }
 .scanner-detail { width: 100%; margin-top: 8px; color: var(--scanner-muted); font-size: .85rem; line-height: 1.45; overflow-wrap: anywhere; }
 .scanner-result-status { margin-top: 14px; padding: 7px 16px; border: 1px solid #cae4d7; border-radius: 99px; background: #eaf6ef; color: #236444; font-size: .76rem; font-weight: 800; }
 .scanner-result-status:empty { display: none; }
+.scanner-result-success .scanner-result-title { background: #eaf6ef; color: #236444; }
 .scanner-result-error .scanner-result-title { background: #fff0ef; color: var(--scanner-error); }
 .scanner-result-error .scanner-student-name { max-width: 560px; font-family: var(--font-body, sans-serif); font-size: 1rem; font-weight: 500; line-height: 1.55; }
 .scanner-result-error .scanner-result-status { border-color: #edc5c5; background: #fff4f3; color: var(--scanner-error); }
 .scanner-result-duplicate .scanner-result-title { background: #fff5dd; color: var(--scanner-warning); }
+.scanner-result-duplicate .scanner-result-status { border-color: #edd9a4; background: #fff9e9; color: var(--scanner-warning); }
 .scanner-result-info .scanner-result-title { background: #edf6fa; color: #37687c; }
 .scanner-footer { padding-top: 14px; border-top: 1px solid rgba(102, 130, 120, .2); color: var(--scanner-muted); font-size: .72rem; text-align: center; }
 

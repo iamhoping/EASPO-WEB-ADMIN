@@ -2458,21 +2458,28 @@ tbody tr:last-child td { border-bottom: none; }
 }
 .scanner-indicator.busy { background: var(--yellow); box-shadow: 0 0 0 4px var(--yellow-dim); }
 .scanner-indicator.success { background: var(--green); box-shadow: 0 0 0 4px var(--green-dim); }
-.scanner-indicator.error,
-.scanner-indicator.duplicate { background: var(--red); box-shadow: 0 0 0 4px var(--red-dim); }
+.scanner-indicator.error { background: var(--red); box-shadow: 0 0 0 4px var(--red-dim); }
+.scanner-indicator.duplicate { background: var(--yellow); box-shadow: 0 0 0 4px var(--yellow-dim); }
+.scanner-indicator.no_schedule { background: var(--primary); box-shadow: 0 0 0 4px var(--primary-dim); }
 .scanner-indicator.idle { background: var(--text3); box-shadow: 0 0 0 4px var(--surface); }
 .scanner-result {
   grid-column: 1 / -1;
   padding-top: 14px;
   border-top: 1px solid var(--border);
 }
-.scanner-result-title { color: var(--green); font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.scanner-result-title { display: inline-flex; align-items: center; gap: 7px; color: var(--green); font-size: .8rem; font-weight: 700; }
+.scanner-result-title::before { display: inline-grid; width: 18px; height: 18px; place-items: center; border-radius: 50%; font-size: .76rem; font-weight: 900; }
+.scanner-result-success .scanner-result-title::before { content: '✓'; background: var(--green-dim); }
+.scanner-result-error .scanner-result-title::before { content: '!'; background: var(--red-dim); }
+.scanner-result-duplicate .scanner-result-title::before { content: '!'; background: var(--yellow-dim); }
+.scanner-result-info .scanner-result-title::before { content: 'i'; background: var(--primary-dim); }
 .scanner-student-name { margin-top: 5px; color: var(--text); font-family: var(--font-head); font-size: 1.05rem; font-weight: 700; }
 .scanner-detail { margin-top: 3px; color: var(--text2); font-size: .78rem; }
 .scanner-result-status { margin-top: 8px; color: var(--green); font-family: var(--font-head); font-size: .95rem; font-weight: 800; }
 .scanner-result-error .scanner-result-title,
 .scanner-result-error .scanner-result-status { color: var(--red); }
 .scanner-result-duplicate .scanner-result-title { color: var(--yellow); }
+.scanner-result-info .scanner-result-title { color: var(--primary); }
 
 /* ═══════════════════════════════════════════════════════════
    EMPTY STATE / LOADER

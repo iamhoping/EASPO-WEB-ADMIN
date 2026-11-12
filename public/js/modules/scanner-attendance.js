@@ -126,8 +126,9 @@ function showResult(student, sectionName, subjectName, scannedAt) {
   if (!result) return
 
   showScanResult()
-  result.classList.remove('hidden', 'scanner-result-error', 'scanner-result-duplicate')
-  setText('scannerResultTitle', 'Attendance Recorded Successfully')
+  result.classList.remove('hidden', 'scanner-result-error', 'scanner-result-duplicate', 'scanner-result-info')
+  result.classList.add('scanner-result-success')
+  setText('scannerResultTitle', 'Attendance recorded successfully!')
   setText('scannerStudentName', formatUserName(student.name))
   setText('scannerStudentId', `LRN Number: ${student.student_id}`)
   setText('scannerStudentClass', `${student.grade_level || 'No grade'} - ${sectionName}`)
@@ -136,13 +137,13 @@ function showResult(student, sectionName, subjectName, scannedAt) {
   setText('scannerScannedAt', formatScanTime(scannedAt))
 }
 
-function showErrorResult(title, message, duplicate = false) {
+function showErrorResult(title, message, type = 'error') {
   const result = getElement('scannerResult')
   if (!result) return
 
   showScanResult()
-  result.classList.remove('hidden', 'scanner-result-error', 'scanner-result-duplicate', 'scanner-result-info')
-  result.classList.add(duplicate ? 'scanner-result-duplicate' : 'scanner-result-error')
+  result.classList.remove('hidden', 'scanner-result-success', 'scanner-result-error', 'scanner-result-duplicate', 'scanner-result-info')
+  result.classList.add(`scanner-result-${type}`)
   setText('scannerResultTitle', title)
   setText('scannerStudentName', message)
   setText('scannerStudentId', '')
@@ -153,13 +154,21 @@ function showErrorResult(title, message, duplicate = false) {
 }
 
 function finishResult(state) {
-  setScannerState(state === 'DUPLICATE' ? 'Already Scanned' : state === 'NO_SCHEDULE' ? 'No Schedule Today' : state === 'NOT_FOUND' ? 'Student Not Found' : state === 'ERROR' ? 'System Error' : 'Ready to Scan', state.toLowerCase())
+  const states = {
+    DUPLICATE: ['QR Code Already Scanned!', 'duplicate'],
+    NO_SCHEDULE: ['No Schedule Today', 'no_schedule'],
+    NOT_STARTED: ['Class Has Not Started Yet', 'error'],
+    SCHEDULE_ENDED: ['Class Schedule Already Ended', 'error'],
+    NOT_FOUND: ['Invalid QR Code', 'error'],
+    ERROR: ['Unable to process scan', 'error']
+  }
+  const [message, type] = states[state] || ['Ready to Scan', 'ready']
+  setScannerState(message, type)
 }
 
 function showNoScheduleResult(student) {
   const result = getElement('scannerResult')
-  showErrorResult('No Schedule Today', `${formatUserName(student.name)} does not have an attendance schedule today. Attendance was not recorded.`)
-  result?.classList.remove('scanner-result-error')
+  showErrorResult('No Schedule Today', `${formatUserName(student.name)} does not have a scheduled class for today. Attendance was not recorded.`, 'info')
   result?.classList.add('scanner-result-info')
 }
 
@@ -191,32 +200,36 @@ async function processDynamicQrScan(code) {
       const scannedAt = new Date()
       showResult(student, student.section_name || '—', data.subject_name, scannedAt)
       const attendanceStatus = String(data.attendance_status || 'present').toLowerCase()
-      setText('scannerResultTitle', 'Valid QR Code - Attendance Recorded')
       setText('scannerResultStatus', attendanceStatus === 'late' ? 'Late' : 'Present')
       setText('scannerScannedAt', `Time In: ${formatTime12Hour(data.time_in || formatAttendanceTime(scannedAt))}`)
-      setScannerState(attendanceStatus === 'late' ? 'Late Arrival' : 'Attendance Recorded', 'success')
+      setScannerState('Attendance recorded successfully!', 'success')
       document.dispatchEvent(new CustomEvent('scanner-attendance-recorded'))
       return
     }
     case 'EXPIRED_QR':
-      showErrorResult('Expired QR Code', 'Ask the student to refresh their QR code.')
-      setScannerState('Expired QR Code', 'error')
+      showErrorResult('QR Code Expired', 'This QR code is no longer valid. Ask the student to generate a new one.')
+      setScannerState('QR Code Expired', 'error')
+      return
+    case 'REVOKED_QR':
+      showErrorResult('QR Code Revoked', 'This QR code has been deactivated and can no longer be used.')
+      setScannerState('QR Code Revoked', 'error')
       return
     case 'ALREADY_USED':
-      showErrorResult('Already Used', 'This QR code has already been used.', true)
-      setScannerState('Already Used', 'duplicate')
-      return
     case 'DUPLICATE_ATTENDANCE':
-      showErrorResult('Duplicate Attendance', 'Attendance has already been recorded for this schedule and date.', true)
-      setScannerState('Duplicate Attendance', 'duplicate')
+      showErrorResult('QR Code Already Scanned!', 'The student’s attendance has already been recorded for the current schedule.', 'duplicate')
+      setScannerState('QR Code Already Scanned!', 'duplicate')
       return
     case 'NO_ACTIVE_SCHEDULE':
-      showErrorResult('No Active Schedule', 'No applicable schedule was found for this student today.')
-      setScannerState('No Active Schedule', 'error')
+      showErrorResult('No Schedule Today', 'The student does not have a scheduled class for today.', 'info')
+      setScannerState('No Schedule Today', 'no_schedule')
+      return
+    case 'SCHEDULE_ALREADY_ENDED':
+      showErrorResult('Class Schedule Already Ended', 'The scheduled class has already finished. Attendance was not recorded.')
+      setScannerState('Class Schedule Already Ended', 'error')
       return
     case 'STUDENT_NOT_ELIGIBLE':
-      showErrorResult('Student Not Eligible', 'Student account is not eligible for attendance.')
-      setScannerState('Student Not Eligible', 'error')
+      showErrorResult('Invalid QR Code', 'This QR code does not match an eligible registered student.')
+      setScannerState('Invalid QR Code', 'error')
       return
     case 'INVALID_QR':
       showErrorResult('Invalid QR Code', 'QR code not recognized.')
@@ -236,6 +249,24 @@ function scheduleValue(schedule, keys) {
 
 function normalizeDay(value) {
   return String(value || '').trim().toLowerCase().slice(0, 3)
+}
+
+function scheduleTimeInSeconds(value) {
+  if (value === null || value === undefined || value === '') return null
+  const parts = String(value).split(':').map(Number)
+  if (parts.length < 2 || parts.some(part => !Number.isFinite(part))) return null
+  return parts[0] * 3600 + parts[1] * 60 + (parts[2] || 0)
+}
+
+function getScheduleTimeValidation(schedule, scannedAt) {
+  const parts = schoolDateParts(scannedAt)
+  const currentSeconds = Number(parts.hour) * 3600 + Number(parts.minute) * 60 + Number(parts.second)
+  const startSeconds = scheduleTimeInSeconds(scheduleValue(schedule, ['start_time', 'time_start', 'start']))
+  const endSeconds = scheduleTimeInSeconds(scheduleValue(schedule, ['end_time', 'time_end', 'end']))
+
+  if (startSeconds !== null && currentSeconds < startSeconds) return 'NOT_STARTED'
+  if (endSeconds !== null && currentSeconds > endSeconds) return 'SCHEDULE_ENDED'
+  return null
 }
 
 function scheduleIsToday(schedule, date, day) {
@@ -274,6 +305,15 @@ async function findTodaySchedule(student, date, day) {
 }
 
 function resetResult() {
+  const result = getElement('scannerResult')
+  result?.classList.remove('scanner-result-success', 'scanner-result-error', 'scanner-result-duplicate', 'scanner-result-info')
+  setText('scannerResultTitle', '')
+  setText('scannerStudentName', '')
+  setText('scannerStudentId', '')
+  setText('scannerStudentClass', '')
+  setText('scannerSubject', '')
+  setText('scannerResultStatus', '')
+  setText('scannerScannedAt', '')
   getElement('scannerResult')?.classList.add('hidden')
   getElement('scannerScanPrompt')?.classList.remove('hidden')
   getElement('scannerPage')?.querySelector('.scanner-scan-area')?.classList.remove('has-result')
@@ -282,6 +322,7 @@ function resetResult() {
 
 async function recordScan(rawValue) {
   if (processing) return
+  resetResult()
   const scannedValue = rawValue.trim().replace(/\r/g, '').replace(/\n/g, '').replace(/\s+/g, '')
   console.log('[SCANNER] Raw scan:', rawValue)
   console.log('[SCANNER] Normalized scan:', scannedValue)
@@ -342,7 +383,7 @@ async function recordScan(rawValue) {
       }
 
       console.error('[STUDENT] Student not found', { scannedValue })
-      showErrorResult('Student Not Found', 'The scanned student ID is not registered. Attendance was not recorded.')
+      showErrorResult('Invalid QR Code', 'The scanned code is not recognized or does not match a registered student. Attendance was not recorded.')
       finishResult('NOT_FOUND')
       return
     }
@@ -366,6 +407,18 @@ async function recordScan(rawValue) {
     if (!todaySchedule) {
       showNoScheduleResult(student)
       finishResult('NO_SCHEDULE')
+      return
+    }
+    const scheduleValidation = getScheduleTimeValidation(todaySchedule, scannedAt)
+    if (scheduleValidation) {
+      const isNotStarted = scheduleValidation === 'NOT_STARTED'
+      showErrorResult(
+        isNotStarted ? 'Class Has Not Started Yet' : 'Class Schedule Already Ended',
+        isNotStarted
+          ? 'The scheduled class has not started yet. Attendance was not recorded.'
+          : 'The scheduled class has already finished. Attendance was not recorded.'
+      )
+      finishResult(scheduleValidation)
       return
     }
     const scheduleId = scheduleValue(todaySchedule, ['id', 'schedule_id'])
@@ -397,7 +450,7 @@ async function recordScan(rawValue) {
       if (String(existing.status || '').toLowerCase() === 'present') {
         // Already scanned as present
         console.log('[ATTENDANCE] Already marked present', existing)
-        showErrorResult('Already Scanned', `${formatUserName(student.name)} has already been marked present for this schedule. No duplicate was created.`, true)
+        showErrorResult('QR Code Already Scanned!', `${formatUserName(student.name)}’s attendance has already been recorded for the current schedule.`, 'duplicate')
         setText('scannerScannedAt', `Time In: ${formatTime12Hour(existing.time_in)}`)
         finishResult('DUPLICATE')
         processing = false
@@ -459,6 +512,11 @@ async function recordScan(rawValue) {
     }
 
     console.error('[ATTENDANCE] Potential error:', insertError)
+    if (insertError?.code === '23505') {
+      showErrorResult('QR Code Already Scanned!', `${formatUserName(student.name)}’s attendance has already been recorded for the current schedule.`, 'duplicate')
+      finishResult('DUPLICATE')
+      return
+    }
     if (insertError) throw insertError
 
     console.log('[ATTENDANCE] Success:', attendance)
@@ -468,18 +526,19 @@ async function recordScan(rawValue) {
       if (resultDiv) {
         showScanResult()
         resultDiv.classList.remove('hidden', 'scanner-result-error', 'scanner-result-duplicate', 'scanner-result-info')
-        setText('scannerResultTitle', 'Late Arrival Recorded')
+        resultDiv.classList.add('scanner-result-success')
+        setText('scannerResultTitle', 'Attendance recorded successfully!')
         setText('scannerStudentName', formatUserName(student.name))
         setText('scannerStudentId', `LRN Number: ${student.student_id}`)
         setText('scannerStudentClass', `${student.grade_level || 'No grade'} - ${sectionName}`)
         setText('scannerSubject', `Subject: ${subjectName || '—'}`)
         setText('scannerResultStatus', 'Late')
         setText('scannerScannedAt', formatScanTime(scannedAt))
-        setScannerState('Late Arrival', 'success')
+        setScannerState('Attendance recorded successfully!', 'success')
       }
     } else {
       showResult(student, sectionName, subjectName, scannedAt)
-      setScannerState('Ready to Scan', 'success')
+      setScannerState('Attendance recorded successfully!', 'success')
     }
     document.dispatchEvent(new CustomEvent('scanner-attendance-recorded'))
   } catch (error) {
