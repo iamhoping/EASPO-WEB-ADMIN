@@ -64,19 +64,8 @@ serve(async req => {
     .maybeSingle()
   if (targetError) return jsonResponse(500, { error: targetError.message })
   if (!target) return jsonResponse(404, { error: 'The selected account was not found.' })
-
-  if (target.role === 'WEB_ADMIN' && !['inactive', 'archived'].includes(String(target.status || '').toLowerCase())) {
-    const { data: webAdmins, error: countError } = await adminClient
-      .from('profiles')
-      .select('status')
-      .eq('role', 'WEB_ADMIN')
-    if (countError) return jsonResponse(500, { error: countError.message })
-    const activeWebAdminCount = (webAdmins || []).filter(account =>
-      !['inactive', 'archived'].includes(String(account.status || '').toLowerCase())
-    ).length
-    if (activeWebAdminCount <= 1) {
-      return jsonResponse(409, { error: 'The last active Web Admin account cannot be deleted.' })
-    }
+  if (String(target.status || '').toLowerCase() !== 'archived') {
+    return jsonResponse(409, { error: 'Only archived accounts can be permanently deleted.' })
   }
 
   const { error: authDeleteError } = await adminClient.auth.admin.deleteUser(userId)

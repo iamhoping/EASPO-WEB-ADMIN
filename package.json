@@ -5,6 +5,8 @@
   "main": "addStudent.js",
   "scripts": {
     "start": "node server.js",
+    "backup:database": "python scripts/manage_database_backup.py backup",
+    "restore:database": "python scripts/manage_database_backup.py restore",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

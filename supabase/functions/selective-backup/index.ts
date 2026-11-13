@@ -36,7 +36,13 @@ type BackupPackage = {
   records: Partial<Record<DatasetName, Record<string, unknown>[]>>
 }
 
-type Context = { admin: SupabaseClient; user: User }
+type Context = {
+  admin: SupabaseClient
+  user: User
+  token: string
+  supabaseUrl: string
+  functionApiKey: string
+}
 
 function response(status: number, body: Record<string, unknown>) {
   return new Response(JSON.stringify(body), {
@@ -175,6 +181,7 @@ async function authorize(req: Request): Promise<Context | Response> {
   const url = Deno.env.get('SUPABASE_URL')
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
   if (!url || !serviceRoleKey) return response(500, { error: 'Supabase server credentials are not configured.' })
+  const functionApiKey = Deno.env.get('SUPABASE_ANON_KEY') || serviceRoleKey
 
   const token = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim()
   if (!token) return response(401, { error: 'Missing authorization token.' })
@@ -191,7 +198,7 @@ async function authorize(req: Request): Promise<Context | Response> {
       ['inactive', 'archived'].includes(String(profile.status || '').toLowerCase())) {
     return response(403, { error: 'Only active Web Admins can manage backups.' })
   }
-  return { admin, user: data.user }
+  return { admin, user: data.user, token, supabaseUrl: url, functionApiKey }
 }
 
 function validateSelection(value: unknown): DatasetName[] {
@@ -253,6 +260,107 @@ async function loadUploadedBackup(admin: SupabaseClient, path: string) {
   return loadStoredBackup(admin, path, 'The uploaded backup file could not be read.')
 }
 
+async function restoreArchivedAccounts(
+  admin: SupabaseClient,
+  supabaseUrl: string,
+  functionApiKey: string,
+  token: string,
+  backup: BackupPackage,
+) {
+  const accountDatasets = [
+    ['students', 'STUDENT'],
+    ['teachers', 'TEACHER'],
+    ['parents', 'PARENT'],
+  ] as const
+  const activeBackupProfiles = accountDatasets.flatMap(([dataset, role]) =>
+    (backup.records[dataset] || []).flatMap(profile => {
+      if (profile.role !== role ||
+          ['inactive', 'archived'].includes(String(profile.status || 'active').toLowerCase()) ||
+          typeof profile.id !== 'string') return []
+      return [{ id: profile.id, role }]
+    })
+  )
+  const seenProfileIds = new Set<string>()
+  const uniqueProfiles = activeBackupProfiles.filter(profile => {
+    if (seenProfileIds.has(profile.id)) return false
+    seenProfileIds.add(profile.id)
+    return true
+  })
+  const archivedProfiles: typeof uniqueProfiles = []
+
+  for (let offset = 0; offset < uniqueProfiles.length; offset += 500) {
+    const chunk = uniqueProfiles.slice(offset, offset + 500)
+    const { data, error } = await admin.from('profiles')
+      .select('id,role,status')
+      .in('id', chunk.map(profile => profile.id))
+    if (error) {
+      console.error('Could not find archived accounts from the backup.', { code: error.code || 'unknown' })
+      return {
+        restored: 0,
+        failed: 0,
+        checked: false,
+        warning: 'Could not check archived accounts against this backup. Use Archived Accounts to restore them manually.',
+      }
+    }
+    const backupRoles = new Map<string, typeof chunk[number]['role']>()
+    for (const profile of chunk) backupRoles.set(profile.id, profile.role)
+    archivedProfiles.push(...(data || []).flatMap(profile => {
+      const role = backupRoles.get(profile.id)
+      return role &&
+        profile.role === role &&
+        String(profile.status || '').toLowerCase() === 'archived'
+        ? [{ id: profile.id, role }]
+        : []
+    }))
+  }
+
+  let restored = 0
+  const failures: string[] = []
+  for (let offset = 0; offset < archivedProfiles.length; offset += 5) {
+    const chunk = archivedProfiles.slice(offset, offset + 5)
+    const results = await Promise.all(chunk.map(async profile => {
+      try {
+        const result = await fetch(`${supabaseUrl.replace(/\/+$/, '')}/functions/v1/manage-archived-account`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+            'apikey': functionApiKey,
+          },
+          body: JSON.stringify({ action: 'restore', userId: profile.id, role: profile.role }),
+        })
+        let body: Record<string, unknown> = {}
+        try {
+          body = await result.json()
+        } catch {
+          body = {}
+        }
+        if (!result.ok || body.ok !== true) {
+          throw new Error(typeof body.error === 'string' ? body.error : `HTTP ${result.status}`)
+        }
+        return { restored: true, failure: '' }
+      } catch (error) {
+        return {
+          restored: false,
+          failure: `${profile.id}: ${error instanceof Error ? error.message : 'restore failed'}`,
+        }
+      }
+    }))
+    restored += results.filter(result => result.restored).length
+    failures.push(...results.filter(result => result.failure).map(result => result.failure))
+  }
+
+  return {
+    restored,
+    failed: failures.length,
+    checked: true,
+    warning: failures.length
+      ? `${restored} archived account(s) were reactivated; ${failures.length} could not be restored. Check Archived Accounts for details and retry.`
+      : null,
+    failures,
+  }
+}
+
 function preview(backup: BackupPackage, validatedCounts: Record<string, number>) {
   const tables = backup.tables.map(table => ({
     name: table,
@@ -286,7 +394,7 @@ serve(async req => {
   try {
     const context = await authorize(req)
     if (context instanceof Response) return context
-    const { admin, user } = context
+    const { admin, user, token, supabaseUrl, functionApiKey } = context
 
     let body: Record<string, unknown>
     try {
@@ -431,12 +539,15 @@ serve(async req => {
         console.error('Transactional backup restore failed.', { code: restoreError.code || 'unknown' })
         return response(400, { error: 'Restore failed without applying partial changes. Check table compatibility and foreign-key relationships, then use a matching backup.' })
       }
+      const accountRestore = await restoreArchivedAccounts(admin, supabaseUrl, functionApiKey, token, backup)
       const { error: cleanupError } = await admin.storage.from(BUCKET).remove([path])
       if (cleanupError) console.error('Could not remove a restored temporary upload.', { code: cleanupError.name || 'unknown' })
       return response(200, {
         ok: true,
         results: restored,
-        warning: 'Existing records were not overwritten. Profile rows are restored only when their Supabase Auth user still exists.',
+        accountRestore,
+        warning: 'Existing data conflicts were preserved. Accounts active in this backup and archived now were reactivated when their Supabase Auth login still exists. Permanently deleted logins cannot be recreated from a selective backup.' +
+          (accountRestore.warning ? ` ${accountRestore.warning}` : ''),
         cleanupWarning: cleanupError ? 'Restore succeeded, but the temporary uploaded file could not be deleted. Use Remove uploaded file to retry.' : null,
       })
     }

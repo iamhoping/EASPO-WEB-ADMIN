@@ -4,7 +4,15 @@ import { renderPagination } from '../ui/pagination.js'
 import { formatUserName } from '../utils/name-format.js'
 
 const PER_PAGE = 10
-const ROLE_LABELS = { STUDENT: 'Student', TEACHER: 'Teacher', PARENT: 'Parent / Guardian' }
+const ROLE_LABELS = {
+  WEB_ADMIN: 'Web Admin',
+  SCHOOL_ADMIN: 'School Administration',
+  STUDENT: 'Student',
+  TEACHER: 'Teacher',
+  PARENT: 'Parent / Guardian',
+  SCANNER: 'Scanner',
+}
+const ACCOUNT_ROLES = Object.keys(ROLE_LABELS)
 let archivedAccounts = []
 let filteredAccounts = []
 let archivedSectionNames = new Map()
@@ -49,12 +57,12 @@ async function getRequestErrorMessage(error, fallback) {
 
 export async function loadArchivedAccounts() {
   const tbody = document.getElementById('archiveAccountsTableBody')
-  if (tbody) tbody.innerHTML = '<tr><td colspan="9"><div class="loader"><div class="spinner"></div></div></td></tr>'
+  if (tbody) tbody.innerHTML = '<tr><td colspan="8"><div class="loader"><div class="spinner"></div></div></td></tr>'
   const { data, error } = await supabase
     .from('profiles')
     .select('id,name,email,role,student_id,teacher_id,grade_level,department,archive_reason,archived_at,archived_by,archived_by_name,archived_section_id')
     .eq('status', 'archived')
-    .in('role', ['STUDENT', 'TEACHER', 'PARENT'])
+    .in('role', ACCOUNT_ROLES)
     .order('archived_at', { ascending: false })
 
   if (error) {
@@ -97,7 +105,7 @@ function renderArchivedAccounts() {
   if (!tbody) return
   const total = filteredAccounts.length
   if (!total) {
-    tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-title">No archived accounts found</div><div class="empty-sub">Archived students, teachers, and parents will appear here.</div></div></td></tr>'
+    tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-title">No archived accounts found</div><div class="empty-sub">Archived accounts will appear here.</div></div></td></tr>'
     count.textContent = '0 accounts'
     document.getElementById('archiveAccountsPagination').innerHTML = ''
     return
@@ -109,15 +117,22 @@ function renderArchivedAccounts() {
     const accountId = account.student_id || account.teacher_id || account.id
     const academic = account.role === 'STUDENT' ? account.grade_level || '—' : account.department || '—'
     const archivedBy = account.archived_by_name || (account.archived_by ? account.archived_by.slice(0, 8) : '—')
+    const accountName = formatUserName(account.name) || 'this account'
+    const deleteButton = document.body.dataset.role === 'WEB_ADMIN'
+      ? `<button class="btn btn-danger btn-sm" type="button" data-delete-account="${escapeHtml(account.id)}" data-account-name="${escapeHtml(accountName)}">Delete Permanently</button>`
+      : ''
     return `<tr>
       <td data-label="Account"><div class="ent-name">${escapeHtml(formatUserName(account.name) || 'Unnamed account')}</div><div class="ent-sub">${escapeHtml(account.email || '')}</div></td>
-      <td data-label="Type"><span class="pill pill-grey">${ROLE_LABELS[account.role] || escapeHtml(account.role)}</span></td>
+      <td data-label="Type"><span class="pill pill-grey">${escapeHtml(ROLE_LABELS[account.role] || account.role)}</span></td>
       <td data-label="Account ID"><code>${escapeHtml(accountId)}</code></td>
       <td data-label="Grade / Department">${escapeHtml(academic)}</td>
       <td data-label="Section">${escapeHtml(archivedSectionNames.get(String(account.archived_section_id)) || account.archived_section_id || '—')}</td>
       <td data-label="Archive Date">${escapeHtml(formatDate(account.archived_at))}</td>
       <td data-label="Archived By"><code>${escapeHtml(archivedBy)}</code></td>
-      <td data-label="Actions"><button class="btn btn-secondary btn-sm" type="button" data-restore-account="${escapeHtml(account.id)}" data-account-role="${escapeHtml(account.role)}" data-account-name="${escapeHtml(formatUserName(account.name) || 'this account')}">Restore</button></td>
+      <td data-label="Actions">
+        <button class="btn btn-secondary btn-sm" type="button" data-restore-account="${escapeHtml(account.id)}" data-account-role="${escapeHtml(account.role)}" data-account-name="${escapeHtml(accountName)}">Restore</button>
+        ${deleteButton}
+      </td>
     </tr>`
   }).join('')
   count.textContent = `Showing ${start + 1}–${Math.min(start + PER_PAGE, total)} of ${total} archived accounts`
@@ -175,11 +190,45 @@ async function restoreAccount(button) {
     button.disabled = false
     return
   }
-  showToast('Account restored', `${name} was restored. Students must be assigned to a section again.`, 'success')
+  const restoreMessage = role === 'STUDENT'
+    ? `${name} was restored. Assign the student to a section to resume classes.`
+    : `${name} was restored and can use the system again.`
+  showToast('Account restored', restoreMessage, 'success')
   try {
     await Promise.all([loadArchivedAccounts(), refreshActiveAccountList(role)])
   } catch (error) {
     showToast('Account restored; list refresh failed', error.message || 'Reload the account lists to see the update.', 'error')
+  }
+}
+
+async function permanentlyDeleteAccount(button) {
+  const { deleteAccount: id, accountName: name } = button.dataset
+  if (document.body.dataset.role !== 'WEB_ADMIN') {
+    showToast('Not authorized', 'Only a Web Admin can permanently delete accounts.', 'error')
+    return
+  }
+  if (!id || !window.confirm(
+    `Permanently delete "${name}"? This removes the archived account and its login and cannot be undone. ` +
+    'Selective Backup & Restore files cannot recreate its deleted login. Archive it instead if you may need to restore it. Related records may prevent deletion.',
+  )) return
+
+  button.disabled = true
+  try {
+    const { error } = await supabase.functions.invoke('delete-school-account', {
+      body: { userId: id },
+    })
+    if (error) throw error
+  } catch (error) {
+    showToast('Account not deleted', await getRequestErrorMessage(error, 'Could not permanently delete this account.'), 'error')
+    button.disabled = false
+    return
+  }
+
+  showToast('Account permanently deleted', `"${name}" was permanently deleted.`, 'success')
+  try {
+    await loadArchivedAccounts()
+  } catch (error) {
+    showToast('Account deleted; list refresh failed', error.message || 'Reload Archived Accounts to see the update.', 'error')
   }
 }
 
@@ -193,6 +242,13 @@ async function refreshActiveAccountList(role) {
   } else if (role === 'PARENT') {
     const { loadParents } = await import('./parents.js')
     await loadParents()
+  } else {
+    const { loadUserManagement } = await import('./user-management.js')
+    await loadUserManagement()
+  }
+  if (['STUDENT', 'TEACHER', 'PARENT'].includes(role)) {
+    const { loadUserManagement } = await import('./user-management.js')
+    await loadUserManagement()
   }
   document.dispatchEvent(new CustomEvent('section-student-profile-updated'))
 }
@@ -221,5 +277,7 @@ export function initArchiveSection() {
     }
     const restoreButton = event.target.closest('[data-restore-account]')
     if (restoreButton) restoreAccount(restoreButton)
+    const deleteButton = event.target.closest('[data-delete-account]')
+    if (deleteButton) permanentlyDeleteAccount(deleteButton)
   })
 }

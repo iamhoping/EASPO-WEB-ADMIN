@@ -503,8 +503,9 @@ new schedules, or recording scanner attendance. Archiving preserves the profile
 and academic history, stores the student's prior section ID as text (so it
 supports existing numeric as well as UUID section IDs), and clears the student's
 active section assignment. The `20261020000000_account_archived_section_text.sql`
-migration converts existing archive metadata to that compatible type. The Archived Accounts page
-supports confirmation-only archive/restore for students, teachers, and parents.
+migration converts existing archive metadata to that compatible type. User Management
+and the Archived Accounts page support reversible archive/restore for all account
+types; archived accounts are hidden from active lists and blocked from signing in.
 Student archives receive the default `Graduated` reason; teacher and parent
 archives receive `Inactive`. Reasons are retained in account metadata but are
 not displayed in the Archived Accounts list. Restored students return without a
@@ -556,11 +557,13 @@ Account archiving also requires deploying `manage-archived-account`; deploying
 Run `supabase db push` first so the archive metadata columns and RLS policies
 exist before invoking that function.
 
-Role assignment and permanent account deletion are available to Web Admins in
-User Management; the server rejects self-role changes, self-deletion, School
-Admin promotion to Web Admin, and deletion of the last active Web Admin.
-Account creation, status changes, password resets, role changes, deletion, and
-health checks must use their authenticated Edge Functions. Keep the Supabase
+Role assignment and reversible account archiving are available to Web Admins in
+User Management. Web Admins can permanently delete archived accounts from
+Archived Accounts after confirmation; active accounts cannot be permanently
+deleted. The server rejects self-role changes, self-archiving, School Admin
+promotion to Web Admin, and archiving the last active Web Admin.
+Account creation, status changes, password resets, role changes, permanent
+deletion, and health checks must use their authenticated Edge Functions. Keep the Supabase
 service-role key and notification credentials in server-side environment
 variables only.
 

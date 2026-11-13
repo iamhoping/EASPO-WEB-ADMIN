@@ -3,6 +3,11 @@ import { showToast } from '../ui/toast.js'
 
 const BUCKET = 'easpo-backups'
 const MAX_FILE_BYTES = 10 * 1024 * 1024
+const FULL_SQL_WORKER_URL = (window.EASPO_FULL_RESTORE_WORKER_URL || 'https://easpo-full-restore.onrender.com').replace(/\/+$/, '')
+const MAX_FULL_SQL_FILE_BYTES = 100 * 1024 * 1024
+const FULL_SQL_CONFIRMATION = 'Are you sure? This will replace all current data with the backup data.'
+const FULL_SQL_FILENAME = /^easp_backup_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-(?:AM|PM)(?:-\d+)?\.sql$/
+const FULL_SQL_JOB_TIMEOUT_MS = 60 * 60 * 1000
 const DATASETS = [
   ['students', 'Students'],
   ['teachers', 'Teachers'],
@@ -31,6 +36,7 @@ let handlersInitialized = false
 let importedPath = ''
 let importedPreview = null
 let restoreReport = null
+let fullSqlBusy = false
 
 function formatDate(value) {
   if (!value) return '—'
@@ -373,6 +379,208 @@ function setBackupBusy(busy) {
   }
 }
 
+async function getWorkerAccessToken() {
+  const { data, error } = await supabase.auth.getSession()
+  if (error) throw new Error(`Could not verify the current session: ${error.message}`)
+  const token = data?.session?.access_token
+  if (!token) throw new Error('Your session has expired. Sign in again before continuing.')
+  return token
+}
+
+async function workerRequest(path, token, options = {}) {
+  let response
+  try {
+    response = await fetch(`${FULL_SQL_WORKER_URL}${path}`, {
+      ...options,
+      headers: {
+        ...(options.headers || {}),
+        Authorization: `Bearer ${token}`,
+      },
+    })
+  } catch {
+    const error = new Error('The Render restore worker could not be reached. Check its deployment and try again.')
+    error.responseReceived = false
+    throw error
+  }
+
+  let result
+  try {
+    result = await response.json()
+  } catch {
+    const error = new Error(`The restore worker returned an invalid response (HTTP ${response.status}).`)
+    error.responseReceived = true
+    error.responseCouldHaveAccepted = response.ok || response.status >= 500
+    throw error
+  }
+  if (!response.ok) {
+    const error = new Error(result.error || `The restore worker returned HTTP ${response.status}.`)
+    error.responseReceived = true
+    error.responseCouldHaveAccepted = response.status >= 500
+    throw error
+  }
+  return result
+}
+
+function wait(milliseconds) {
+  return new Promise(resolve => window.setTimeout(resolve, milliseconds))
+}
+
+async function waitForFullSqlJob(jobId, jobToken, messageElementId) {
+  const startedAt = Date.now()
+  while (Date.now() - startedAt < FULL_SQL_JOB_TIMEOUT_MS) {
+    await wait(2000)
+    const response = await fetch(`${FULL_SQL_WORKER_URL}/api/jobs/${encodeURIComponent(jobId)}`, {
+      headers: { 'X-EASPO-Job-Token': jobToken },
+    })
+    let job
+    try {
+      job = await response.json()
+    } catch {
+      throw new Error(`The restore worker returned an invalid job status (HTTP ${response.status}).`)
+    }
+    if (!response.ok) throw new Error(job.error || `The restore worker returned HTTP ${response.status}.`)
+    setText(messageElementId, job.message || 'Full database operation in progress…')
+    if (job.status === 'completed') return job
+    if (job.status === 'failed') throw new Error(job.message || 'The full database operation failed.')
+    if (!['queued', 'running'].includes(job.status)) {
+      throw new Error('The restore worker returned an unknown job status.')
+    }
+  }
+  throw new Error('The worker has not reported completion. Verify the database before retrying.')
+}
+
+function setFullSqlBusy(busy, operation = '') {
+  fullSqlBusy = busy
+  const backupButton = document.getElementById('fullSqlBackupBtn')
+  const restoreButton = document.getElementById('fullSqlRestoreBtn')
+  const fileInput = document.getElementById('fullSqlRestoreFile')
+  const confirmation = document.getElementById('fullSqlRestoreConfirmation')
+
+  if (backupButton) {
+    backupButton.disabled = busy
+    backupButton.textContent = busy && operation === 'backup' ? 'Creating full SQL backup…' : 'Download Full SQL Backup'
+  }
+  if (fileInput) fileInput.disabled = busy
+  if (confirmation) confirmation.disabled = busy
+  updateFullSqlRestoreAvailability()
+}
+
+function updateFullSqlRestoreAvailability() {
+  const button = document.getElementById('fullSqlRestoreBtn')
+  if (!button) return
+  const file = document.getElementById('fullSqlRestoreFile')?.files?.[0]
+  const confirmation = document.getElementById('fullSqlRestoreConfirmation')?.value
+  button.disabled = fullSqlBusy || !file || !file.size || !FULL_SQL_FILENAME.test(file.name) ||
+    file.size > MAX_FULL_SQL_FILE_BYTES || confirmation !== FULL_SQL_CONFIRMATION
+  button.textContent = fullSqlBusy ? 'Restoring full database…' : 'Restore Full Database'
+}
+
+async function createFullSqlBackup() {
+  if (fullSqlBusy) return
+  setFullSqlBusy(true, 'backup')
+  setText('fullSqlBackupMessage', 'Connecting to the private Render worker and creating a complete PostgreSQL dump…')
+  try {
+    const token = await getWorkerAccessToken()
+    const job = await workerRequest('/api/backup', token, { method: 'POST' })
+    if (!job.jobId || !job.jobToken) throw new Error('The worker did not return a valid backup job.')
+    await waitForFullSqlJob(job.jobId, job.jobToken, 'fullSqlBackupMessage')
+
+    let response
+    try {
+      response = await fetch(`${FULL_SQL_WORKER_URL}/api/jobs/${encodeURIComponent(job.jobId)}/download`, {
+        headers: { 'X-EASPO-Job-Token': job.jobToken },
+      })
+    } catch {
+      throw new Error('The backup was created, but its download could not be reached. Do not start another backup until you check the worker.')
+    }
+    if (!response.ok) {
+      let detail = null
+      try { detail = await response.json() } catch { detail = null }
+      throw new Error(detail?.error || `The backup was created, but the download returned HTTP ${response.status}.`)
+    }
+    const blob = await response.blob()
+    if (!blob.size) throw new Error('The worker returned an empty SQL backup.')
+    const disposition = response.headers.get('Content-Disposition') || ''
+    const filename = /filename="([^"]+)"/i.exec(disposition)?.[1] || `easp_backup_${new Date().toISOString().replace(/[:.]/g, '-')}.sql`
+    const downloadUrl = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = downloadUrl
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 30000)
+    setText('fullSqlBackupMessage', `Full SQL backup downloaded as ${filename}. Keep the file in a secure location.`)
+    showToast('Full backup ready', 'The complete PostgreSQL backup was downloaded to your device.', 'success')
+  } catch (error) {
+    setText('fullSqlBackupMessage', `Full SQL backup failed: ${error.message || 'The operation did not complete.'}`)
+    showToast('Full backup failed', error.message || 'The operation did not complete.', 'error')
+  } finally {
+    setFullSqlBusy(false)
+  }
+}
+
+async function restoreFullSqlBackup() {
+  if (fullSqlBusy) return
+  const file = document.getElementById('fullSqlRestoreFile')?.files?.[0]
+  const confirmation = document.getElementById('fullSqlRestoreConfirmation')?.value
+  if (!file) {
+    showToast('Restore not started', 'Choose a dated EASPO .sql backup file.', 'warning')
+    return
+  }
+  if (!FULL_SQL_FILENAME.test(file.name)) {
+    showToast('Restore not started', 'Choose a dated EASPO full SQL backup file.', 'warning')
+    return
+  }
+  if (file.size > MAX_FULL_SQL_FILE_BYTES) {
+    showToast('Restore not started', 'Choose a SQL backup no larger than 100 MiB.', 'warning')
+    return
+  }
+  if (confirmation !== FULL_SQL_CONFIRMATION) {
+    showToast('Restore not started', 'Enter the exact confirmation sentence before restoring.', 'warning')
+    return
+  }
+  if (!window.confirm(`${FULL_SQL_CONFIRMATION}\n\nThis full restore replaces the current database, including accounts created after the backup.`)) return
+
+  setFullSqlBusy(true, 'restore')
+  setText('fullSqlRestoreMessage', 'Uploading the SQL backup to the private Render worker…')
+  let accepted = false
+  let submissionAttempted = false
+  try {
+    const token = await getWorkerAccessToken()
+    submissionAttempted = true
+    const job = await workerRequest('/api/restore', token, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/sql',
+        'X-EASPO-Confirmation': FULL_SQL_CONFIRMATION,
+        'X-EASPO-Backup-Filename': file.name,
+      },
+      body: file,
+    })
+    accepted = true
+    if (!job.jobId || !job.jobToken) {
+      throw new Error('The worker accepted the request but did not return a valid restore job. Verify the database before retrying.')
+    }
+    await waitForFullSqlJob(job.jobId, job.jobToken, 'fullSqlRestoreMessage')
+    document.getElementById('fullSqlRestoreFile').value = ''
+    document.getElementById('fullSqlRestoreConfirmation').value = ''
+    updateFullSqlRestoreAvailability()
+    setText('fullSqlRestoreMessage', 'Full database restore completed. Sign in again and verify the restored account and data.')
+    showToast('Full restore completed', 'The database was replaced from the selected SQL backup. Verify the restored system before using it.', 'success')
+  } catch (error) {
+    const outcomeUnknown = submissionAttempted &&
+      (error.responseReceived === false || error.responseCouldHaveAccepted === true)
+    const message = accepted || outcomeUnknown
+      ? `The restore job was accepted or its request outcome is unknown. Do not retry until you inspect the database. ${error.message || ''}`
+      : `Full restore did not start: ${error.message || 'The operation did not complete.'}`
+    setText('fullSqlRestoreMessage', message)
+    showToast(accepted || outcomeUnknown ? 'Restore status needs verification' : 'Full restore failed', message, accepted || outcomeUnknown ? 'warning' : 'error')
+  } finally {
+    setFullSqlBusy(false)
+  }
+}
+
 async function createBackup() {
   const tables = selectedDatasets()
   if (!tables.length) {
@@ -529,7 +737,7 @@ async function previewBackup() {
 async function restoreBackup() {
   if (!importedPath || !importedPreview) return
   const recordCount = Number(importedPreview.totalRecords)
-  const skippedWarning = 'Existing conflicting records will be skipped, not overwritten. Account profiles can only be restored while their original Supabase Auth login still exists; this backup cannot recreate permanently deleted logins or passwords. Use Archived Accounts to restore archived accounts.'
+  const skippedWarning = 'Existing conflicting records are preserved. Backed-up students, teachers, or parents that were active in this backup but archived since then will be reactivated if their original Supabase Auth login still exists. Permanently deleted logins cannot be recreated from this backup.'
   const zeroWarnings = importedPreview.zeroRecordWarnings || []
   const missingWarnings = importedPreview.missingTableWarnings || []
   const restoreWarnings = []
@@ -610,8 +818,15 @@ async function restoreBackup() {
       ['students', 'teachers', 'parents'].includes(table.name) && table.skipped > 0,
     )
     const accountSkipNote = skippedAccountRecords
-      ? ' Some account records were skipped. Backups cannot recreate missing Auth logins or passwords; skipped records may also be existing duplicates.'
+      ? ' Existing account rows are handled separately; permanently deleted Supabase Auth logins cannot be recreated from this backup.'
       : ''
+    const accountRestore = result.accountRestore || {}
+    const accountsRestored = Number(accountRestore.restored || 0)
+    const accountRestoreFailures = Number(accountRestore.failed || 0)
+    const accountRestoreChecked = accountRestore.checked !== false
+    const accountRestoreWarning = typeof accountRestore.warning === 'string' ? accountRestore.warning : ''
+    const restoreFailureCount = accountRestoreChecked ? accountRestoreFailures : 'not checked'
+    const accountRestoreLine = `Archived students, teachers, or parents reactivated: ${accountsRestored}; account restore failures: ${restoreFailureCount}.`
     restoreReport = {
       title: 'EASPO Restore Report',
       metadata: [
@@ -619,6 +834,8 @@ async function restoreBackup() {
         ['Date filters', formatRange(importedPreview.dateFrom, importedPreview.dateTo)],
         ['Status', totalSkipped ? 'Completed with skipped records' : 'Completed successfully'],
         ['Totals', `Requested ${recordCount}; inserted ${totalInserted}; skipped ${totalSkipped}`],
+        ['Archived accounts reactivated', accountsRestored],
+        ['Account restore failures', accountRestoreFailures],
       ],
       headers: ['Dataset', 'Requested', 'Inserted', 'Skipped'],
       rows: tableResults.map(table => [table.name, table.requested, table.inserted, table.skipped]),
@@ -629,8 +846,9 @@ async function restoreBackup() {
         `${table.name}: requested ${table.requested}; inserted ${table.inserted}; skipped ${table.skipped}`,
       ),
       `Total: requested ${recordCount}; inserted ${totalInserted}; skipped ${totalSkipped}`,
+      accountRestoreLine,
       ...(skippedAccountRecords
-        ? ['Account note: skipped account records may require their original Supabase Auth login; backups do not recreate deleted logins or passwords.']
+        ? ['Account note: archived accounts active in the backup are reactivated only if their original Supabase Auth login still exists. Permanent deletion removes that login.']
         : []),
     ].join('\n')
     setText('restoreResults', resultText)
@@ -640,8 +858,8 @@ async function restoreBackup() {
       document.getElementById('restoreBackupBtn').disabled = true
       document.getElementById('discardRestoreFileBtn')?.classList.remove('hidden')
       const status = totalSkipped ? 'Restore completed with skipped records.' : 'Restore completed successfully.'
-      setText('restoreActionMessage', `${status} ${result.cleanupWarning}`)
-      showToast(totalSkipped ? 'Restore completed with skipped records' : 'Restore completed', result.cleanupWarning, 'warning')
+      setText('restoreActionMessage', `${status} ${accountRestoreLine} ${accountRestoreWarning} ${result.cleanupWarning}`)
+      showToast('Restore completed; cleanup needs attention', `${accountRestoreWarning} ${result.cleanupWarning}`, 'warning')
       return
     }
     importedPath = ''
@@ -652,8 +870,10 @@ async function restoreBackup() {
     const summary = totalSkipped
       ? `Restore completed with skipped records: ${totalInserted} inserted and ${totalSkipped} skipped. Existing conflicts were preserved.${accountSkipNote}`
       : `Restore succeeded: all ${totalInserted} requested records were inserted.`
-    setText('restoreActionMessage', `${summary} ${result.warning || ''}`)
-    showToast(totalSkipped ? 'Restore completed with skipped records' : 'Restore complete', summary, totalSkipped ? 'warning' : 'success')
+    const finalSummary = `${summary} ${accountRestoreLine} ${accountRestoreWarning} ${result.warning || ''}`
+    const hasRestoreWarning = totalSkipped > 0 || accountRestoreFailures > 0 || Boolean(accountRestoreWarning)
+    setText('restoreActionMessage', finalSummary)
+    showToast(hasRestoreWarning ? 'Restore completed with warnings' : 'Restore complete', finalSummary, hasRestoreWarning ? 'warning' : 'success')
   } catch (error) {
     if (restoreCommitted && restoreReport) {
       restoreReport.metadata = [
@@ -785,6 +1005,22 @@ export function initBackupRecovery() {
   document.getElementById('restoreExportPdfBtn')?.addEventListener('click', () => downloadReport(restoreReport, 'pdf'))
   document.getElementById('restoreExportExcelBtn')?.addEventListener('click', () => downloadReport(restoreReport, 'excel'))
   document.getElementById('backupNowBtn')?.addEventListener('click', createBackup)
+  document.getElementById('fullSqlBackupBtn')?.addEventListener('click', createFullSqlBackup)
+  document.getElementById('fullSqlRestoreBtn')?.addEventListener('click', restoreFullSqlBackup)
+  document.getElementById('fullSqlRestoreFile')?.addEventListener('change', () => {
+    updateFullSqlRestoreAvailability()
+    const file = document.getElementById('fullSqlRestoreFile')?.files?.[0]
+    if (file && !FULL_SQL_FILENAME.test(file.name)) {
+      setText('fullSqlRestoreMessage', 'Choose an EASPO full SQL backup downloaded from the web backup control.')
+    } else if (file && file.size > MAX_FULL_SQL_FILE_BYTES) {
+      setText('fullSqlRestoreMessage', 'The SQL backup exceeds the 100 MiB web restore limit.')
+    } else if (file && !file.size) {
+      setText('fullSqlRestoreMessage', 'The selected SQL backup file is empty.')
+    } else {
+      setText('fullSqlRestoreMessage', '')
+    }
+  })
+  document.getElementById('fullSqlRestoreConfirmation')?.addEventListener('input', updateFullSqlRestoreAvailability)
   document.getElementById('previewBackupBtn')?.addEventListener('click', previewBackup)
   document.getElementById('restoreBackupBtn')?.addEventListener('click', restoreBackup)
   document.getElementById('discardRestoreFileBtn')?.addEventListener('click', async () => {

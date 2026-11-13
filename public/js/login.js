@@ -123,11 +123,8 @@ async function verifyAndRedirect(userId) {
     return
   }
 
-  if (
-    ['STUDENT', 'TEACHER', 'PARENT'].includes(data.role) &&
-    ['inactive', 'archived'].includes(String(data.status || '').toLowerCase())
-  ) {
-    setStatus('This account is inactive or archived. Contact your school administrator.', 'error')
+  if (['inactive', 'archived'].includes(String(data.status || '').toLowerCase())) {
+    setStatus('This account is inactive or archived. Contact your administrator.', 'error')
     await supabase.auth.signOut()
     document.getElementById('loginBtn').disabled = false
     document.getElementById('loginBtn').textContent = 'Sign In'

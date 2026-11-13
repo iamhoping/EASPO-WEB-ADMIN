@@ -134,7 +134,7 @@ const SECTIONS = {
   subjects   : { id: 'subjectsSection',   title: 'Subject Management',    sub: 'Create, edit and manage school subjects' },
   sections   : { id: 'sectionsSection',   title: 'Section Management',    sub: 'Manage sections and student assignments' },
   parents    : { id: 'parentsSection',    title: 'Parents Management',    sub: 'Manage parent and guardian records' },
-  archiveAccounts: { id: 'archiveAccountsSection', title: 'Archived Accounts', sub: 'Review and restore archived student, teacher, and parent accounts' },
+  archiveAccounts: { id: 'archiveAccountsSection', title: 'Archived Accounts', sub: 'Review and restore archived accounts' },
   schedules  : { id: 'schedulesSection',  title: 'Schedule Management',   sub: 'Create, review, and validate class schedules' },
   attendance : { id: 'attendanceSection', title: 'Attendance Logs',       sub: 'Real-time tracking with manual override' },
   grades     : { id: 'gradesSection',     title: 'Grade Records',         sub: 'Manage student academic performance' },

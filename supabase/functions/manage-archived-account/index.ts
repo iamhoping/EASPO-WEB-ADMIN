@@ -49,9 +49,13 @@ serve(async req => {
   const action = body.action
   const userId = body.userId?.trim()
   const role = body.role
+  const supportedRoles = ['WEB_ADMIN', 'SCHOOL_ADMIN', 'STUDENT', 'TEACHER', 'PARENT', 'SCANNER']
   if (!['archive', 'restore'].includes(action || '') ||
-      !userId || !['STUDENT', 'TEACHER', 'PARENT'].includes(role || '')) {
+      !userId || !supportedRoles.includes(role || '')) {
     return jsonResponse(400, { error: 'A valid account and archive or restore action are required.' })
+  }
+  if (['WEB_ADMIN', 'SCHOOL_ADMIN', 'SCANNER'].includes(role || '') && caller.role !== 'WEB_ADMIN') {
+    return jsonResponse(403, { error: 'Only Web Admins can archive or restore administrator and scanner accounts.' })
   }
   if (userId === callerData.user.id) return jsonResponse(400, { error: 'Administrators cannot archive their own account.' })
 
@@ -68,6 +72,20 @@ serve(async req => {
   }
   if (action === 'restore' && String(target.status || '').toLowerCase() !== 'archived') {
     return jsonResponse(409, { error: 'This account is not currently archived.' })
+  }
+  if (action === 'archive' && role === 'WEB_ADMIN' &&
+      !['inactive', 'archived'].includes(String(target.status || '').toLowerCase())) {
+    const { data: webAdmins, error: countError } = await adminClient
+      .from('profiles')
+      .select('status')
+      .eq('role', 'WEB_ADMIN')
+    if (countError) return jsonResponse(500, { error: countError.message })
+    const activeWebAdminCount = (webAdmins || []).filter(account =>
+      !['inactive', 'archived'].includes(String(account.status || '').toLowerCase())
+    ).length
+    if (activeWebAdminCount <= 1) {
+      return jsonResponse(409, { error: 'The last active Web Admin account cannot be archived.' })
+    }
   }
 
   const previousStatus = target.status || 'active'
