@@ -15,6 +15,7 @@ const BACKUP_NAME_PATTERN = /^easp_backup_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-(?:AM|PM
 const SIGNATURE_PREFIX = '-- EASPO-WEB-SQL-SIGNATURE: '
 const JOB_LIFETIME_MS = 60 * 60 * 1000
 const DEFAULT_MAX_SQL_BYTES = 100 * 1024 * 1024
+const MAX_PROCESS_DIAGNOSTIC_BYTES = 8192
 const jobs = new Map()
 const backupNameCounters = new Map()
 let operationInProgress = false
@@ -264,7 +265,16 @@ function startProgram(command, args, environment, timeoutMs, stdout = 'ignore') 
     throw new Error(`${command} could not be started.`)
   }
 
-  child.stderr.on('data', () => {})
+  const stderrChunks = []
+  let stderrBytes = 0
+  child.stderr.on('data', chunk => {
+    const remaining = MAX_PROCESS_DIAGNOSTIC_BYTES - stderrBytes
+    if (remaining <= 0) return
+    const boundedChunk = chunk.subarray(0, remaining)
+    stderrChunks.push(boundedChunk)
+    stderrBytes += boundedChunk.length
+  })
+  const stderrText = () => Buffer.concat(stderrChunks).toString('utf8')
   let timedOut = false
   const timeout = setTimeout(() => {
     timedOut = true
@@ -278,20 +288,64 @@ function startProgram(command, args, environment, timeoutMs, stdout = 'ignore') 
   const completion = new Promise((resolve, reject) => {
     child.once('error', () => {
       clearTimeout(timeout)
-      reject(new Error(`${command} could not be started.`))
+      const error = new Error(`${command} could not be started.`)
+      error.stderr = stderrText()
+      reject(error)
     })
     child.once('close', (code, signal) => {
       clearTimeout(timeout)
+      let message
       if (timedOut) {
-        reject(new Error(`${command} exceeded the configured time limit.`))
+        message = `${command} exceeded the configured time limit.`
       } else if (code !== 0) {
-        reject(new Error(`${command} failed${signal ? ` (${signal})` : ` with exit code ${code}`}.`))
+        message = `${command} failed${signal ? ` (${signal})` : ` with exit code ${code}`}.`
       } else {
         resolve()
+        return
       }
+      const error = new Error(message)
+      error.stderr = stderrText()
+      error.exitCode = code
+      error.signal = signal
+      reject(error)
     })
   })
   return { child, completion }
+}
+
+function diagnoseDatabaseCommandError(command, error) {
+  const details = `${error.stderr || ''}\n${error.message || ''}`.toLowerCase()
+  if (/password authentication failed|authentication failed|no password supplied|sasl authentication/.test(details)) {
+    return 'Database authentication failed. Check the username and password in SUPABASE_DB_URL.'
+  }
+  if (/could not translate host name|name or service not known|temporary failure in name resolution|nodename nor servname/.test(details)) {
+    return 'The database host could not be resolved. Check the host in SUPABASE_DB_URL.'
+  }
+  if (/connection refused|connection timed out|timeout expired|could not connect to server|no route to host|network is unreachable/.test(details)) {
+    return 'The database connection failed. Check the host, port, project status, and Supabase network access.'
+  }
+  if (/server version.*(mismatch|newer|older|not supported)|pg_dump version.*(older|not supported)/.test(details)) {
+    return 'The PostgreSQL client version is incompatible with the database server.'
+  }
+  if (/permission denied|must be owner|insufficient privilege|not authorized/.test(details)) {
+    return command === 'pg_dump'
+      ? 'The database user lacks permission to dump one or more schemas or tables.'
+      : 'The database user lacks permission to restore or modify one or more database objects.'
+  }
+  if (/no space left on device|enospc|disk quota exceeded/.test(details)) {
+    return 'The Render worker ran out of temporary disk space.'
+  }
+  if (/exceeds the .* limit|size limit/.test(details)) {
+    return 'The SQL backup exceeds the configured size limit.'
+  }
+  if (/certificate verify failed|ssl error|ssl syscall|certificate/.test(details)) {
+    return 'The SSL connection failed. Check the SSL mode in SUPABASE_DB_URL.'
+  }
+  if (/could not be started|spawn .* enoent/.test(details)) {
+    return `${command} is unavailable in the Render image. Redeploy the latest worker image.`
+  }
+  if (error instanceof HttpError) return error.message
+  return `${command} failed. Check the Render worker logs and database connection settings.`
 }
 
 function runProgram(command, args, environment, timeoutMs) {
@@ -543,8 +597,9 @@ async function runBackupJob(job, config) {
     job.message = `Full database backup ready (${Math.ceil(stats.size / (1024 * 1024))} MiB).`
   } catch (error) {
     job.status = 'failed'
-    job.message = 'Full database backup failed. Check the Render worker logs and database connection settings.'
-    console.error('[full-database-backup] Operation failed:', error.message)
+    const diagnostic = diagnoseDatabaseCommandError('pg_dump', error)
+    job.message = `Full database backup failed: ${diagnostic}`
+    console.error('[full-database-backup]', diagnostic)
     if (job.directory) await fs.promises.rm(job.directory, { recursive: true, force: true }).catch(() => {
       console.error('[full-database-backup] Temporary file cleanup failed.')
     })
@@ -571,8 +626,9 @@ async function runRestoreJob(job, config) {
     job.message = 'Full database restore completed. Sign in again if the restored Auth data changed your session.'
   } catch (error) {
     job.status = 'failed'
-    job.message = 'Full database restore failed. The SQL ran in a single transaction; inspect the target database before retrying.'
-    console.error('[full-database-restore] Operation failed:', error.message)
+    const diagnostic = diagnoseDatabaseCommandError('psql', error)
+    job.message = `Full database restore failed: ${diagnostic} The restore uses a single transaction; inspect the target database before retrying.`
+    console.error('[full-database-restore]', diagnostic)
   } finally {
     if (job.directory) await fs.promises.rm(job.directory, { recursive: true, force: true }).catch(() => {
       console.error('[full-database-restore] Temporary file cleanup failed.')
@@ -707,6 +763,7 @@ module.exports = {
   createFilename,
   createServer,
   databaseEnvironment,
+  diagnoseDatabaseCommandError,
   parseDatabaseUrl,
   signDumpFile,
   validateBackupName,

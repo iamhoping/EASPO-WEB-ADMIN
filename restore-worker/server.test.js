@@ -10,6 +10,7 @@ const {
   createFilename,
   createServer,
   databaseEnvironment,
+  diagnoseDatabaseCommandError,
   parseDatabaseUrl,
   signDumpFile,
   validateBackupName,
@@ -49,6 +50,22 @@ test('database child environment does not inherit application secrets', () => {
   assert.equal(environment.PGPASSWORD, 'secret')
   assert.equal(environment.SUPABASE_SERVICE_ROLE_KEY, undefined)
   assert.equal(environment.SUPABASE_DB_URL, undefined)
+})
+
+test('database command diagnostics identify common failures without exposing raw output', () => {
+  const authError = new Error('pg_dump failed with exit code 1.')
+  authError.stderr = 'password authentication failed for user "postgres.secret-project"'
+  assert.equal(
+    diagnoseDatabaseCommandError('pg_dump', authError),
+    'Database authentication failed. Check the username and password in SUPABASE_DB_URL.',
+  )
+
+  const permissionError = new Error('psql failed with exit code 1.')
+  permissionError.stderr = 'ERROR: permission denied for table profiles'
+  assert.equal(
+    diagnoseDatabaseCommandError('psql', permissionError),
+    'The database user lacks permission to restore or modify one or more database objects.',
+  )
 })
 
 test('backup names are unique-format dated SQL names', () => {
