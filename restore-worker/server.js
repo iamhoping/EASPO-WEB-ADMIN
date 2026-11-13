@@ -465,8 +465,8 @@ function sendError(response, error) {
 
 function addCors(request, response, config) {
   const origin = request.headers.origin
-  if (typeof origin !== 'string' ||
-      (!config.allowAllOrigins && !config.allowedOrigins.has(origin))) return false
+  if (typeof origin !== 'string') return true
+  if (!config.allowAllOrigins && !config.allowedOrigins.has(origin)) return false
   response.setHeader('Access-Control-Allow-Origin', config.allowAllOrigins ? '*' : origin)
   response.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
   response.setHeader(
@@ -589,7 +589,10 @@ async function handleRequest(request, response, config) {
   const parsedUrl = new URL(request.url, 'http://localhost')
 
   if (parsedUrl.pathname === '/health' && request.method === 'GET') {
-    sendJson(response, 200, { ok: true })
+    sendJson(response, 200, {
+      ok: true,
+      commit: process.env.RENDER_GIT_COMMIT || 'unknown',
+    })
     return
   }
 

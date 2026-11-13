@@ -172,12 +172,28 @@ test('wildcard CORS still requires a valid Web Admin session', async () => {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
   const address = server.address()
   try {
+    const preflight = await fetch(`http://127.0.0.1:${address.port}/api/restore`, {
+      method: 'OPTIONS',
+      headers: {
+        Origin: 'https://unrelated.example',
+        'Access-Control-Request-Method': 'POST',
+        'Access-Control-Request-Headers': 'authorization,content-type,x-easpo-confirmation',
+      },
+    })
+    assert.equal(preflight.status, 204)
+    assert.equal(preflight.headers.get('access-control-allow-origin'), '*')
+
     const response = await fetch(`http://127.0.0.1:${address.port}/api/backup`, {
       method: 'POST',
       headers: { Origin: 'https://unrelated.example' },
     })
     assert.equal(response.status, 401)
     assert.equal(response.headers.get('access-control-allow-origin'), '*')
+
+    const withoutOrigin = await fetch(`http://127.0.0.1:${address.port}/api/backup`, {
+      method: 'POST',
+    })
+    assert.equal(withoutOrigin.status, 401)
   } finally {
     await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
   }

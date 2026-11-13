@@ -12,7 +12,7 @@ The full `.sql` workflow dumps database schemas and rows accessible to the confi
 
 ### Web backup and restore (Render)
 
-The full SQL controls call the separate Render worker in `restore-worker/`. Database credentials and PostgreSQL tools stay on Render; the browser sends only the signed-in Web Admin's access token and selected SQL file. The worker verifies the token with Supabase, permits only an active `WEB_ADMIN`, checks that the database URL matches the Supabase project, requires the exact destructive confirmation on restore, and uses `psql` with stop-on-error and a single transaction. It signs web-generated SQL files with a server-only HMAC key and rejects files that are unsigned or changed. Only one full-database operation runs at a time.
+The full SQL controls call the separate Render worker in `restore-worker/`. Database credentials and PostgreSQL tools stay on Render; the browser sends only the signed-in Web Admin's access token and selected SQL file. The worker verifies the token with Supabase, permits only an active `WEB_ADMIN`, checks that the database URL matches the Supabase project, requires the exact destructive confirmation on restore, and uses `psql` with stop-on-error and a single transaction. It signs web-generated SQL files with a server-only HMAC key and rejects files that are unsigned or changed. CORS accepts the configured origins; a request without an `Origin` header proceeds only to the same server-side authentication and authorization checks. Only one full-database operation runs at a time.
 
 Set up the worker before using the full SQL web controls:
 
@@ -23,7 +23,7 @@ Set up the worker before using the full SQL web controls:
    - `SUPABASE_DB_URL`: the PostgreSQL connection URL for the same project, with SSL enabled. Prefer the Supabase session pooler URL if Render cannot connect to the direct database host. This is a database password and must remain a Render secret.
    - `BACKUP_SIGNING_SECRET`: a random secret of at least 32 characters. Keep a secure offline copy and do not rotate it unless you are willing to make previously downloaded web backups unusable in the web restore flow.
    - `ALLOWED_ORIGINS`: the Render blueprint defaults to `*` as requested, allowing browser requests from any origin. This does not bypass the required active-Web-Admin session or server-side checks. To restrict browser origins later, replace `*` with exact HTTPS origins (comma-separated for production and staging).
-3. Wait for the Render health check at `/health` to pass. The frontend defaults to `https://easpo-full-restore.onrender.com`. If Render assigns another service URL, change `FULL_SQL_WORKER_URL` in `public/js/modules/backup-recovery.js` to the exact HTTPS URL, then redeploy the frontend.
+3. Wait for the Render health check at `/health` to pass. It reports Render's deployed commit as `commit`; compare it with the Git commit you intended to deploy. The frontend defaults to `https://easpo-full-restore.onrender.com`. If Render assigns another service URL, change `FULL_SQL_WORKER_URL` in `public/js/modules/backup-recovery.js` to the exact HTTPS URL, then redeploy the frontend.
 4. Deploy the frontend. The selective `.easpobackup` controls continue using Supabase directly; full SQL backup and restore use Render.
 
 Generate `BACKUP_SIGNING_SECRET` in PowerShell, then copy its output directly into Render's secret setting and keep a protected offline copy:
