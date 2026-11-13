@@ -242,11 +242,15 @@ function importPath(path: unknown, userId: string) {
   return path
 }
 
-async function loadUploadedBackup(admin: SupabaseClient, path: string) {
+async function loadStoredBackup(admin: SupabaseClient, path: string, unavailableMessage: string) {
   const { data, error } = await admin.storage.from(BUCKET).download(path)
-  if (error || !data) throw new Error('The uploaded backup file could not be read.')
-  if (data.size > MAX_FILE_BYTES) throw new Error('The uploaded backup exceeds the 10 MiB limit.')
+  if (error || !data) throw new Error(unavailableMessage)
+  if (data.size > MAX_FILE_BYTES) throw new Error('The backup exceeds the 10 MiB limit.')
   return decryptBackup(new Uint8Array(await data.arrayBuffer()))
+}
+
+async function loadUploadedBackup(admin: SupabaseClient, path: string) {
+  return loadStoredBackup(admin, path, 'The uploaded backup file could not be read.')
 }
 
 function preview(backup: BackupPackage, validatedCounts: Record<string, number>) {
@@ -461,6 +465,25 @@ serve(async req => {
       const { error: deleteError } = await admin.from('system_backup_runs').delete().eq('id', run.id)
       if (deleteError) return response(500, { error: 'The backup file was removed, but its history record could not be deleted.' })
       return response(200, { ok: true })
+    }
+
+    if (body.action === 'export-data') {
+      if (typeof body.id !== 'string' ||
+          !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.id)) {
+        return response(400, { error: 'A valid backup record is required.' })
+      }
+      const { data: run, error: runError } = await admin.from('system_backup_runs')
+        .select('id,status,object_key')
+        .eq('id', body.id)
+        .eq('backup_type', 'data_export')
+        .maybeSingle()
+      if (runError) return response(500, { error: 'Could not load the selected backup record.' })
+      if (!run?.object_key) return response(404, { error: 'The selected data backup file is unavailable.' })
+      if (run.status !== 'verified' || run.object_key !== `data/${run.id}.easpobackup`) {
+        return response(409, { error: 'Only completed selective backups can be exported.' })
+      }
+      const backup = await loadStoredBackup(admin, run.object_key, 'The backup file could not be read.')
+      return response(200, { ok: true, backup })
     }
 
     return response(400, { error: 'Unsupported backup operation.' })

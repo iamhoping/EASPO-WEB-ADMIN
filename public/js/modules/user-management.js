@@ -226,7 +226,11 @@ async function deleteUserAccount(userId, name, button) {
   }
   const user = allUsers.find(item => item.id === userId)
   if (!user) return showToast('User not found', 'Refresh the user list and try again.', 'warning')
-  if (!window.confirm(`Permanently delete ${name}'s account? This cannot be undone. The action may be blocked if other records still depend on this account.`)) return
+  if (!window.confirm(
+    `Permanently delete ${name}'s account? This removes the login and cannot be undone. ` +
+    'EASPO backups do not recreate deleted logins or passwords. Archive the account instead if you may need to restore it later. ' +
+    'The action may be blocked if other records still depend on this account.',
+  )) return
 
   button.disabled = true
   try {

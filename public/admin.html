@@ -9,10 +9,12 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
-  <!-- jsPDF and dependencies -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <!-- PDF reports -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/pdfmake.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/vfs_fonts.js"></script>
   <!-- SheetJS for Excel export -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 </head>
 <body data-brand-title="Admin Dashboard">
 <div class="admin-layout">
@@ -1040,25 +1042,31 @@
             <div class="form-group"><label class="form-label" for="backupDateFrom">From date</label><input class="form-input" id="backupDateFrom" type="date"></div>
             <div class="form-group"><label class="form-label" for="backupDateTo">Through date</label><input class="form-input" id="backupDateTo" type="date"></div>
           </div>
-          <label class="system-backup-option"><input id="backupAllDatasets" type="checkbox" checked><span><strong>Back up all supported data</strong></span></label>
-          <div class="system-backup-datasets">
-            <label class="system-backup-option"><input type="checkbox" data-backup-dataset value="students" checked><span>Students</span></label>
-            <label class="system-backup-option"><input type="checkbox" data-backup-dataset value="teachers" checked><span>Teachers</span></label>
-            <label class="system-backup-option"><input type="checkbox" data-backup-dataset value="parents" checked><span>Parents</span></label>
-            <label class="system-backup-option"><input type="checkbox" data-backup-dataset value="sections" checked><span>Sections</span></label>
-            <label class="system-backup-option"><input type="checkbox" data-backup-dataset value="subjects" checked><span>Subjects</span></label>
-            <label class="system-backup-option"><input type="checkbox" data-backup-dataset value="schedules" checked><span>Schedules</span></label>
-            <label class="system-backup-option"><input type="checkbox" data-backup-dataset value="grades" checked><span>Grades</span></label>
-            <label class="system-backup-option"><input type="checkbox" data-backup-dataset value="attendance" checked><span>Attendance</span></label>
-            <label class="system-backup-option"><input type="checkbox" data-backup-dataset value="system_settings" checked><span>System settings</span></label>
-          </div>
+          <fieldset class="system-backup-selection">
+            <legend>Data to include</legend>
+            <label class="system-backup-option system-backup-all-option">
+              <input id="backupAllDatasets" type="checkbox" checked>
+              <span><strong>Back up all supported data</strong><small>Toggle all 9 datasets at once</small></span>
+            </label>
+            <div class="system-backup-datasets">
+              <label class="system-backup-option"><input type="checkbox" data-backup-dataset value="students" checked><span>Students</span></label>
+              <label class="system-backup-option"><input type="checkbox" data-backup-dataset value="teachers" checked><span>Teachers</span></label>
+              <label class="system-backup-option"><input type="checkbox" data-backup-dataset value="parents" checked><span>Parents</span></label>
+              <label class="system-backup-option"><input type="checkbox" data-backup-dataset value="sections" checked><span>Sections</span></label>
+              <label class="system-backup-option"><input type="checkbox" data-backup-dataset value="subjects" checked><span>Subjects</span></label>
+              <label class="system-backup-option"><input type="checkbox" data-backup-dataset value="schedules" checked><span>Schedules</span></label>
+              <label class="system-backup-option"><input type="checkbox" data-backup-dataset value="grades" checked><span>Grades</span></label>
+              <label class="system-backup-option"><input type="checkbox" data-backup-dataset value="attendance" checked><span>Attendance</span></label>
+              <label class="system-backup-option"><input type="checkbox" data-backup-dataset value="system_settings" checked><span>System settings</span></label>
+            </div>
+          </fieldset>
           <button class="btn btn-primary" id="backupNowBtn" type="button">Backup Now</button>
           <p class="system-backup-status" id="backupActionMessage" role="status" aria-live="polite"></p>
         </div>
 
         <div class="panel panel-padded">
           <div class="panel-title">Restore a backup</div>
-          <p class="panel-sub">Upload an EASPO <code>.easpobackup</code> file (maximum 10 MiB). It is validated before restore and held in private temporary storage. Existing rows are never updated; duplicate rows are skipped.</p>
+          <p class="panel-sub">Upload an EASPO <code>.easpobackup</code> file (maximum 10 MiB). It is validated before restore and held in private temporary storage. Existing rows are never updated; duplicate rows are skipped. Backups do not recreate deleted Supabase Auth logins or passwords; profile records require their original login. Use Archived Accounts to restore archived accounts.</p>
           <div class="system-backup-restore-controls">
             <input id="restoreBackupFile" type="file" accept=".easpobackup,application/octet-stream">
             <button class="btn btn-secondary" id="previewBackupBtn" type="button">Validate and Preview</button>
@@ -1070,11 +1078,15 @@
           </div>
           <p class="system-backup-status" id="restoreActionMessage" role="status" aria-live="polite"></p>
           <pre class="system-backup-preview hidden" id="restoreResults" aria-live="polite"></pre>
+          <div class="system-backup-restore-actions hidden" id="restoreExportActions">
+            <button class="btn btn-secondary" id="restoreExportPdfBtn" type="button">Download restore report (PDF)</button>
+            <button class="btn btn-secondary" id="restoreExportExcelBtn" type="button">Download restore report (Excel)</button>
+          </div>
         </div>
 
         <div class="panel panel-padded">
           <div class="panel-header system-backup-history-header">
-            <div><div class="panel-title">Backup history</div><div class="panel-sub" id="backupHistorySummary">Loading backup history…</div></div>
+            <div><div class="panel-title">Backup history</div><div class="panel-sub" id="backupHistorySummary">Loading backup history…</div><div class="panel-sub">PDF and Excel exports contain unencrypted records. Store downloaded files securely.</div></div>
           </div>
           <div class="table-wrap"><table><thead><tr><th>Backup date</th><th>Date range</th><th>Included data</th><th>File size</th><th>Status</th><th>File</th></tr></thead><tbody id="backupHistoryBody"><tr><td colspan="6">Loading backup history…</td></tr></tbody></table></div>
         </div>

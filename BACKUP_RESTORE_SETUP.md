@@ -27,6 +27,8 @@ The Backup & Restore page creates encrypted, selective data backups and stores t
 3. Deploy the function: `supabase functions deploy selective-backup`. Supabase supplies `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` to the function; do not add either value to frontend configuration. The function independently verifies the caller's Supabase session and requires an active `WEB_ADMIN` profile.
 4. Deploy the web application. The existing Supabase URL and publishable key in the frontend are used only for the authenticated session and signed file upload; they do not grant access to the private bucket.
 
+Each completed selective backup history entry has its own PDF and Excel download containing its backed-up records, as well as metadata; the Excel workbook has a sheet for each dataset. The PDF and every workbook sheet include the configured school logo, name, and address. Restore results can also be downloaded as PDF or Excel reports. Record exports are unencrypted and may contain personal information, so store them securely. They do not replace the encrypted `.easpobackup` file used to restore data.
+
 ## Safe sample-data test
 
 Do this in a separate test/staging Supabase project with the same migrations, using synthetic names and contact details only:
@@ -35,9 +37,9 @@ Do this in a separate test/staging Supabase project with the same migrations, us
 2. Open **Backup & Restore**, select the synthetic records' date range and tables, create the backup, and confirm it downloads. Check its metadata and record counts in history.
 3. Upload the downloaded `.easpobackup` file and validate the preview. Cancel once to test cleanup, then preview again and restore after confirming. Verify inserted records and foreign-key relationships in the staging application.
 4. Restore the same file a second time. Verify existing records are skipped and not changed. Also try a renamed non-backup file and a modified backup file; validation should reject both without changing database rows.
-5. Test history download and deletion using only the synthetic backup. Confirm deletion removes both the storage object and its history row.
+5. Test the per-backup PDF and Excel downloads using only the synthetic backup. Verify that every selected dataset and its records appear in the exports, then test the encrypted file download and deletion. Confirm deletion removes both the storage object and its history row.
 
-Do not test by deleting or restoring real production student records. Backups are restored by inserting only: existing unique/conflicting records are ignored, not overwritten. Profile records can only be inserted when their corresponding Supabase Auth user already exists. Auth passwords, sessions, and schema/migration state are not part of these data backups; this is not a complete Supabase project or point-in-time database backup.
+Do not test by deleting or restoring real production student records. Backups are restored by inserting only: existing unique/conflicting records are ignored, not overwritten. Profile records can only be inserted when their corresponding Supabase Auth user already exists. Auth passwords, sessions, and schema/migration state are not part of these data backups, so a permanently deleted account cannot be recreated from a backup. Archive accounts instead when they may need to be restored; archived accounts retain their Auth identity and can be restored from Archived Accounts. This is not a complete Supabase project or point-in-time database backup.
 
 ## Limits and coverage
 
