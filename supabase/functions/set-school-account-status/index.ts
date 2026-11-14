@@ -15,7 +15,7 @@ function jsonResponse(status: number, body: Record<string, unknown>) {
   })
 }
 
-serve(async req => {
+serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 200, headers: corsHeaders })
   }
@@ -42,7 +42,7 @@ serve(async req => {
     .eq('id', callerData.user.id)
     .single()
   if (callerProfileError || !['WEB_ADMIN', 'SCHOOL_ADMIN'].includes(callerProfile?.role) ||
-      ['inactive', 'archived'].includes(String(callerProfile.status || '').toLowerCase())) {
+      ['inactive', 'archived', 'deleted'].includes(String(callerProfile.status || '').toLowerCase())) {
     return jsonResponse(403, { error: 'Only authorized school administrators can deactivate accounts.' })
   }
 
@@ -95,7 +95,7 @@ serve(async req => {
       .maybeSingle()
     const statusToPreserve = latestProfileError ? target.status : latestProfile?.status ?? target.status
     const { error: rollbackError } = await adminClient.auth.admin.updateUserById(userId, {
-      ban_duration: ['inactive', 'archived'].includes(String(statusToPreserve || '').toLowerCase()) ? '876000h' : 'none',
+      ban_duration: ['inactive', 'archived', 'deleted'].includes(String(statusToPreserve || '').toLowerCase()) ? '876000h' : 'none',
     })
     if (rollbackError || latestProfileError) {
       console.error('Account status reconciliation failed after profile update error:', {
@@ -130,7 +130,7 @@ serve(async req => {
       : await adminClient.from('profiles').select('status').eq('id', userId).maybeSingle()
     const statusToPreserve = latestProfileError ? status : latestProfile?.status ?? status
     const { error: authRollbackError } = await adminClient.auth.admin.updateUserById(userId, {
-      ban_duration: ['inactive', 'archived'].includes(String(statusToPreserve || '').toLowerCase()) ? '876000h' : 'none',
+      ban_duration: ['inactive', 'archived', 'deleted'].includes(String(statusToPreserve || '').toLowerCase()) ? '876000h' : 'none',
     })
     if (profileRollbackError || !profileRollback || latestProfileError || authRollbackError) {
       console.error('Account status rollback failed after audit insertion error:', {

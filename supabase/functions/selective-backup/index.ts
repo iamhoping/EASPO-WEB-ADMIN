@@ -18,6 +18,9 @@ const DATASETS = {
   students: { table: 'profiles', role: 'STUDENT', orderColumn: 'id' },
   teachers: { table: 'profiles', role: 'TEACHER', orderColumn: 'id' },
   parents: { table: 'profiles', role: 'PARENT', orderColumn: 'id' },
+  school_admins: { table: 'profiles', role: 'SCHOOL_ADMIN', orderColumn: 'id' },
+  web_admins: { table: 'profiles', role: 'WEB_ADMIN', orderColumn: 'id' },
+  scanners: { table: 'profiles', role: 'SCANNER', orderColumn: 'id' },
   sections: { table: 'sections', dateColumn: 'created_at', orderColumn: 'id' },
   subjects: { table: 'subjects', dateColumn: 'created_at', orderColumn: 'id' },
   schedules: { table: 'schedules', dateColumn: 'created_at', orderColumn: 'id' },
@@ -31,18 +34,13 @@ type BackupPackage = {
   format: string
   version: number
   createdAt: string
+  authUserIds?: string[]
   filters: { dateFrom: string | null; dateTo: string | null }
   tables: DatasetName[]
   records: Partial<Record<DatasetName, Record<string, unknown>[]>>
 }
 
-type Context = {
-  admin: SupabaseClient
-  user: User
-  token: string
-  supabaseUrl: string
-  functionApiKey: string
-}
+type Context = { admin: SupabaseClient; user: User }
 
 function response(status: number, body: Record<string, unknown>) {
   return new Response(JSON.stringify(body), {
@@ -56,17 +54,23 @@ function base64Bytes(value: string): Uint8Array {
   return Uint8Array.from(decoded, character => character.charCodeAt(0))
 }
 
+// Explicit ArrayBuffer conversion keeps both Deno's Web Crypto types and the
+// VS Code language service happy when typed-array generics are enabled.
+function asArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
+}
+
 async function encryptionKey() {
   const encoded = Deno.env.get('EASPO_BACKUP_ENCRYPTION_KEY')
   if (!encoded) throw new Error('EASPO_BACKUP_ENCRYPTION_KEY is not configured.')
   const bytes = base64Bytes(encoded)
   if (bytes.length !== 32) throw new Error('EASPO_BACKUP_ENCRYPTION_KEY must be a base64-encoded 32-byte key.')
-  return crypto.subtle.importKey('raw', bytes, 'AES-GCM', false, ['encrypt', 'decrypt'])
+  return crypto.subtle.importKey('raw', asArrayBuffer(bytes), 'AES-GCM', false, ['encrypt', 'decrypt'])
 }
 
 async function encryptBackup(plain: Uint8Array) {
   const iv = crypto.getRandomValues(new Uint8Array(12))
-  const cipher = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await encryptionKey(), plain))
+  const cipher = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await encryptionKey(), asArrayBuffer(plain)))
   const encrypted = new Uint8Array(MAGIC.length + iv.length + cipher.length)
   encrypted.set(MAGIC)
   encrypted.set(iv, MAGIC.length)
@@ -83,7 +87,7 @@ async function decryptBackup(encrypted: Uint8Array): Promise<BackupPackage> {
   const cipher = encrypted.slice(MAGIC.length + 12)
   let decrypted: ArrayBuffer
   try {
-    decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, await encryptionKey(), cipher)
+    decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, await encryptionKey(), asArrayBuffer(cipher))
   } catch {
     throw new Error('Backup decryption or integrity validation failed. Check that the original backup key is configured.')
   }
@@ -108,11 +112,17 @@ function validateBackup(value: unknown): BackupPackage {
   if (candidate.format !== FORMAT) {
     throw new Error(`Unsupported backup format; expected "${FORMAT}".`)
   }
-  if (candidate.version !== 1) {
-    throw new Error(`Unsupported backup version "${String(candidate.version)}"; expected version 1.`)
+  if (![1, 2].includes(candidate.version as number)) {
+    throw new Error(`Unsupported backup version "${String(candidate.version)}"; supported versions are 1 and 2.`)
   }
   if (typeof candidate.createdAt !== 'string' || !Number.isFinite(Date.parse(candidate.createdAt))) {
     throw new Error('The backup metadata field "createdAt" must be a valid date and time.')
+  }
+  if ((candidate.version === 2 || candidate.authUserIds !== undefined) &&
+      (!Array.isArray(candidate.authUserIds) ||
+       !candidate.authUserIds.every(id => typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) ||
+       new Set(candidate.authUserIds).size !== candidate.authUserIds.length)) {
+    throw new Error('The backup does not contain a valid Auth identity snapshot.')
   }
   if (!Array.isArray(candidate.tables) || !candidate.tables.length) {
     throw new Error('The backup metadata field "tables" must list at least one dataset.')
@@ -181,7 +191,6 @@ async function authorize(req: Request): Promise<Context | Response> {
   const url = Deno.env.get('SUPABASE_URL')
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
   if (!url || !serviceRoleKey) return response(500, { error: 'Supabase server credentials are not configured.' })
-  const functionApiKey = Deno.env.get('SUPABASE_ANON_KEY') || serviceRoleKey
 
   const token = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim()
   if (!token) return response(401, { error: 'Missing authorization token.' })
@@ -195,10 +204,10 @@ async function authorize(req: Request): Promise<Context | Response> {
     .eq('id', data.user.id)
     .single()
   if (profileError || profile?.role !== 'WEB_ADMIN' ||
-      ['inactive', 'archived'].includes(String(profile.status || '').toLowerCase())) {
+      ['inactive', 'archived', 'deleted'].includes(String(profile.status || '').toLowerCase())) {
     return response(403, { error: 'Only active Web Admins can manage backups.' })
   }
-  return { admin, user: data.user, token, supabaseUrl: url, functionApiKey }
+  return { admin, user: data.user }
 }
 
 function validateSelection(value: unknown): DatasetName[] {
@@ -242,6 +251,63 @@ async function fetchDataset(admin: SupabaseClient, name: DatasetName, from: stri
   return rows
 }
 
+async function fetchAuthUsers(admin: SupabaseClient): Promise<User[]> {
+  const users: User[] = []
+  for (let page = 1; ; page += 1) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: PAGE_SIZE })
+    if (error) throw new Error('Could not read the Auth identity snapshot.')
+    users.push(...(data.users || []))
+    if (!data.users || data.users.length < PAGE_SIZE) return users
+  }
+}
+
+async function fetchAuthUserIds(admin: SupabaseClient) {
+  return (await fetchAuthUsers(admin)).map(user => user.id)
+}
+
+function recordsForRestore(backup: BackupPackage): Record<DatasetName, Record<string, unknown>[]> {
+  // The database validator uses a fixed dependency list. Supplying empty arrays
+  // for unselected datasets keeps a selective restore isolated to its manifest.
+  return Object.fromEntries(
+    (Object.keys(DATASETS) as DatasetName[]).map(dataset => [dataset, backup.records[dataset] || []]),
+  ) as Record<DatasetName, Record<string, unknown>[]>
+}
+
+async function restoreAuthAccess(admin: SupabaseClient, backup: BackupPackage, users: User[]) {
+  const backedUpProfiles = (['students', 'teachers', 'parents', 'school_admins', 'web_admins', 'scanners'] as const)
+    .flatMap(dataset => backup.records[dataset] || [])
+  const usersById = new Map(users.map(user => [user.id, user]))
+  const updates = backedUpProfiles.flatMap(profile => {
+    if (typeof profile.id !== 'string') return []
+    const user = usersById.get(profile.id)
+    if (!user) return []
+    const shouldBeBanned = ['inactive', 'archived', 'deleted']
+      .includes(String(profile.status || '').toLowerCase())
+    const bannedUntil = user.banned_until ? Date.parse(user.banned_until) : Number.NaN
+    const isBanned = Number.isFinite(bannedUntil) && bannedUntil > Date.now()
+    return shouldBeBanned === isBanned ? [] : [{ userId: user.id, shouldBeBanned }]
+  })
+
+  let failedUpdates = 0
+  for (let offset = 0; offset < updates.length; offset += 10) {
+    const results = await Promise.all(updates.slice(offset, offset + 10).map(async update => {
+      const { error } = await admin.auth.admin.updateUserById(update.userId, {
+        ban_duration: update.shouldBeBanned ? '876000h' : 'none',
+      })
+      if (error) {
+        console.error('Could not synchronize restored account access status.', { code: error.status || 'unknown' })
+        return false
+      }
+      return true
+    }))
+    failedUpdates += results.filter(success => !success).length
+  }
+
+  return failedUpdates
+    ? `Database data was restored, but authentication access could not be synchronized for ${failedUpdates} backed-up account(s). Re-upload the backup and retry restore, or contact support.`
+    : null
+}
+
 function importPath(path: unknown, userId: string) {
   if (typeof path !== 'string' || !new RegExp(`^incoming/${userId}/[0-9a-f-]{36}\\.easpobackup$`, 'i').test(path)) {
     throw new Error('The uploaded backup reference is invalid.')
@@ -260,115 +326,19 @@ async function loadUploadedBackup(admin: SupabaseClient, path: string) {
   return loadStoredBackup(admin, path, 'The uploaded backup file could not be read.')
 }
 
-async function restoreArchivedAccounts(
-  admin: SupabaseClient,
-  supabaseUrl: string,
-  functionApiKey: string,
-  token: string,
-  backup: BackupPackage,
-) {
-  const accountDatasets = [
-    ['students', 'STUDENT'],
-    ['teachers', 'TEACHER'],
-    ['parents', 'PARENT'],
-  ] as const
-  const activeBackupProfiles = accountDatasets.flatMap(([dataset, role]) =>
-    (backup.records[dataset] || []).flatMap(profile => {
-      if (profile.role !== role ||
-          ['inactive', 'archived'].includes(String(profile.status || 'active').toLowerCase()) ||
-          typeof profile.id !== 'string') return []
-      return [{ id: profile.id, role }]
-    })
-  )
-  const seenProfileIds = new Set<string>()
-  const uniqueProfiles = activeBackupProfiles.filter(profile => {
-    if (seenProfileIds.has(profile.id)) return false
-    seenProfileIds.add(profile.id)
-    return true
-  })
-  const archivedProfiles: typeof uniqueProfiles = []
-
-  for (let offset = 0; offset < uniqueProfiles.length; offset += 500) {
-    const chunk = uniqueProfiles.slice(offset, offset + 500)
-    const { data, error } = await admin.from('profiles')
-      .select('id,role,status')
-      .in('id', chunk.map(profile => profile.id))
-    if (error) {
-      console.error('Could not find archived accounts from the backup.', { code: error.code || 'unknown' })
-      return {
-        restored: 0,
-        failed: 0,
-        checked: false,
-        warning: 'Could not check archived accounts against this backup. Use Archived Accounts to restore them manually.',
-      }
-    }
-    const backupRoles = new Map<string, typeof chunk[number]['role']>()
-    for (const profile of chunk) backupRoles.set(profile.id, profile.role)
-    archivedProfiles.push(...(data || []).flatMap(profile => {
-      const role = backupRoles.get(profile.id)
-      return role &&
-        profile.role === role &&
-        String(profile.status || '').toLowerCase() === 'archived'
-        ? [{ id: profile.id, role }]
-        : []
-    }))
-  }
-
-  let restored = 0
-  const failures: string[] = []
-  for (let offset = 0; offset < archivedProfiles.length; offset += 5) {
-    const chunk = archivedProfiles.slice(offset, offset + 5)
-    const results = await Promise.all(chunk.map(async profile => {
-      try {
-        const result = await fetch(`${supabaseUrl.replace(/\/+$/, '')}/functions/v1/manage-archived-account`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-            'apikey': functionApiKey,
-          },
-          body: JSON.stringify({ action: 'restore', userId: profile.id, role: profile.role }),
-        })
-        let body: Record<string, unknown> = {}
-        try {
-          body = await result.json()
-        } catch {
-          body = {}
-        }
-        if (!result.ok || body.ok !== true) {
-          throw new Error(typeof body.error === 'string' ? body.error : `HTTP ${result.status}`)
-        }
-        return { restored: true, failure: '' }
-      } catch (error) {
-        return {
-          restored: false,
-          failure: `${profile.id}: ${error instanceof Error ? error.message : 'restore failed'}`,
-        }
-      }
-    }))
-    restored += results.filter(result => result.restored).length
-    failures.push(...results.filter(result => result.failure).map(result => result.failure))
-  }
-
-  return {
-    restored,
-    failed: failures.length,
-    checked: true,
-    warning: failures.length
-      ? `${restored} archived account(s) were reactivated; ${failures.length} could not be restored. Check Archived Accounts for details and retry.`
-      : null,
-    failures,
-  }
-}
-
 function preview(backup: BackupPackage, validatedCounts: Record<string, number>) {
   const tables = backup.tables.map(table => ({
     name: table,
     records: validatedCounts[table],
   }))
+  const fullState = Boolean(backup.authUserIds) &&
+    !backup.filters.dateFrom && !backup.filters.dateTo &&
+    backup.tables.length === Object.keys(DATASETS).length
   return {
     ok: true,
     createdAt: backup.createdAt,
+    fullState,
+    hasAuthIdentitySnapshot: Boolean(backup.authUserIds),
     tables,
     totalRecords: tables.reduce((total, table) => total + table.records, 0),
     dateFrom: backup.filters.dateFrom,
@@ -376,7 +346,7 @@ function preview(backup: BackupPackage, validatedCounts: Record<string, number>)
     zeroRecordWarnings: tables
       .filter(table => ['sections', 'subjects', 'schedules'].includes(table.name) && table.records === 0)
       .map(table => table.name),
-    missingTableWarnings: ['sections', 'subjects', 'schedules']
+    missingTableWarnings: (Object.keys(DATASETS) as DatasetName[])
       .filter(table => !backup.tables.includes(table as DatasetName)),
   }
 }
@@ -387,14 +357,14 @@ async function signedDownload(admin: SupabaseClient, path: string, name: string)
   return data.signedUrl
 }
 
-serve(async req => {
+serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders })
   if (req.method !== 'POST') return response(405, { error: 'Method not allowed.' })
 
   try {
     const context = await authorize(req)
     if (context instanceof Response) return context
-    const { admin, user, token, supabaseUrl, functionApiKey } = context
+    const { admin, user } = context
 
     let body: Record<string, unknown>
     try {
@@ -439,8 +409,9 @@ serve(async req => {
 
         const backup: BackupPackage = {
           format: FORMAT,
-          version: 1,
+          version: 2,
           createdAt: startedAt,
+          authUserIds: await fetchAuthUserIds(admin),
           filters,
           tables,
           records,
@@ -450,7 +421,7 @@ serve(async req => {
           throw new Error('The backup exceeds the 10 MiB file limit. Select fewer tables or a narrower date range.')
         }
         const encrypted = await encryptBackup(plain)
-        const sha256 = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', encrypted)))
+        const sha256 = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', asArrayBuffer(encrypted))) )
           .map(byte => byte.toString(16).padStart(2, '0')).join('')
         const { error: uploadError } = await admin.storage.from(BUCKET).upload(
           objectKey,
@@ -514,9 +485,10 @@ serve(async req => {
         return response(200, { ok: true })
       }
       const backup = await loadUploadedBackup(admin, path)
+      const restoreRecords = recordsForRestore(backup)
       if (body.action === 'preview') {
         const { data: validatedCounts, error: validationError } = await admin.rpc('validate_easpo_backup', {
-          p_rows: backup.records,
+          p_rows: restoreRecords,
         })
         if (validationError || !validatedCounts || typeof validatedCounts !== 'object') {
           if (validationError) {
@@ -531,24 +503,77 @@ serve(async req => {
         return response(200, preview(backup, validatedCounts as Record<string, number>))
       }
       if (body.confirmed !== true) return response(400, { error: 'Explicit restore confirmation is required.' })
+      if (backup.authUserIds && !backup.authUserIds.includes(user.id)) {
+        return response(400, { error: 'The selected backup does not include your administrator identity, so it cannot be restored safely.' })
+      }
+
+      const fullState = Boolean(backup.authUserIds) &&
+        !backup.filters.dateFrom && !backup.filters.dateTo &&
+        backup.tables.length === Object.keys(DATASETS).length
+      const currentUsers = await fetchAuthUsers(admin)
+      const currentUserIds = new Set(currentUsers.map(currentUser => currentUser.id))
+      const backedUpProfileIds = new Set(
+        (['students', 'teachers', 'parents', 'school_admins', 'web_admins', 'scanners'] as const)
+          .flatMap(dataset => backup.records[dataset] || [])
+          .flatMap(profile => typeof profile.id === 'string' ? [profile.id] : []),
+      )
+      const missingAuthIdentities = [...backedUpProfileIds].filter(id => !currentUserIds.has(id))
+      if (missingAuthIdentities.length) {
+        return response(409, {
+          error: `Restore was not applied: ${missingAuthIdentities.length} backed-up account identity(ies) no longer exist in Supabase Auth. Selective backup files do not contain password hashes and cannot recreate deleted logins.`,
+        })
+      }
 
       const { data: restored, error: restoreError } = await admin.rpc('restore_easpo_backup', {
-        p_rows: backup.records,
+        p_rows: restoreRecords,
+        p_full_state: fullState,
       })
       if (restoreError) {
         console.error('Transactional backup restore failed.', { code: restoreError.code || 'unknown' })
-        return response(400, { error: 'Restore failed without applying partial changes. Check table compatibility and foreign-key relationships, then use a matching backup.' })
+        const detail = String(restoreError.message || 'Database validation or schema compatibility failed.')
+          .replace(/\s+/g, ' ')
+          .slice(0, 500)
+        return response(400, { error: `Restore failed without applying partial changes. ${detail}` })
       }
-      const accountRestore = await restoreArchivedAccounts(admin, supabaseUrl, functionApiKey, token, backup)
+      if (!fullState) {
+        const { error: profileRestoreError } = await admin.rpc('restore_easpo_backup_profile_states', {
+          p_rows: restoreRecords,
+        })
+        if (profileRestoreError) {
+          console.error('Scoped profile-state restore failed.', { code: profileRestoreError.code || 'unknown' })
+          return response(500, { error: 'The date-scoped data restore completed, but account statuses could not be restored. Apply the latest backup migration and retry the restore.' })
+        }
+      }
+      // The database RPC is transactional. Auth is a separate Supabase service,
+      // so synchronize account bans and remove post-snapshot identities only
+      // after that transaction commits.
+      const authStatusWarning = await restoreAuthAccess(admin, backup, currentUsers)
+      const currentIds = fullState ? currentUsers.map(currentUser => currentUser.id) : []
+      const wantedIds = new Set(backup.authUserIds || [])
+      let authCleanupWarning: string | null = null
+      if (backup.authUserIds) {
+        for (const id of currentIds) {
+          if (!wantedIds.has(id)) {
+            const { error } = await admin.auth.admin.deleteUser(id)
+            if (error) {
+              authCleanupWarning = 'Application data was restored, but one or more post-backup Auth identities could not be removed. Contact support before retrying.'
+              break
+            }
+          }
+        }
+      }
       const { error: cleanupError } = await admin.storage.from(BUCKET).remove([path])
       if (cleanupError) console.error('Could not remove a restored temporary upload.', { code: cleanupError.name || 'unknown' })
       return response(200, {
         ok: true,
         results: restored,
-        accountRestore,
-        warning: 'Existing data conflicts were preserved. Accounts active in this backup and archived now were reactivated when their Supabase Auth login still exists. Permanently deleted logins cannot be recreated from a selective backup.' +
-          (accountRestore.warning ? ` ${accountRestore.warning}` : ''),
-        cleanupWarning: cleanupError ? 'Restore succeeded, but the temporary uploaded file could not be deleted. Use Remove uploaded file to retry.' : null,
+        warning: fullState
+          ? 'The selected backup replaced the supported application data as one transaction. Auth identities are retained by account deactivation and must exist for every backed-up profile.'
+          : backup.authUserIds
+            ? 'The selected date-scoped backup was restored without removing records outside its date range. Backed-up account statuses were restored.'
+            : 'This older backup has no Auth identity snapshot, so post-backup Auth users were retained and full-state replacement was not attempted.',
+        authStatusWarning,
+        cleanupWarning: authCleanupWarning || (cleanupError ? 'Restore succeeded, but the temporary uploaded file could not be deleted. Use Remove uploaded file to retry.' : null),
       })
     }
 

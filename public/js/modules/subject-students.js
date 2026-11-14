@@ -273,7 +273,7 @@ async function loadAssignedStudents() {
     const seen = new Set()
     assignedStudents = students.filter(student => {
       const status = String(student.status || 'active').toLowerCase()
-      if (['inactive', 'archived'].includes(status) || seen.has(student.id)) return false
+      if (['inactive', 'archived', 'deleted'].includes(status) || seen.has(student.id)) return false
       seen.add(student.id)
       return true
     })

@@ -145,7 +145,7 @@ async function loadStudentPortal() {
     .eq('id', user.id)
     .single()
   if (accountError || !account || !['STUDENT', 'PARENT'].includes(account.role) ||
-      ['inactive', 'archived'].includes(String(account.status || '').toLowerCase())) {
+      ['inactive', 'archived', 'deleted'].includes(String(account.status || '').toLowerCase())) {
     await supabase.auth.signOut()
     window.location.replace('index.html')
     return
@@ -295,11 +295,11 @@ async function loadStudentPortal() {
     ${section('Academic Performance', gradesResult.error ? '' : academicContent, gradesResult.error?.message || 'No grade records are recorded.')}
     ${section('Enrollment and Class Information', schedulesResult.error ? '' : scheduleContent, schedulesResult.error?.message || 'No class schedules are assigned.')}
     ${section('Parent/Guardian Information', parentContent, parentResult.error?.message || 'No guardian details are recorded.')}
-    ${account.role === 'STUDENT' && !['inactive', 'archived'].includes(String(student.status || '').toLowerCase())
+    ${account.role === 'STUDENT' && !['inactive', 'archived', 'deleted'].includes(String(student.status || '').toLowerCase())
       ? section('Dynamic Attendance QR Code', '<div class="student-qr"><div id="studentQrImage" class="student-qr-image" aria-label="Your current attendance QR code"></div><div><p id="studentQrStatus" role="status" aria-live="polite">Preparing your secure QR code...</p><p id="studentQrCode" class="student-qr-code"></p><p id="studentQrExpiry" class="student-qr-expiry">Codes refresh automatically and expire after 30 seconds.</p></div></div>')
       : ''}`
 
-  if (account.role === 'STUDENT' && !['inactive', 'archived'].includes(String(student.status || '').toLowerCase())) {
+  if (account.role === 'STUDENT' && !['inactive', 'archived', 'deleted'].includes(String(student.status || '').toLowerCase())) {
     startStudentQr()
   }
 }

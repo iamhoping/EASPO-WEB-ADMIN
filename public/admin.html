@@ -1039,33 +1039,8 @@
         </div>
 
         <div class="panel panel-padded">
-          <div class="panel-title">Full database SQL backup</div>
-          <p class="panel-sub">Create a dated plain SQL dump of the whole PostgreSQL database, including archived profiles and Auth rows accessible to the database connection, then download it to your device. Full restore replaces all current database data. Test against a staging project first. SQL dumps do not include Supabase project secrets or the actual bytes of Storage files. Keep downloaded backups secure; Render does not retain them.</p>
-          <div class="system-backup-restore-controls">
-            <button class="btn btn-primary" id="fullSqlBackupBtn" type="button">Download Full SQL Backup</button>
-          </div>
-          <p class="system-backup-status" id="fullSqlBackupMessage" role="status" aria-live="polite"></p>
-        </div>
-
-        <div class="panel panel-padded">
-          <div class="panel-title">Restore a full SQL backup</div>
-          <p class="panel-sub">This replaces the entire database, including accounts created after the backup. Upload an untouched, signed <code>.sql</code> file downloaded from the full backup control above (maximum 100 MiB). Local CLI backups must be restored with the CLI. Coordinate a maintenance window because the system may be unavailable while restoring. Confirm by entering the exact sentence below. Keep this page open while the restore is running.</p>
-          <div class="system-backup-restore-controls">
-            <input id="fullSqlRestoreFile" type="file" accept=".sql,application/sql">
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="fullSqlRestoreConfirmation">Type exactly: <strong>Are you sure? This will replace all current data with the backup data.</strong></label>
-            <input class="form-input" id="fullSqlRestoreConfirmation" type="text" autocomplete="off" spellcheck="false">
-          </div>
-          <div class="system-backup-restore-actions">
-            <button class="btn btn-danger" id="fullSqlRestoreBtn" type="button" disabled>Restore Full Database</button>
-          </div>
-          <p class="system-backup-status" id="fullSqlRestoreMessage" role="status" aria-live="polite"></p>
-        </div>
-
-        <div class="panel panel-padded">
           <div class="panel-title">Create a backup</div>
-          <p class="panel-sub">This creates a selective encrypted <code>.easpobackup</code> file, not a full SQL backup. Choose a date range, or leave both dates blank for all available dates. Selected student, teacher, and parent profiles are included in full because they have no date columns.</p>
+          <p class="panel-sub">Choose one or more datasets. Leave both dates blank for a complete snapshot of the selected data; select dates for a scoped backup of records in that period.</p>
           <div class="system-backup-date-grid">
             <div class="form-group"><label class="form-label" for="backupDateFrom">From date</label><input class="form-input" id="backupDateFrom" type="date"></div>
             <div class="form-group"><label class="form-label" for="backupDateTo">Through date</label><input class="form-input" id="backupDateTo" type="date"></div>
@@ -1074,12 +1049,14 @@
             <legend>Data to include</legend>
             <label class="system-backup-option system-backup-all-option">
               <input id="backupAllDatasets" type="checkbox" checked>
-              <span><strong>Back up all supported data</strong><small>Toggle all 9 datasets at once</small></span>
+              <span><strong>Back up all supported data</strong><small>Toggle every supported dataset at once</small></span>
             </label>
             <div class="system-backup-datasets">
               <label class="system-backup-option"><input type="checkbox" data-backup-dataset value="students" checked><span>Students</span></label>
               <label class="system-backup-option"><input type="checkbox" data-backup-dataset value="teachers" checked><span>Teachers</span></label>
               <label class="system-backup-option"><input type="checkbox" data-backup-dataset value="parents" checked><span>Parents</span></label>
+              <label class="system-backup-option"><input type="checkbox" data-backup-dataset value="school_admins" checked><span>School administrators</span></label>
+              <label class="system-backup-option"><input type="checkbox" data-backup-dataset value="web_admins" checked><span>Web administrators</span></label>
               <label class="system-backup-option"><input type="checkbox" data-backup-dataset value="sections" checked><span>Sections</span></label>
               <label class="system-backup-option"><input type="checkbox" data-backup-dataset value="subjects" checked><span>Subjects</span></label>
               <label class="system-backup-option"><input type="checkbox" data-backup-dataset value="schedules" checked><span>Schedules</span></label>
@@ -1093,8 +1070,8 @@
         </div>
 
         <div class="panel panel-padded">
-          <div class="panel-title">Restore a selective backup</div>
-          <p class="panel-sub">Upload an EASPO <code>.easpobackup</code> file (maximum 10 MiB). This merge-style restore inserts missing supported records and skips conflicts; it does not replace the database. Backed-up students, teachers, or parents that were active in the backup but archived since then are reactivated if their original Supabase Auth login still exists. Permanently deleted logins and account types not included in the backup cannot be recreated from this file.</p>
+          <div class="panel-title">Restore a backup</div>
+          <p class="panel-sub">Upload an EASPO <code>.easpobackup</code> file (maximum 10 MiB). It is validated before restore and held in private temporary storage. Restore replaces supported application data with the exact selected snapshot; records created after the backup are removed.</p>
           <div class="system-backup-restore-controls">
             <input id="restoreBackupFile" type="file" accept=".easpobackup,application/octet-stream">
             <button class="btn btn-secondary" id="previewBackupBtn" type="button">Validate and Preview</button>

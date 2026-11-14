@@ -15,7 +15,7 @@ function jsonResponse(status: number, body: Record<string, unknown>) {
   })
 }
 
-serve(async req => {
+serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders })
   if (req.method !== 'POST') return jsonResponse(405, { error: 'Method not allowed' })
 
@@ -36,7 +36,7 @@ serve(async req => {
     .eq('id', callerData.user.id)
     .single()
   if (callerProfileError || !['WEB_ADMIN', 'SCHOOL_ADMIN'].includes(caller?.role) ||
-      ['inactive', 'archived'].includes(String(caller.status || '').toLowerCase())) {
+      ['inactive', 'archived', 'deleted'].includes(String(caller.status || '').toLowerCase())) {
     return jsonResponse(403, { error: 'Only active school administrators can archive or restore accounts.' })
   }
 
@@ -74,14 +74,14 @@ serve(async req => {
     return jsonResponse(409, { error: 'This account is not currently archived.' })
   }
   if (action === 'archive' && role === 'WEB_ADMIN' &&
-      !['inactive', 'archived'].includes(String(target.status || '').toLowerCase())) {
+      !['inactive', 'archived', 'deleted'].includes(String(target.status || '').toLowerCase())) {
     const { data: webAdmins, error: countError } = await adminClient
       .from('profiles')
       .select('status')
       .eq('role', 'WEB_ADMIN')
     if (countError) return jsonResponse(500, { error: countError.message })
     const activeWebAdminCount = (webAdmins || []).filter(account =>
-      !['inactive', 'archived'].includes(String(account.status || '').toLowerCase())
+      !['inactive', 'archived', 'deleted'].includes(String(account.status || '').toLowerCase())
     ).length
     if (activeWebAdminCount <= 1) {
       return jsonResponse(409, { error: 'The last active Web Admin account cannot be archived.' })
@@ -111,7 +111,7 @@ serve(async req => {
         ...(role === 'STUDENT' ? { section_id: null } : {}),
       }
 
-  const previousAuthBanned = ['inactive', 'archived'].includes(String(previousStatus).toLowerCase())
+  const previousAuthBanned = ['inactive', 'archived', 'deleted'].includes(String(previousStatus).toLowerCase())
   const updateAuth = async (banned: boolean) => adminClient.auth.admin.updateUserById(userId, {
     ban_duration: banned ? '876000h' : 'none',
   })

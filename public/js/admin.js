@@ -116,7 +116,7 @@ async function authGuard() {
     .single()
 
   if (!profile || !['WEB_ADMIN', 'SCHOOL_ADMIN'].includes(profile.role) ||
-      ['inactive', 'archived'].includes(String(profile.status || '').toLowerCase())) {
+      ['inactive', 'archived', 'deleted'].includes(String(profile.status || '').toLowerCase())) {
     await supabase.auth.signOut()
     window.location.href = 'index.html'
     return null

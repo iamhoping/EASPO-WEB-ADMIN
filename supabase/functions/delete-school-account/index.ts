@@ -15,7 +15,7 @@ function jsonResponse(status: number, body: Record<string, unknown>) {
   })
 }
 
-serve(async req => {
+serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders })
   if (req.method !== 'POST') return jsonResponse(405, { error: 'Method not allowed' })
 
@@ -40,7 +40,7 @@ serve(async req => {
     .eq('id', callerData.user.id)
     .single()
   if (callerProfileError || caller?.role !== 'WEB_ADMIN' ||
-      ['inactive', 'archived'].includes(String(caller.status || '').toLowerCase())) {
+      ['inactive', 'archived', 'deleted'].includes(String(caller.status || '').toLowerCase())) {
     return jsonResponse(403, { error: 'Only active Web Admins can delete accounts.' })
   }
 
@@ -64,23 +64,30 @@ serve(async req => {
     .maybeSingle()
   if (targetError) return jsonResponse(500, { error: targetError.message })
   if (!target) return jsonResponse(404, { error: 'The selected account was not found.' })
-  if (String(target.status || '').toLowerCase() !== 'archived') {
-    return jsonResponse(409, { error: 'Only archived accounts can be permanently deleted.' })
+  if (String(target.status || '').toLowerCase() === 'deleted') {
+    return jsonResponse(409, { error: 'This account is already deactivated.' })
   }
 
-  const { error: authDeleteError } = await adminClient.auth.admin.deleteUser(userId)
-  if (authDeleteError) return jsonResponse(400, { error: authDeleteError.message })
+  // Preserve both the profile and its Auth identity.  "Delete" is reversible
+  // deactivation, not a destructive operation.
+  const { error: authError } = await adminClient.auth.admin.updateUserById(userId, {
+    ban_duration: '876000h',
+  })
+  if (authError) return jsonResponse(400, { error: authError.message })
 
-  const { error: profileDeleteError } = await adminClient
+  const { error: profileUpdateError } = await adminClient
     .from('profiles')
-    .delete()
+    .update({ status: 'deleted' })
     .eq('id', userId)
-  if (profileDeleteError) {
-    console.error('Profile cleanup failed after authentication account deletion:', profileDeleteError.message)
-    return jsonResponse(500, {
-      error: 'The login account was deleted, but its profile could not be removed. Contact support to complete cleanup.',
-    })
+  if (profileUpdateError) {
+    await adminClient.auth.admin.updateUserById(userId, { ban_duration: 'none' })
+    return jsonResponse(500, { error: 'The account could not be deactivated. No records were removed.' })
   }
 
-  return jsonResponse(200, { ok: true })
+  await adminClient.from('activity_logs').insert({
+    actor_id: callerData.user.id, actor_role: caller.role, action: 'account_deactivated',
+    table_name: 'profiles', record_id: userId,
+    before_data: target, after_data: { ...target, status: 'deleted' },
+  })
+  return jsonResponse(200, { ok: true, status: 'deleted' })
 })

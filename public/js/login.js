@@ -123,7 +123,7 @@ async function verifyAndRedirect(userId) {
     return
   }
 
-  if (['inactive', 'archived'].includes(String(data.status || '').toLowerCase())) {
+  if (['inactive', 'archived', 'deleted'].includes(String(data.status || '').toLowerCase())) {
     setStatus('This account is inactive or archived. Contact your administrator.', 'error')
     await supabase.auth.signOut()
     document.getElementById('loginBtn').disabled = false

@@ -119,7 +119,7 @@ function renderArchivedAccounts() {
     const archivedBy = account.archived_by_name || (account.archived_by ? account.archived_by.slice(0, 8) : '—')
     const accountName = formatUserName(account.name) || 'this account'
     const deleteButton = document.body.dataset.role === 'WEB_ADMIN'
-      ? `<button class="btn btn-danger btn-sm" type="button" data-delete-account="${escapeHtml(account.id)}" data-account-name="${escapeHtml(accountName)}">Delete Permanently</button>`
+      ? `<button class="btn btn-danger btn-sm" type="button" data-delete-account="${escapeHtml(account.id)}" data-account-name="${escapeHtml(accountName)}">Delete Account</button>`
       : ''
     return `<tr>
       <td data-label="Account"><div class="ent-name">${escapeHtml(formatUserName(account.name) || 'Unnamed account')}</div><div class="ent-sub">${escapeHtml(account.email || '')}</div></td>
@@ -204,12 +204,12 @@ async function restoreAccount(button) {
 async function permanentlyDeleteAccount(button) {
   const { deleteAccount: id, accountName: name } = button.dataset
   if (document.body.dataset.role !== 'WEB_ADMIN') {
-    showToast('Not authorized', 'Only a Web Admin can permanently delete accounts.', 'error')
+    showToast('Not authorized', 'Only a Web Admin can deactivate accounts.', 'error')
     return
   }
   if (!id || !window.confirm(
-    `Permanently delete "${name}"? This removes the archived account and its login and cannot be undone. ` +
-    'Selective Backup & Restore files cannot recreate its deleted login. Archive it instead if you may need to restore it. Related records may prevent deletion.',
+    `Delete "${name}"? This deactivates the account and blocks sign-in. ` +
+    'Its records and login are retained in backups for recovery.',
   )) return
 
   button.disabled = true
@@ -219,12 +219,12 @@ async function permanentlyDeleteAccount(button) {
     })
     if (error) throw error
   } catch (error) {
-    showToast('Account not deleted', await getRequestErrorMessage(error, 'Could not permanently delete this account.'), 'error')
+    showToast('Account not deactivated', await getRequestErrorMessage(error, 'Could not deactivate this account.'), 'error')
     button.disabled = false
     return
   }
 
-  showToast('Account permanently deleted', `"${name}" was permanently deleted.`, 'success')
+  showToast('Account deactivated', `"${name}" was deactivated and is no longer visible in the system.`, 'success')
   try {
     await loadArchivedAccounts()
   } catch (error) {

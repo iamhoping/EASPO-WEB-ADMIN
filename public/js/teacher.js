@@ -102,7 +102,7 @@ async function loadTeacherProfile() {
     .single()
 
   if (profileError || !profile || profile.role !== 'TEACHER' ||
-      ['inactive', 'archived'].includes(String(profile.status || '').toLowerCase())) {
+      ['inactive', 'archived', 'deleted'].includes(String(profile.status || '').toLowerCase())) {
     await supabase.auth.signOut()
     window.location.href = 'index.html'
     return null
