@@ -188,6 +188,53 @@ async function fetchTeacherAttendance(studentIds = []) {
   return data || []
 }
 
+function populateTeacherAttendanceSchedules() {
+  const select = document.getElementById('teacherAttendanceSchedule')
+  if (!select) return
+
+  select.innerHTML = '<option value="">Select an assigned schedule</option>' + state.schedules.map(schedule => {
+    const subjectName = schedule.subject || schedule.subjects?.name || 'Class'
+    const sectionName = getSectionLabel(schedule.section_id)
+    const label = `${subjectName} — ${sectionName} — ${schedule.day || 'Schedule'} ${schedule.start_time || ''}`
+    return `<option value="${escapeHtml(schedule.id)}">${escapeHtml(label)}</option>`
+  }).join('')
+}
+
+function renderTeacherAttendanceEntry() {
+  const tbody = document.getElementById('teacherAttendanceEntryBody')
+  const scheduleId = document.getElementById('teacherAttendanceSchedule')?.value || ''
+  if (!tbody) return
+
+  const schedule = byId(state.schedules, scheduleId)
+  if (!schedule) {
+    tbody.innerHTML = '<tr><td colspan="2">Select a schedule to load its students.</td></tr>'
+    return
+  }
+
+  const students = state.students.filter(student =>
+    String(student.section_id || '') === String(schedule.section_id || '')
+  )
+
+  if (!students.length) {
+    tbody.innerHTML = '<tr><td colspan="2">No students are assigned to this schedule.</td></tr>'
+    return
+  }
+
+  tbody.innerHTML = students.map(student => `
+    <tr>
+      <td>${escapeHtml(formatUserName(student.name))}</td>
+      <td>
+        <select class="form-select" data-attendance-student="${escapeHtml(student.id)}" aria-label="Attendance status for ${escapeHtml(formatUserName(student.name))}">
+          <option value="">Select status</option>
+          <option value="present">Present</option>
+          <option value="late">Late</option>
+          <option value="absent">Absent</option>
+        </select>
+      </td>
+    </tr>
+  `).join('')
+}
+
 async function fetchTeacherGrades(studentIds = []) {
   if (!studentIds.length) return []
 
@@ -360,7 +407,8 @@ function renderTeacherAttendance() {
 
   const filtered = state.attendance.filter(row => {
     const student = byId(state.students, row.student_id)
-    const schedule = state.schedules.find(item => String(item.section_id) === String(student?.section_id || ''))
+    const schedule = byId(state.schedules, row.schedule_id) ||
+      state.schedules.find(item => String(item.section_id) === String(student?.section_id || ''))
     const matchesSubject = !subjectFilter || String(schedule?.subject_id || schedule?.subject || '') === String(subjectFilter) || String(schedule?.subjects?.id || '') === String(subjectFilter)
     const matchesSection = !sectionFilter || String(student?.section_id || '') === String(sectionFilter) || String(schedule?.section_id || '') === String(sectionFilter)
     const matchesDate = !dateFilter || (row.attendance_date || '').startsWith(dateFilter)
@@ -374,7 +422,7 @@ function renderTeacherAttendance() {
   const pageItems = filtered.slice(startIndex, startIndex + state.rowsPerPage)
 
   if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="5">No attendance records found for your assigned schedules.</td></tr>'
+    tbody.innerHTML = '<tr><td colspan="4">No attendance records found for your assigned schedules.</td></tr>'
     if (paginationContainer) paginationContainer.innerHTML = ''
     return
   }
@@ -544,7 +592,9 @@ async function initTeacherDashboard() {
   state.attendance = await fetchTeacherAttendance(studentIds)
   state.grades = await fetchTeacherGrades(studentIds)
 
+  populateTeacherAttendanceSchedules()
   populateTeacherFilters()
+  renderTeacherAttendanceEntry()
   renderOverview()
   renderTeacherSchedule()
   renderTeacherAttendance()
@@ -562,6 +612,76 @@ async function initTeacherDashboard() {
   document.getElementById('teacherAttendanceDateFilter')?.addEventListener('change', () => {
     state.attendancePage = 1
     renderTeacherAttendance()
+  })
+  document.getElementById('teacherAttendanceSchedule')?.addEventListener('change', renderTeacherAttendanceEntry)
+  document.getElementById('teacherAttendanceForm')?.addEventListener('submit', async event => {
+    event.preventDefault()
+
+    const scheduleId = document.getElementById('teacherAttendanceSchedule')?.value || ''
+    const schedule = byId(state.schedules, scheduleId)
+    if (!schedule || String(schedule.teacher_id) !== String(state.teacher.id)) {
+      showToast('Access denied', 'Select a schedule assigned to your teacher account.', 'error')
+      return
+    }
+
+    const entrySelects = [...document.querySelectorAll('#teacherAttendanceEntryBody [data-attendance-student]')]
+    const entries = entrySelects.map(select => ({
+      student_id: select.dataset.attendanceStudent,
+      status: select.value,
+    }))
+    const allowedStudentIds = new Set(state.students
+      .filter(student => String(student.section_id || '') === String(schedule.section_id || ''))
+      .map(student => String(student.id)))
+
+    if (!entries.length || entries.some(entry => !allowedStudentIds.has(String(entry.student_id)))) {
+      showToast('No students available', 'This schedule has no students assigned to your classes.', 'warning')
+      return
+    }
+    if (entries.some(entry => !['present', 'late', 'absent'].includes(entry.status))) {
+      showToast('Missing attendance status', 'Select Present, Late, or Absent for every student before saving.', 'warning')
+      return
+    }
+
+    const saveButton = document.getElementById('teacherAttendanceSaveButton')
+    if (saveButton) saveButton.disabled = true
+
+    try {
+      const { data, error } = await supabase.rpc('record_teacher_manual_attendance', {
+        p_schedule_id: schedule.id,
+        p_entries: entries,
+      })
+
+      if (error) throw error
+
+      const result = data || {}
+      const recordedCount = Number(result.recorded_count || 0)
+      const duplicateIds = Array.isArray(result.duplicate_student_ids) ? result.duplicate_student_ids : []
+      const duplicateNames = duplicateIds
+        .map(studentId => byId(state.students, studentId)?.name)
+        .filter(Boolean)
+
+      if (recordedCount > 0) {
+        showToast('Attendance saved', `${recordedCount} attendance record${recordedCount === 1 ? '' : 's'} saved successfully.`, 'success')
+      }
+      if (duplicateIds.length > 0) {
+        const duplicateMessage = duplicateNames.length
+          ? `Already recorded for: ${duplicateNames.join(', ')}.`
+          : 'Attendance was already recorded for one or more students on this schedule today.'
+        showToast('Already recorded', duplicateMessage, 'warning')
+      }
+      if (recordedCount === 0 && duplicateIds.length === 0) {
+        showToast('Nothing saved', 'No attendance records were saved.', 'warning')
+      }
+
+      state.attendance = await fetchTeacherAttendance(state.students.map(student => student.id))
+      renderTeacherAttendance()
+      renderOverview()
+    } catch (error) {
+      console.error('Teacher attendance save failed:', error)
+      showToast('Save failed', error.message || 'Could not save attendance. Check your connection and try again.', 'error')
+    } finally {
+      if (saveButton) saveButton.disabled = false
+    }
   })
   document.getElementById('teacherGradeSubject')?.addEventListener('change', () => {
     populateTeacherFilters()

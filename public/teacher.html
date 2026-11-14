@@ -201,6 +201,40 @@
         </section>
 
         <section id="attendanceSection" class="hidden">
+          <div class="panel" style="margin-bottom: 20px;">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">Record Attendance</div>
+                <div class="panel-sub">Record attendance for students in one of your assigned schedules. Philippine date and time are saved automatically.</div>
+              </div>
+            </div>
+            <div class="panel-body">
+              <form id="teacherAttendanceForm">
+                <div class="field" style="max-width: 520px; margin-bottom: 16px;">
+                  <label for="teacherAttendanceSchedule">Schedule</label>
+                  <select id="teacherAttendanceSchedule" class="form-select" required>
+                    <option value="">Select an assigned schedule</option>
+                  </select>
+                </div>
+                <div class="table-wrap">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>Student</th>
+                        <th>Attendance Status</th>
+                      </tr>
+                    </thead>
+                    <tbody id="teacherAttendanceEntryBody">
+                      <tr><td colspan="2">Select a schedule to load its students.</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div style="display: flex; justify-content: flex-end; margin-top: 16px;">
+                  <button type="submit" class="btn btn-primary" id="teacherAttendanceSaveButton">Save Attendance</button>
+                </div>
+              </form>
+            </div>
+          </div>
           <div class="panel">
             <div class="panel-header">
               <div>
@@ -230,7 +264,7 @@
                   </tr>
                 </thead>
                 <tbody id="teacherAttendanceTableBody">
-                  <tr><td colspan="5">Loading attendance…</td></tr>
+                  <tr><td colspan="4">Loading attendance…</td></tr>
                 </tbody>
               </table>
             </div>

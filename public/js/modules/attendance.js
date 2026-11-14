@@ -307,6 +307,13 @@ export async function submitManualEntry() {
 	const status     = val('manualStatus')
 	const date       = val('manualDate') || new Date().toISOString().slice(0,10)
 	const note       = val('manualNote')
+	const time_in    = status.toLowerCase() === 'absent'
+		? null
+		: new Intl.DateTimeFormat('en-US', {
+			timeZone: 'Asia/Manila',
+			hour: 'numeric',
+			minute: '2-digit',
+		}).format(new Date())
 
 	if (!student_id || !status)
 		return showToast('Missing fields', 'Select a student and status', 'warning')
@@ -321,7 +328,7 @@ export async function submitManualEntry() {
 	if (existing) {
 		const { error } = await supabase
 			.from('attendance')
-			.update({ status })
+			.update({ status, time_in })
 			.eq('student_id', student_id)
 			.eq('attendance_date', date)
 		if (error) return showToast('Error', error.message, 'error')
@@ -329,7 +336,7 @@ export async function submitManualEntry() {
 	} else {
 		const { error } = await supabase
 			.from('attendance')
-			.insert([{ student_id, status, attendance_date: date }])
+			.insert([{ student_id, status, attendance_date: date, time_in }])
 		if (error) return showToast('Error', error.message, 'error')
 		showToast('Recorded', 'Attendance entry saved', 'success')
 	}
